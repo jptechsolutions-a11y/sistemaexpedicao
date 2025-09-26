@@ -1,0 +1,807 @@
+/* Variáveis Globais de Cor */
+:root {
+    --primary: #00D4AA;
+    --secondary: #00B4D8;
+    --accent: #0077B6;
+    --dark: #023047;
+    --darker: #011627;
+    --light: #90E0EF;
+    --primary-gradient: linear-gradient(135deg, #00D4AA 0%, #00B4D8 50%, #0077B6 100%);
+    --secondary-gradient: linear-gradient(135deg, #90E0EF 0%, #00D4AA 100%);
+    --accent-gradient: linear-gradient(135deg, #0077B6 0%, #023047 100%);
+}
+
+/* Estilos Base do Corpo */
+body {
+    font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+    background-color: #f4f7fa;
+}
+
+/* Estrutura Principal com Sidebar */
+.sidebar {
+    width: 260px;
+    transition: transform 0.3s ease-in-out;
+    background: var(--darker);
+    color: white;
+    flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        position: fixed;
+        height: 100vh;
+        z-index: 1000;
+    }
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    .main-content {
+        width: 100%;
+    }
+}
+
+.nav-item {
+    transition: all 0.2s ease;
+    color: var(--light);
+}
+.nav-item:hover, .nav-item.active {
+    background-color: rgba(0, 180, 216, 0.2);
+    border-left: 4px solid var(--primary);
+    color: white;
+}
+
+/* Estilos dos Cards de Estatística do Home */
+.stat-card-dash {
+    background: var(--primary-gradient);
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 119, 182, 0.3);
+}
+
+/* Grid do Home */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+/* Ícones de funcionalidades (Emojis) */
+.feature-icon {
+    display: inline-block; width: 16px; height: 16px; margin-right: 8px; font-style: normal;
+    font-weight: 700; color: var(--primary); vertical-align: middle; text-align: center; line-height: 16px;
+}
+.feature-icon.truck::before { content: "🚚"; color: var(--accent); }
+.feature-icon.store::before { content: "🏢"; color: var(--primary); }
+.feature-icon.package::before { content: "📦"; color: var(--primary); }
+.feature-icon.rolltrainer::before { content: "🔄"; color: var(--secondary); }
+.feature-icon.dock::before { content: "⚓"; color: var(--accent); }
+.feature-icon.user::before { content: "👤"; color: var(--dark); }
+.feature-icon.clock::before { content: "⏰"; color: #F77F00; }
+.feature-icon.calendar::before { content: "📅"; color: #F77F00; }
+.feature-icon.note::before { content: "📝"; color: var(--primary); }
+.feature-icon.clipboard::before { content: "📋"; color: #F77F00; }
+.feature-icon.email::before { content: "📧"; color: white; }
+.feature-icon.info::before { content: "ℹ️"; color: var(--primary); }
+.feature-icon.building::before { content: "🏢"; color: var(--primary); }
+.feature-icon.history::before { content: "📜"; color: var(--light); }
+
+/* Estilos da tela de seleção de filial (do código original) */
+.filial-selection-container {
+     background: var(--primary-gradient);
+     min-height: 100vh;
+     padding: 20px;
+     text-align: center;
+}
+.filial-selection {
+    max-width: 900px;
+    margin: auto;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    box-shadow: 0 16px 32px rgba(0, 119, 182, 0.2);
+    padding: 40px 20px;
+    text-align: center;
+}
+.filial-selection h2 {
+    color: var(--dark); font-size: 2rem; margin-bottom: 20px; font-weight: 700;
+}
+.filial-selection p {
+    color: var(--secondary); font-size: 1.1rem; margin-bottom: 40px; line-height: 1.5;
+}
+.filiais-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;
+}
+.filial-card {
+    background: rgba(255, 255, 255, 0.9); border: 2px solid rgba(0, 212, 170, 0.3); border-radius: 16px;
+    padding: 30px; cursor: pointer; transition: all 0.3s ease; text-align: center; position: relative; overflow: hidden;
+}
+.filial-card:hover {
+    transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 12px 30px rgba(0, 212, 170, 0.3);
+}
+.filial-card h3 { color: var(--dark); font-size: 1.4rem; margin-bottom: 10px; font-weight: 700; }
+.filial-card p { color: var(--secondary); font-size: 0.9rem; }
+.filial-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--primary-gradient);
+}
+
+/* Demais estilos adaptados do sistema original */
+.view-content { display: none; }
+.view-content.active { display: block; animation: fadeIn 0.5s; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.form-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 24px; }
+@media (min-width: 768px) { .form-grid { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); } }
+.form-group label { margin-bottom: 6px; font-weight: 600; color: var(--dark); font-size: 0.9rem; }
+.form-group input, .form-group select, .form-group textarea {
+    padding: 12px 16px; border: 2px solid rgba(0, 212, 170, 0.3); border-radius: 8px; font-size: 1rem;
+    background: rgba(255, 255, 255, 0.9); transition: all 0.3s ease;
+}
+.form-group input:focus, .form-group select:focus {
+    outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.1);
+}
+.btn { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; transition: all 0.3s ease; }
+.btn-primary { background: var(--primary-gradient); color: white; }
+.btn-success { background: linear-gradient(135deg, #00D4AA, #00B4D8); color: white; }
+.btn-danger { background: linear-gradient(135deg, #D62828, #F77F00); color: white; }
+.btn-warning { background: linear-gradient(135deg, #F77F00, #FCBF49); color: white; }
+.btn-small { padding: 8px 12px; font-size: 0.85rem; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 119, 182, 0.3); }
+.table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+th { background-color: #f9fafb; font-weight: 600; color: #374151; }
+.status-badge { padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; display: inline-block; text-align: center; }
+.status-carregado { background-color: #d1fae5; color: #065f46; }
+.status-em_carregamento { background-color: #fef3c7; color: #92400e; }
+.status-pendente { background-color: #fee2e2; color: #991b1b; }
+.status-aguardando_faturamento { background-color: #e0e7ff; color: #3730a3; }
+.status-faturamento_iniciado { background-color: #fef3c7; color: #92400e; }
+.status-faturado { background-color: #d1fae5; color: #065f46; }
+.status-saiu_para_entrega { background-color: #cffafe; color: #0e7490; }
+.status-retornando_cd { background-color: #e5e7eb; color: #1f2937; }
+.status-retornando_com_imobilizado { background-color: #dbeafe; color: #1e40af; }
+.status-descarregando_imobilizado { background-color: #fef9c3; color: #854d0e; }
+.status-disponivel { background-color: #d1fae5; color: #065f46; }
+.status-em_viagem { background-color: #fef3c7; color: #92400e; }
+.status-folga { background-color: #e5e7eb; color: #374151; }
+.status-aguardando_agrupamento { background-color: #fae8ff; color: #701a75; }
+.status-aguardando_veiculo { background-color: #e0e7ff; color: #3730a3; }
+.status-entregue { background-color: #f3f4f6; color: #4b5563; }
+.status-cancelado { background-color: #e5e7eb; color: #4b5563; }
+.status-manutencao { background-color: #fde68a; color: #92400e; }
+.status-em_uso { background-color: #fef3c7; color: #92400e; }
+
+
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6);
+    justify-content: center; align-items: center; z-index: 1001; padding: 10px; overflow-y: auto;
+}
+.modal-content {
+    background: white; padding: 24px; border-radius: 12px; max-width: 95vw; width: 500px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); animation: popIn 0.3s ease;
+}
+#editExpeditionModal .modal-content { width: 90vw; max-width: 700px; }
+#addFormModal .modal-content { width: 90vw; max-width: 600px; }
+@keyframes popIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.alert { padding: 12px 16px; margin: 16px 0; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
+.alert-success { background: rgba(0, 212, 170, 0.1); color: var(--secondary); border: 1px solid var(--primary); }
+.alert-error { background: rgba(214, 40, 40, 0.1); color: #D62828; border: 1px solid #F77F00; }
+
+/* Estilos dos cards, tabelas e outros componentes do sistema original */
+.sub-tabs { display: flex; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; }
+.sub-tab { padding: 10px 20px; cursor: pointer; color: #6b7280; border: none; background: none; font-size: 1rem; font-weight: 600; transition: all 0.3s ease; }
+.sub-tab.active { color: var(--dark); border-bottom: 3px solid var(--primary); }
+.sub-tab-content { display: none; }
+.sub-tab-content.active { display: block; }
+
+/* ESTILOS ADICIONADOS */
+.transport-card, .faturamento-card, .motorista-card, .historico-card {
+    background: white; padding: 20px; border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 119, 182, 0.1); margin-bottom: 20px;
+}
+ .availability-info {
+    display: flex; justify-content: center; gap: 20px; background: rgba(240, 249, 255, 1);
+    padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid rgba(0, 180, 216, 0.2);
+}
+.availability-stat { text-align: center; }
+.availability-stat .stat-number { font-size: 1.5rem; font-weight: 700; color: var(--dark); }
+.availability-stat .stat-label { font-size: 0.85rem; color: var(--secondary); }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: var(--primary-gradient); color: white; padding: 15px; border-radius: 12px; text-align: center; }
+.stat-number { font-size: 1.8rem; font-weight: 700; margin-bottom: 4px; }
+.stat-label { font-size: 0.8rem; opacity: 0.9; }
+.loading { text-align: center; padding: 40px 20px; color: var(--secondary); }
+.spinner { border: 3px solid rgba(0, 212, 170, 0.1); border-top: 3px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.form-group.selected { background: rgba(144, 224, 239, 0.4) !important; border: 2px solid var(--primary); transform: scale(1.02); box-shadow: 0 4px 15px rgba(0, 119, 182, 0.15); }
+#cargasDisponiveisList .form-group { transition: all 0.2s ease-in-out; }
+.veiculo-option.incapacitated { background-color: #fee2e2 !important; color: #991b1b !important; font-weight: 700; }
+.time-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.time-stat-card { background: linear-gradient(135deg, #7209B7, #A663CC); color: white; padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 6px 20px rgba(114, 9, 183, 0.2); }
+.time-stat-card .stat-number { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
+.time-stat-card .stat-label { font-size: 0.75rem; opacity: 0.95; font-weight: 500; line-height: 1.2; }
+.time-display { background: rgba(240, 249, 255, 1); padding: 8px 12px; border-radius: 6px; margin: 6px 0; font-size: 0.8rem; font-weight: 600; color: var(--dark); border-left: 3px solid var(--primary); }
+.motorista-status-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; margin-bottom: 8px; border-radius: 8px; background: #fff; border: 1px solid #e5e7eb; }
+.loja-descarga-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+.filters-section { background: rgba(240, 249, 255, 1); padding: 16px; border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(0, 180, 216, 0.2); }
+.filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.progress-container { width: 100%; background-color: #e5e7eb; border-radius: 9999px; overflow: hidden; height: 1.25rem; }
+.progress-bar { height: 100%; border-radius: 9999px; transition: width 0.4s ease-in-out; text-align: center; color: white; font-size: 0.75rem; font-weight: 600; line-height: 1.25rem; }
+.progress-green { background-color: #10b981; }
+.progress-orange { background-color: #f59e0b; }
+.progress-red { background-color: #ef4444; }
+
+/* NOVO: Estilos para o sistema de notificação */
+#notificationContainer {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 2000;
+}
+
+.notification {
+    width: 300px;
+    background: #fff;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    animation: slideIn 0.5s forwards;
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes slideIn {
+    to { transform: translateX(0); }
+}
+
+.notification.hide {
+    animation: slideOut 0.5s forwards;
+}
+
+@keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+.notification.success { border-left: 4px solid var(--primary); }
+.notification.error { border-left: 4px solid #D62828; }
+.notification.info { border-left: 4px solid var(--accent); }
+
+.notification-header {
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+}
+
+.notification.success .notification-header { color: var(--primary); }
+.notification.error .notification-header { color: #D62828; }
+.notification.info .notification-header { color: var(--accent); }
+
+.notification-body { font-size: 0.9rem; color: #555; }
+/* Estilos para rastreio em tempo real */
+.tracking-card {
+    background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #3b82f6; transition: all 0.3s ease; padding: 1.5rem;
+}
+/* Adicionar no final do CSS existente */
+.custom-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.leaflet-popup-content {
+    margin: 8px 12px !important;
+    line-height: 1.4 !important;
+}
+
+#map {
+    z-index: 1;
+}
+
+.modal-overlay {
+    z-index: 1001;
+}
+.tracking-card.in-transit { border-left-color: #3b82f6; }
+.tracking-card.unloading { border-left-color: #f59e0b; }
+.tracking-card.returning { border-left-color: #10b981; }
+.status-indicator {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 600;
+}
+.status-indicator.transit { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+.status-indicator.unloading { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.status-indicator.returning { background-color: rgba(16, 185, 129, 0.1); color: #10b981; }
+.pulse-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite; }
+.pulse-dot.blue { background-color: #3b82f6; }
+.pulse-dot.orange { background-color: #f59e0b; }
+.pulse-dot.green { background-color: #10b981; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.route-item { display: flex; align-items: center; padding: 0.5rem; border-radius: 0.5rem; transition: background-color 0.2s; }
+.route-item:hover { background-color: #f9fafb; }
+.route-item.completed { background-color: #ecfdf5; }
+.route-item.current { background-color: #fef3c7; }
+.gps-coords { font-family: 'Courier New', monospace; font-size: 0.75rem; color: #6b7280; }
+
+/* Estilos para proximidade de pontos */
+.proximity-alert {
+    background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 8px 0;
+    animation: proximityPulse 2s infinite;
+}
+
+@keyframes proximityPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
+.proximity-icon {
+    display: inline-block;
+    margin-right: 8px;
+    animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-4px); }
+    60% { transform: translateY(-2px); }
+}
+/* Estilos para o modal de detalhes */
+#detalhesExpedicaoModal .modal-content {
+    background: white;
+    border-radius: 8px;
+}
+
+/* Estilos para a planilha de controle */
+.planilha-controle {
+    border: 2px solid #333;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    width: 100%;
+    margin: 10px 0;
+    background: white;
+}
+
+.planilha-header {
+    background-color: #4a90e2;
+    color: white;
+    text-align: center;
+    font-weight: bold;
+    padding: 10px;
+    border-bottom: 2px solid #333;
+    font-size: 16px;
+}
+
+.planilha-row {
+    display: flex;
+    align-items: center;
+}
+
+.planilha-cell {
+    border: 1px solid #666;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    font-weight: bold;
+    color: #333;
+    text-align: right;
+}
+
+.planilha-value {
+    border: 1px solid #666;
+    padding: 8px 12px;
+    background: white;
+    flex: 1;
+    color: #000;
+    font-weight: 500;
+}
+.horario-cell {
+    border: 1px solid #000;
+    padding: 8px;
+    text-align: center;
+    background: #d9d9d9;
+    font-weight: bold;
+}
+
+.horario-value {
+    border: 1px solid #000;
+    padding: 8px;
+    text-align: center;
+    background: white;
+}
+
+.loja-section {
+    margin-bottom: 20px;
+    border: 2px solid #000;
+    padding: 10px;
+}
+
+/* Estilos para impressão */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .modal-overlay {
+        position: static !important;
+        background: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .modal-content {
+        box-shadow: none !important;
+        border: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    
+    /* Configurações da página */
+    @page {
+        size: A4;
+        margin: 1cm;
+    }
+    
+    /* Cada planilha deve ocupar exatamente uma página */
+    .planilha-controle {
+        page-break-inside: avoid;
+        page-break-after: always;
+        font-size: 12px;
+        width: 100%;
+        height: auto;
+        margin: 0 !important;
+        padding: 0;
+        border: 2px solid #333;
+        box-sizing: border-box;
+    }
+    
+    /* A última planilha não deve quebrar página depois */
+    .planilha-controle:last-child {
+        page-break-after: avoid;
+    }
+    
+    /* Remover quebras de página manuais na impressão */
+    div[style*="page-break-before: always"] {
+        page-break-before: always;
+        height: 0;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Otimizar espaçamentos para impressão */
+    .planilha-header {
+        padding: 8px !important;
+        font-size: 14px !important;
+        margin: 0 !important;
+    }
+    
+    .planilha-row {
+        margin-bottom: 4px !important;
+    }
+    
+    .planilha-cell, .planilha-value {
+        padding: 6px 8px !important;
+        font-size: 11px !important;
+        line-height: 1.2;
+    }
+    
+    /* Ajustar grid para impressão */
+    div[style*="grid-template-columns: 1fr 1fr"] {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px !important;
+        margin: 10px 0 !important;
+    }
+    
+    /* Remover margens desnecessárias */
+    div[style*="margin-top: 20px"] {
+        margin-top: 10px !important;
+    }
+    
+    div[style*="margin-bottom: 30px"] {
+        margin-bottom: 0 !important;
+    }
+    
+    body * {
+        visibility: hidden;
+    }
+    
+    #detalhesExpedicaoModal, #detalhesExpedicaoModal * {
+        visibility: visible;
+    }
+    
+    #detalhesExpedicaoModal {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+}
+/* Estilos para o mapa da home */
+#homeMap {
+    border: 2px solid rgba(0, 180, 216, 0.2);
+    transition: all 0.3s ease;
+}
+
+#homeMap:hover {
+    border-color: var(--primary);
+}
+
+#homeMapControls {
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(0, 180, 216, 0.2);
+}
+
+/* Melhorar legibilidade dos marcadores */
+.leaflet-marker-icon {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+/* Estilo para popups */
+.leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.leaflet-popup-content {
+    font-family: 'Inter', sans-serif !important;
+}
+
+/* NOVO: Estilos para a lista de ordenação de carregamento */
+#ordemLojasList li {
+    padding: 12px;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: move;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background-color 0.2s, opacity 0.2s;
+}
+#ordemLojasList li:hover {
+    background-color: #f3f4f6;
+}
+#ordemLojasList li.dragging {
+    opacity: 0.5;
+    background: #dbeafe; /* Azul claro para indicar que está sendo arrastado */
+}
+#ordemLojasList .drag-handle {
+    color: #9ca3af;
+}
+/* Estilos para impressão de identificação */
+.identificacao-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    transition: all 0.2s ease;
+}
+
+.identificacao-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(0, 180, 216, 0.15);
+}
+
+.print-identification {
+    display: none;
+}
+
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 0;
+        padding: 0;
+    }
+    
+    * {
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        -webkit-print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+    
+    html, body {
+        width: 297mm !important;
+        height: 210mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+    
+    body * {
+        visibility: hidden !important;
+    }
+    
+    .print-identification,
+    .print-identification *,
+    .etiqueta-page,
+    .etiqueta-page *,
+    .etiqueta-container,
+    .etiqueta-container *,
+    .etiqueta-quadro,
+    .etiqueta-quadro * {
+        visibility: visible !important;
+    }
+    
+    .print-identification {
+        display: block !important;
+        position: relative !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        z-index: 9999 !important;
+    }
+    
+    .etiqueta-page {
+        width: 297mm !important;
+        height: 210mm !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        position: relative !important;
+        box-sizing: border-box !important;
+        page-break-after: always !important;
+        page-break-inside: avoid !important;
+        break-after: page !important;
+        break-inside: avoid !important;
+    }
+    
+    .etiqueta-page:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+    }
+    
+    .etiqueta-container {
+        text-align: center !important;
+        font-family: Arial, sans-serif !important;
+        width: 100% !important;
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+        padding: 10mm !important;
+        box-sizing: border-box !important;
+    }
+    
+    .etiqueta-quadro {
+        border: 10px solid #000 !important;
+        padding: 30mm 25mm !important;
+        background: white !important;
+        width: 100% !important;
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 20px !important;
+        box-shadow: inset 0 0 0 5px #333 !important;
+        box-sizing: border-box !important;
+    }
+    
+    .etiqueta-numero {
+        font-size: 120px !important;
+        font-weight: 900 !important;
+        color: #000 !important;
+        margin: 0 !important;
+        line-height: 0.9 !important;
+        letter-spacing: 4px !important;
+        text-transform: uppercase !important;
+    }
+    
+    .etiqueta-info {
+        font-size: 48px !important;
+        font-weight: 700 !important;
+        color: #333 !important;
+        margin: 0 !important;
+        line-height: 1.1 !important;
+        letter-spacing: 3px !important;
+        text-transform: uppercase !important;
+    }
+    
+    .etiqueta-data {
+        font-size: 60px !important;
+        font-weight: 700 !important;
+        color: #000 !important;
+        margin: 0 !important;
+        line-height: 1 !important;
+        letter-spacing: 3px !important;
+    }
+    
+    .etiqueta-contador {
+        font-size: 90px !important;
+        font-weight: 900 !important;
+        color: #000 !important;
+        border: 8px solid #000 !important;
+        padding: 25px 50px !important;
+        margin: 0 !important;
+        line-height: 1 !important;
+        display: inline-block !important;
+        border-radius: 15px !important;
+        background: #f0f0f0 !important;
+        letter-spacing: 4px !important;
+        box-shadow: inset 0 0 0 3px #666 !important;
+    }
+    
+    .etiqueta-lojas {
+        font-size: 42px !important;
+        font-weight: 700 !important;
+        color: #000 !important;
+        margin: 0 !important;
+        line-height: 1.2 !important;
+        text-align: center !important;
+        max-width: 100% !important;
+        word-wrap: break-word !important;
+        text-transform: uppercase !important;
+        letter-spacing: 2px !important;
+    }
+    
+    .etiqueta-divider {
+        width: 90% !important;
+        height: 2px !important;
+        background: linear-gradient(to right, transparent, #ddd 20%, #999 50%, #ddd 80%, transparent) !important;
+        margin: 25px auto !important;
+        border-radius: 1px !important;
+        opacity: 0.7 !important;
+    }
+}
+/* Estilos da nova tela de login */
+.auth-container {
+    background: var(--primary-gradient);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+}
+.auth-card {
+    max-width: 450px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    box-shadow: 0 16px 32px rgba(0, 119, 182, 0.2);
+    padding: 40px 20px;
+}
+.auth-header img {
+    display: inline-block;
+}
+.auth-header h2 {
+    color: var(--dark);
+    font-size: 2rem;
+    margin-bottom: 5px;
+    font-weight: 700;
+}
+.auth-header p {
+    color: var(--secondary);
+    font-size: 1.1rem;
+    margin-bottom: 30px;
+}
+.auth-form .form-group {
+    text-align: left;
+}
+.auth-form input {
+    width: 100%;
+    margin-top: 5px;
+}
