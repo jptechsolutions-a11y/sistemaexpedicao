@@ -8339,7 +8339,7 @@ function renderIdentificacaoExpedicoes(expeditions) {
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
-                    <div><strong>Líder:</strong> ${exp.lider_nome}</div>
+                    <div><strong>Conferente:</strong> ${exp.lider_nome}</div>
                     <div><strong>Veículo:</strong> ${exp.veiculo_placa}</div>
                     <div><strong>Motorista:</strong> ${exp.motorista_nome}</div>
                     <div><strong>Total Itens:</strong> ${totalItens}</div>
@@ -9452,7 +9452,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                                 <hr class="etiqueta-divider">
                                 <div class="etiqueta-contador">${String(i).padStart(2, '0')}/${String(totalItensLoja).padStart(2, '0')}</div>
                                 <hr class="etiqueta-divider">
-                                <div class="etiqueta-lojas">LÍDER: ${liderNome}</div>
+                                <div class="etiqueta-lojas">Conferente: ${liderNome}</div>
                                 <hr class="etiqueta-divider">
                                 <div class="etiqueta-info">CD ${filial.nome} - ${filial.descricao}</div>
                                 <div class="text-xs text-gray-500 mt-4">Carga: ${numeroCarga} | Expedição: ${expeditionId} | Data: ${dataFormatada}</div>
