@@ -24,6 +24,9 @@ body {
     background: var(--darker);
     color: white;
     flex-shrink: 0;
+    /* CORREÇÃO: Garante que o sidebar tenha altura total e scroll, se necessário */
+    height: 100vh; 
+    overflow-y: auto;
 }
 
 @media (max-width: 768px) {
@@ -114,16 +117,44 @@ body {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;
 }
 .filial-card {
-    background: rgba(255, 255, 255, 0.9); border: 2px solid rgba(0, 212, 170, 0.3); border-radius: 16px;
-    padding: 30px; cursor: pointer; transition: all 0.3s ease; text-align: center; position: relative; overflow: hidden;
+    /* Novo estilo profissional e clean */
+    background: white; 
+    border: 1px solid #eee; /* Borda mais suave */
+    border-radius: 12px;
+    padding: 30px; 
+    cursor: pointer; 
+    transition: all 0.3s ease; 
+    text-align: center; 
+    position: relative; 
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); /* Sombra suave */
 }
 .filial-card:hover {
-    transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 12px 30px rgba(0, 212, 170, 0.3);
+    transform: translateY(-3px); 
+    border-color: var(--primary); 
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2); /* Sombra mais destacada no hover */
 }
-.filial-card h3 { color: var(--dark); font-size: 1.4rem; margin-bottom: 10px; font-weight: 700; }
-.filial-card p { color: var(--secondary); font-size: 0.9rem; }
+.filial-card h3 { 
+    color: var(--dark); 
+    font-size: 1.6rem; /* Aumentado o tamanho do código da filial */
+    margin-bottom: 5px; 
+    font-weight: 800; 
+}
+.filial-card p { 
+    color: #888; /* Cor mais neutra para a descrição */
+    font-size: 1rem; 
+    font-weight: 500;
+}
+
 .filial-card::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--primary-gradient);
+    content: ''; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    height: 4px; 
+    background: var(--primary); /* Cor primária sólida no topo */
+    border-radius: 12px 12px 0 0;
 }
 
 /* Demais estilos adaptados do sistema original */
@@ -172,7 +203,10 @@ th { background-color: #f9fafb; font-weight: 600; color: #374151; }
 .status-cancelado { background-color: #e5e7eb; color: #4b5563; }
 .status-manutencao { background-color: #fde68a; color: #92400e; }
 .status-em_uso { background-color: #fef3c7; color: #92400e; }
-
+.status-aguardando_faturamento { background-color: #e0e7ff; color: #3730a3; }
+.status-faturamento_iniciado { background-color: #fef3c7; color: #92400e; }
+.status-em_carregamento_faturando { background-color: #fef3c7; color: #92400e; } 
+.status-faturado { background-color: #d1fae5; color: #065f46; }
 
 .modal-overlay {
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6);
@@ -804,4 +838,295 @@ th { background-color: #f9fafb; font-weight: 600; color: #374151; }
 .auth-form input {
     width: 100%;
     margin-top: 5px;
+}
+
+/* NO ARQUIVO: genteegestapojp/teste/TESTE-SA/style.css */
+
+/* Estilo para a placa destacada */
+.placa-animada {
+    /* REMOVER ANIMAÇÃO DE PULSO E GRADIENTE DE FUNDO */
+    background: #0077B6; /* Cor sólida principal */
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-left: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Sombra mais suave */
+    display: inline-block;
+    /* REMOVIDO: animation: pulsePlaca 1.5s infinite; */ 
+}
+
+@keyframes pulsePlaca {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.02); opacity: 0.9; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Garantir que os gráficos ocupem todo o espaço disponível */
+#frotaProdutividadeChart,
+#lojaDesempenhoChart,
+#ocupacaoTotalChart,
+#fleetUtilizationChart {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Container dos gráficos com altura fixa */
+.relative[style*="height"] canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Força o Chart.js a respeitar o tamanho do container */
+.chartjs-render-monitor {
+    animation: chartFadeIn 0.3s ease-in-out;
+}
+
+@keyframes chartFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
+/* Correção específica para o gráfico de ranking de motoristas */
+#frotaProdutividadeChart {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+}
+
+/* Remove qualquer padding ou margin indesejada do canvas */
+canvas#frotaProdutividadeChart {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Força o container a manter a altura */
+.relative[style*="height: 350px"] {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Remove tooltips duplicados do ChartDataLabels */
+.chartjs-render-monitor {
+    position: relative !important;
+}
+
+/* Estilo para o card do gráfico */
+.bg-white.rounded-xl.shadow-md.p-6 {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 119, 182, 0.1);
+}
+
+/* Otimização do gráfico de ranking de motoristas */
+#motoristasRankingChart {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 350px;
+}
+
+/* Container do gráfico de ranking */
+.relative[style*="height: 350px"] {
+    position: relative;
+    overflow: visible !important;
+    min-height: 350px;
+}
+
+/* Força o canvas a ocupar todo o espaço */
+canvas#motoristasRankingChart {
+    display: block !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+}
+
+/* Remove scroll indesejado */
+.bg-white.p-4.rounded-lg.shadow-md {
+    overflow: visible !important;
+}
+
+/* Esconder painel de instruções do Leaflet Routing */
+.leaflet-routing-container {
+    display: none !important;
+}
+
+.leaflet-routing-alt {
+    display: none !important;
+}
+
+/* Estilo para linha de fallback */
+.leaflet-interactive[stroke-dasharray] {
+    animation: dashAnimation 1s linear infinite;
+}
+
+@keyframes dashAnimation {
+    to {
+        stroke-dashoffset: -20;
+    }
+}
+
+/* Painel de estatísticas customizado */
+.leaflet-control.leaflet-bar {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    border-radius: 8px !important;
+}
+/* ========================================
+   ANIMAÇÃO DA PLACA - STATUS DA FROTA
+   ======================================== */
+
+/* ========================================
+   NOVO ESTILO DA PLACA - SUTIL E PROFISSIONAL
+   ======================================== */
+
+/* Estilo base da placa sutil */
+.placa-destaque {
+    /* Manter um gradiente estático para cor, mas sem animação */
+    background: linear-gradient(135deg, #0077B6, #00D4AA);
+    color: white;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 1px; /* Letra mais próxima para mais profissionalismo */
+    margin-left: 10px;
+    display: inline-block;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Sombra suave */
+    border: 1px solid rgba(255, 255, 255, 0.5); /* Borda sutil */
+    position: relative;
+    overflow: hidden;
+    /* REMOVIDO: ANIMAÇÕES */
+    transition: all 0.2s ease-in-out; /* Adiciona transição para o hover */
+}
+
+/* REMOVIDO: @keyframes gradientShift { ... } */
+/* REMOVIDO: @keyframes pulseGlow { ... } */
+/* REMOVIDO: @keyframes bounce { ... } */
+
+/* REMOVIDO: Efeito de brilho deslizante (::before) */
+.placa-destaque::before {
+    content: none !important;
+}
+
+/* Hover para um destaque leve (sem animação forçada) */
+.placa-destaque:hover {
+    animation: none;
+    transform: scale(1.02); /* Escala suave */
+    box-shadow: 0 6px 15px rgba(0, 119, 182, 0.3);
+    cursor: default; /* Remove o 'pointer' se não for clicável */
+}
+
+/* Variação de cor baseada no status do veículo */
+.placa-destaque.em-viagem {
+    background: linear-gradient(135deg, #F59E0B, #FCBF49);
+    box-shadow: 0 4px 10px rgba(245, 158, 11, 0.2);
+}
+
+.placa-destaque.em-viagem:hover {
+    box-shadow: 0 6px 15px rgba(245, 158, 11, 0.4);
+}
+
+.placa-destaque.retornando {
+    background: linear-gradient(135deg, #10B981, #00D4AA);
+    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+}
+
+.placa-destaque.retornando:hover {
+    box-shadow: 0 6px 15px rgba(16, 185, 129, 0.4);
+}
+
+.placa-destaque.disponivel {
+    background: linear-gradient(135deg, #6B7280, #9CA3AF);
+    box-shadow: 0 4px 10px rgba(107, 114, 128, 0.1);
+    animation: none; /* Desativa a animação gentlePulse */
+}
+
+/* Badge de destaque adicional (opcional) */
+.placa-destaque::after {
+    /* REMOVIDO o after que continha o emoji de caminhão e a animação de rotação */
+    content: none !important;
+}
+
+/* REMOVIDO: @keyframes rotate { ... } */
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .placa-destaque {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        margin-left: 6px;
+    }
+}
+
+/* Adicionar no final do CSS existente para forçar o alinhamento */
+/* NOVO: Estilo para cartões de tempo no histórico */
+.historico-time-card {
+    /* Garante que o cartão ocupe o espaço e não se sobreponha */
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.historico-time-card .time-stat-card {
+    /* Garante que o cartão interno preencha o espaço restante */
+    flex-grow: 1; 
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Ajusta o grid para 4 colunas em telas grandes */
+@media (min-width: 1024px) {
+    /* 5 Colunas para os Tempos Operacionais */
+    #indicadoresTimeSummary {
+        grid-template-columns: repeat(5, 1fr) !important;
+    }
+    /* 6 Colunas para Volume e Eficiência */
+    #indicadoresVolumeStats {
+        grid-template-columns: repeat(6, 1fr) !important;
+    }
+}
+/* CORREÇÃO GERAL DE CHART: Adiciona padding para evitar que os datalabels sejam cortados */
+.bg-white.p-4.rounded-lg.shadow-md {
+    padding: 20px !important; /* Aumenta o padding do container do gráfico */
+}
+/* Adicionar no final do CSS existente para forçar o alinhamento */
+/* NOVO: Estilo para cartões de tempo no histórico */
+.historico-time-card {
+    /* Garante que o cartão ocupe o espaço e não se sobreponha */
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.historico-time-card .time-stat-card {
+    /* Garante que o cartão interno preencha o espaço restante */
+    flex-grow: 1; 
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Ajusta o grid para 4 colunas em telas grandes */
+@media (min-width: 1024px) {
+    /* 5 Colunas para os Tempos Operacionais */
+    #indicadoresTimeSummary {
+        grid-template-columns: repeat(5, 1fr) !important;
+    }
+    /* 6 Colunas para Volume e Eficiência */
+    #indicadoresVolumeStats {
+        grid-template-columns: repeat(6, 1fr) !important;
+    }
+}
+/* CORREÇÃO GERAL DE CHART: Adiciona padding para evitar que os datalabels sejam cortados */
+.bg-white.p-4.rounded-lg.shadow-md {
+    padding: 20px !important; /* Aumenta o padding do container do gráfico */
 }
