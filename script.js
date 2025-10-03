@@ -567,7 +567,7 @@ async function loadAllTabData() {
                 <small class="text-gray-500">Deixe em branco se não houver números específicos</small>
             </div>
             <div class="form-group md:col-span-2">
-                 <label for="lancar_liderSelect">Líder Responsável:</label>
+                 <label for="lancar_liderSelect">Conferente:</label>
                  <select id="lancar_liderSelect" required></select>
             </div>
             <div class="form-group md:col-span-2">
