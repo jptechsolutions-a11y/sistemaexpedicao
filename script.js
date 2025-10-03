@@ -1417,7 +1417,7 @@ async function loadAllTabData() {
     ['lancar_liderSelect', 'dashboardLiderSelect'].forEach(id => {
         const liderSelect = document.getElementById(id);
         if (liderSelect) {
-            liderSelect.innerHTML = '<option value="">Selecione o líder</option>';
+            liderSelect.innerHTML = '<option value="">Selecione o Conferente</option>';
             lideres.forEach(lider => {
                 liderSelect.innerHTML += `<option value="${lider.id}">${lider.nome}</option>`;
             });
