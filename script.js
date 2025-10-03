@@ -5590,7 +5590,7 @@ function populateEditSelects() {
 
     // Líderes
     const liderSelect = document.getElementById('editLider');
-    liderSelect.innerHTML = '<option value="">Selecione o líder</option>';
+    liderSelect.innerHTML = '<option value="">Selecione o Conferente</option>';
     lideres.forEach(l => {
         liderSelect.innerHTML += `<option value="${l.id}">${l.nome}</option>`;
     });
@@ -6266,10 +6266,10 @@ async function saveLider() {
         delete data.codigo_funcionario; 
         
         await supabaseRequest(`lideres?id=eq.${liderId}`, 'PATCH', data);
-        showNotification('Líder atualizado com sucesso!', 'success');
+        showNotification('atualizado com sucesso!', 'success');
     } else {
         await supabaseRequest('lideres', 'POST', data);
-        showNotification('Líder cadastrado com sucesso!', 'success');
+        showNotification('cadastrado com sucesso!', 'success');
     }
     await loadSelectData();
     renderLideresConfig();
@@ -7377,7 +7377,7 @@ async function deleteDoca(docaId) {
 async function editLider(liderId) {
     const lider = lideres.find(l => l.id === liderId);
     if (!lider) {
-        showNotification('Líder não encontrado', 'error');
+        showNotification('não encontrado', 'error');
         return;
     }
     
@@ -7401,7 +7401,7 @@ async function deleteLider(liderId) {
     if (confirmed) {
         try {
             await supabaseRequest(`lideres?id=eq.${liderId}`, 'DELETE');
-            showNotification('Líder excluído com sucesso!', 'success');
+            showNotification('excluído com sucesso!', 'success');
             await loadSelectData();
             renderLideresConfig();
         } catch (error) {
