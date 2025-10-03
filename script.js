@@ -1,10 +1,5 @@
- // --- INÍCIO DO SCRIPT ADAPTADO ---
-        Chart.register(ChartDataLabels);
-        // API REST do Supabase e Headers (do sistema original)
-        const SUPABASE_URL = 'https://owsoweqqttcmuuaohxke.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93c293ZXFxdHRjbXV1YW9oeGtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMjQ5OTAsImV4cCI6MjA3MTgwMDk5MH0.Iee27SUOIkhMFvgDWXrW3C38DUuMr0MyVtR-NjF6FRk';
-        const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' };
-
+ Chart.register(ChartDataLabels);
+      
         // Variáveis globais (do sistema original)
         let lojas = [], docas = [], lideres = [], veiculos = [], motoristas = [], filiais = [];
         let selectedFilial = null;
@@ -26,49 +21,288 @@ let homeMapTimer = null;
 // Variáveis e lógicas de permissão (ADICIONADO)
 let userPermissions = [];
 let masterUserPermission = false;
+let gruposAcesso = [];
+
+
+// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
+
+// SUBSTITUIR A VERSÃO EXISTENTE DE loadUserPermissions
+async function loadUserPermissions(userId, grupoId) {
+    masterUserPermission = false;
+    let finalPermissionsSet = new Set();
+    
+    // 1. CHECAGEM DE GRUPO E CARREGAMENTO DE PERMISSÕES
+    if (grupoId) {
+         try {
+             // Carrega o nome do grupo e todas as permissões do grupo em paralelo
+             // O último 'false' garante que o filtro de filial NÃO seja aplicado (Correto para permissões)
+             const [grupo, permissoesGrupo] = await Promise.all([
+                 supabaseRequest(`grupos_acesso?id=eq.${grupoId}&select=nome`, 'GET', null, false),
+                 supabaseRequest(`permissoes_grupo?grupo_id=eq.${grupoId}&select=permissao`, 'GET', null, false)
+             ]);
+             
+             // LOG PARA DIAGNÓSTICO
+             console.log("Permissões do Grupo lidas do BD (Bruto):", permissoesGrupo);
+
+             // MASTER BYPASS: Se for MASTER, define o bypass e retorna
+             if (grupo && grupo.length > 0 && grupo[0].nome === 'MASTER') {
+                 masterUserPermission = true;
+                 // Adiciona um conjunto básico de permissões para garantir o fluxo de UI
+                 userPermissions = ['gerenciar_permissoes', 'acesso_configuracoes', 'acesso_configuracoes_acessos', 'acesso_home'];
+                 const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
+                 todasFiliais.forEach(f => userPermissions.push(`acesso_filial_${f.nome}`));
+                 return; 
+             }
+
+             // CARREGA PERMISSÕES DE GRUPOS NORMAIS E SANEIA
+             if (permissoesGrupo && Array.isArray(permissoesGrupo)) {
+                 // Saneamento: remove espaços e transforma em minúsculas
+                 permissoesGrupo.forEach(p => finalPermissionsSet.add(p.permissao.trim().toLowerCase()));
+             }
+         } catch (e) {
+             console.error("ERRO CRÍTICO: Falha ao carregar permissoes_grupo ou grupo_acesso. Possível falha de RLS.", e);
+         }
+    }
+    
+    // 🚨 FIX CRÍTICO: Adiciona acesso_home implicitamente para garantir a navegação.
+    // O problema da tela vazia é resolvido por esta injeção.
+    if (!masterUserPermission) {
+        finalPermissionsSet.add('acesso_home');
+    }
+    
+    // 2. IMPLICAR PERMISSÕES PAI A PARTIR DE SUB-PERMISSÕES
+    // Garante que se tem 'acesso_faturamento_ativo', também terá 'acesso_faturamento'.
+    const explicitPermissions = Array.from(finalPermissionsSet);
+    explicitPermissions.forEach(p => {
+        const parts = p.split('_');
+        if (parts.length > 2 && parts[0] === 'acesso') {
+            finalPermissionsSet.add(`${parts[0]}_${parts[1]}`);
+        }
+    });
+
+    // 3. Checagem do Master por Permissão
+    if (finalPermissionsSet.has('gerenciar_permissoes')) {
+         masterUserPermission = true;
+         try {
+             const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
+             todasFiliais.forEach(f => finalPermissionsSet.add(`acesso_filial_${f.nome}`));
+         } catch (e) {
+             console.error("ERRO MASTER: Falha ao adicionar filiais.", e);
+         }
+    }
+    
+    userPermissions = Array.from(finalPermissionsSet);
+    
+    // LOG FINAL
+    console.log("Permissões FINAIS (Saneadas e Implícitas):", userPermissions);
+}
 
 function hasPermission(permission) {
-    // Se for usuário master, sempre retorna true.
     if (masterUserPermission) {
         return true;
     }
-    // Caso contrário, verifica se a permissão existe no array do usuário.
-    return userPermissions.includes(permission);
+    
+    // 🚨 FIX CRÍTICO: Garante que a permissão procurada está sempre saneada.
+    const requiredPermission = permission.trim().toLowerCase();
+    
+    // O array userPermissions já é populado com .trim().toLowerCase() na loadUserPermissions
+    return userPermissions.includes(requiredPermission);
 }
-        // Função de requisição ao Supabase (do sistema original, adaptada)
-        async function supabaseRequest(endpoint, method = 'GET', data = null, includeFilialFilter = true) {
-            let url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
-            if (includeFilialFilter && selectedFilial && method === 'GET') {
-                const separator = url.includes('?') ? '&' : '?';
-                url += `${separator}filial=eq.${selectedFilial.nome}`;
+
+// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
+
+async function supabaseRequest(endpoint, method = 'GET', data = null, includeFilialFilter = true, upsert = false) {
+    
+    // Separa o endpoint base dos filtros existentes
+    const [nomeEndpointBase, filtrosExistentes] = endpoint.split('?', 2);
+    
+    // Constrói a URL começando com o proxy e o endpoint base
+    let url = `${SUPABASE_PROXY_URL}?endpoint=${nomeEndpointBase}`; 
+    
+    // 🚨 CORREÇÃO CRÍTICA APLICADA NOVAMENTE: 
+    // Adiciona flag de upsert. Esta é uma QUERY PARAMETER do PROXY, não um filtro do Supabase.
+    if (method === 'POST' && upsert) {
+        url += '&upsert=true';
+    }
+    
+    // Adiciona filtros existentes se houver
+    if (filtrosExistentes) {
+        url += `&${filtrosExistentes}`;
+    }
+    
+    // 🚨 CORREÇÃO CRÍTICA: expedition_items TEM campo filial mas é preenchido via trigger 🚨
+    const tablesWithoutFilialField = [
+        'acessos',
+        'grupos_acesso', 
+        'permissoes_grupo',
+        'permissoes_sistema',
+        'gps_tracking',
+        'veiculos_status_historico',
+        'pontos_interesse',
+        'filiais'
+    ];
+    
+    // Tabelas que têm campo filial mas não devem receber no payload (trigger cuida)
+    const tablesWithTriggerFilial = [
+        'expedition_items' // Tem trigger que preenche automaticamente
+    ];
+    
+    // 🚨 FILTRO DE FILIAL EM GET (LEITURA) 🚨
+    if (includeFilialFilter && selectedFilial && method === 'GET' && 
+        !tablesWithoutFilialField.includes(nomeEndpointBase) && 
+        !tablesWithTriggerFilial.includes(nomeEndpointBase)) {
+        url += `&filial=eq.${selectedFilial.nome}`;
+    }
+    
+    // Configura as opções da requisição
+    const options = { 
+        method, 
+        headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        } 
+    }; 
+    
+    // 🚨 PROCESSAMENTO DO PAYLOAD - NÃO ENVIAR FILIAL PARA expedition_items 🚨
+    if (data && (method === 'POST' || method === 'PATCH' || method === 'PUT')) { 
+        let payload = data;
+        
+        // Para expedition_items, NUNCA envia o campo filial (o trigger cuida)
+        if (nomeEndpointBase === 'expedition_items') {
+            if (Array.isArray(payload)) {
+                payload = payload.map(item => {
+                    const cleanItem = {...item};
+                    delete cleanItem.filial; // Remove completamente o campo filial
+                    delete cleanItem.nome_filial; // Remove se existir
+                    return cleanItem;
+                });
+            } else {
+                payload = {...payload};
+                delete payload.filial; // Remove completamente o campo filial
+                delete payload.nome_filial; // Remove se existir
             }
-            const options = { method, headers: { ...headers } };
-            
-            if (data && (method === 'POST' || method === 'PATCH')) {
-                if (includeFilialFilter && selectedFilial) {
-                    if (Array.isArray(data)) {
-                        data = data.map(item => ({ ...item, filial: selectedFilial.nome }));
-                    } else {
-                        data = { ...data, filial: selectedFilial.nome };
-                    }
-                }
-                options.body = JSON.stringify(data);
-                if (method !== 'DELETE') {
-                    options.headers.Prefer = 'return=representation';
-                }
-            }
-            
-            try {
-                const response = await fetch(url, options);
-                if (!response.ok) throw new Error(`Erro ${response.status}: ${await response.text()}`);
-                return method === 'DELETE' ? null : await response.json();
-            } catch (error) {
-                console.error(`Falha na requisição: ${method} ${url}`, error);
-                showNotification(`Erro de comunicação com o servidor: ${error.message}`, 'error');
-                throw error;
+        } 
+        // Para outras tabelas que precisam de filial, injeta o valor
+        else if (includeFilialFilter && selectedFilial && 
+                 !tablesWithoutFilialField.includes(nomeEndpointBase) && 
+                 !tablesWithTriggerFilial.includes(nomeEndpointBase)) {
+            if (Array.isArray(data)) {
+                payload = data.map(item => ({ 
+                    ...item, 
+                    filial: selectedFilial.nome 
+                }));
+            } else {
+                payload = { 
+                    ...data, 
+                    filial: selectedFilial.nome 
+                }; 
             }
         }
+        
+        // Converte o payload para JSON string
+        options.body = JSON.stringify(payload);
+        
+        // Log do payload para debug
+        console.log(`[supabaseRequest] Payload sendo enviado para ${nomeEndpointBase}:`, payload);
+    } 
+    
+    // Configura header Prefer para retornar dados após operação
+    if (method === 'PATCH' || method === 'POST') {
+        options.headers.Prefer = 'return=representation';
+    }
+    
+    // Se for upsert, adiciona a preferência específica
+    // O PROXY já lida com esta flag, mas é bom ter uma verificação final
+    if (method === 'POST' && upsert) {
+        options.headers.Prefer = 'return=representation,resolution=merge-duplicates';
+    }
 
+    try {
+        // Log para debug
+        console.log(`[supabaseRequest] ${method} ${url}`, {
+            endpoint: nomeEndpointBase,
+            hasFilialFilter: includeFilialFilter,
+            selectedFilial: selectedFilial?.nome
+        });
+        
+        // Faz a requisição
+        const response = await fetch(url, options);
+        
+        // Tratamento de erros HTTP
+        if (!response.ok) {
+            const errorText = await response.text();
+            let errorMessage = `Erro ${response.status}: ${errorText}`;
+            
+            try {
+                const errorJson = JSON.parse(errorText);
+                
+                if (response.status === 400) {
+                    console.error('[supabaseRequest] Erro 400 detalhado:', errorJson);
+                    
+                    if (errorJson.message && errorJson.message.includes('Tentativa de inserir campo \'filial\'')) {
+                        errorMessage = `Erro: O campo filial está sendo enviado incorretamente para ${nomeEndpointBase}`;
+                    } else if (errorJson.message && errorJson.message.includes('nome_filial')) {
+                        errorMessage = `Erro: Campo 'nome_filial' não existe na tabela`;
+                    } else {
+                        errorMessage = `Erro 400: ${errorJson.message || errorJson.details || errorText}`;
+                    }
+                } else if (response.status === 401) {
+                    errorMessage = `Erro 401: Não autorizado. Verifique as credenciais.`;
+                } else if (response.status === 403) {
+                    errorMessage = `Erro 403: Sem permissão RLS para ${nomeEndpointBase}.`;
+                } else if (response.status === 404) {
+                    errorMessage = `Erro 404: Endpoint '${nomeEndpointBase}' não encontrado.`;
+                } else if (response.status === 409) {
+                    errorMessage = `Erro 409: Registro duplicado.`;
+                } else {
+                    errorMessage = `Erro ${response.status}: ${errorJson.message || errorText}`;
+                }
+            } catch (e) { 
+                console.error('Erro ao fazer parse da resposta de erro:', e);
+            }
+            
+            throw new Error(errorMessage);
+        }
+        
+        // Processa a resposta bem-sucedida
+        const contentType = response.headers.get('content-type');
+        
+        if (method === 'DELETE' || response.status === 204 || !contentType?.includes('application/json')) {
+            return null;
+        }
+        
+        try {
+            const responseData = await response.json();
+            console.log(`[supabaseRequest] Sucesso:`, {
+                endpoint: nomeEndpointBase,
+                recordsReturned: Array.isArray(responseData) ? responseData.length : 1
+            });
+            return responseData;
+        } catch (jsonError) {
+            console.error('[supabaseRequest] Erro ao fazer parse do JSON:', jsonError);
+            return null;
+        }
+        
+    } catch (error) {
+        console.error(`[supabaseRequest] Falha na requisição:`, error);
+        
+        if (typeof showNotification === 'function') {
+            let userMessage = 'Erro de comunicação com o servidor.';
+            
+            if (error.message.includes('401')) {
+                userMessage = 'Erro de autenticação. Faça login novamente.';
+            } else if (error.message.includes('400')) {
+                userMessage = 'Dados inválidos. Verifique o preenchimento.';
+            } else if (error.message.includes('Failed to fetch')) {
+                userMessage = 'Sem conexão com o servidor.';
+            }
+            
+            showNotification(userMessage, 'error');
+        }
+        
+        throw error;
+    }
+}
         // NOVO: Função de notificação aprimorada
         function showNotification(message, type = 'info', timeout = 4000) {
             const container = document.getElementById('notificationContainer');
@@ -107,15 +341,49 @@ function hasPermission(permission) {
             }, timeout);
         }
 
-       // NOVA FUNÇÃO de navegação (SUBSTITUÍDA)
+   
+
+// SUBSTITUIR A VERSÃO EXISTENTE DE showView (Aprox. linha 200 no script.js)
 function showView(viewId, element) {
-    // Verificar permissão
-    const permission = element.dataset.permission;
-    if (permission && !hasPermission(permission)) {
-        showNotification('Você não tem permissão para acessar esta aba.', 'error');
-        return;
+  
+    const permission = element.dataset.permission; 
+    
+    // 🚨 FIX CRÍTICO: Aplica o mapeamento de permissão para garantir que a checagem dupla funcione 🚨
+    let checkPermission = permission;
+    if (permission && permission.startsWith('acesso_')) {
+        // Tenta checar o termo original do HTML ('acesso_faturamento')
+        checkPermission = permission;
+    } else if (permission) {
+     
+        const mappedPermission = permission.replace('acesso_', 'view_');
+        
+        
+        if (!hasPermission(permission) && hasPermission(mappedPermission)) {
+            checkPermission = mappedPermission;
+        } else {
+            checkPermission = permission; // Volta para o original se o mapeado não ajudar
+        }
     }
 
+
+    // 1. Verificar permissão usando o termo ajustado/mapeado
+    if (checkPermission && !hasPermission(checkPermission)) {
+        // Para garantir, fazemos a checagem dupla manual novamente:
+        const alternativePermission = checkPermission.startsWith('acesso_') ? 
+            checkPermission.replace('acesso_', 'view_') : 
+            checkPermission; // Se for 'view_', mantém
+
+        if (checkPermission !== alternativePermission && hasPermission(alternativePermission)) {
+             // O usuário tem a permissão 'view_', então o acesso é permitido.
+             // Não fazemos nada e o fluxo continua.
+        } else {
+             // A checagem falhou e não há alternativa válida no array de permissões.
+             showNotification('Você não tem permissão para acessar esta aba.', 'error');
+             return;
+        }
+    }
+
+    // A partir daqui, o acesso está liberado:
     document.querySelectorAll('.view-content').forEach(view => view.classList.remove('active'));
     document.getElementById(viewId).classList.add('active');
 
@@ -123,20 +391,20 @@ function showView(viewId, element) {
     if(element) element.classList.add('active');
 
    // Limpa timers antigos ao trocar de view para não sobrecarregar
-Object.values(activeTimers).forEach(clearInterval);
-activeTimers = {};
+    Object.values(activeTimers).forEach(clearInterval);
+    activeTimers = {};
 
-// Limpa timer específico do rastreio
-if (rastreioTimer) {
-    clearInterval(rastreioTimer);
-    rastreioTimer = null;
-}
+    // Limpa timer específico do rastreio
+    if (rastreioTimer) {
+        clearInterval(rastreioTimer);
+        rastreioTimer = null;
+    }
 
-// Limpa timer específico do mapa da home
-if (homeMapTimer) {
-    clearInterval(homeMapTimer);
-    homeMapTimer = null;
-}
+    // Limpa timer específico do mapa da home
+    if (homeMapTimer) {
+        clearInterval(homeMapTimer);
+        homeMapTimer = null;
+    }
 
     // Carrega os dados da view selecionada
     switch(viewId) {
@@ -151,34 +419,60 @@ if (homeMapTimer) {
     }
     feather.replace(); // Redesenha os ícones
 }
-        // Carregar filiais (do sistema original)
-        async function loadFiliais() {
-            try {
-                const filiaisData = await supabaseRequest('filiais?select=nome,descricao,ativo&ativo=eq.true&order=nome', 'GET', null, false);
-                const grid = document.getElementById('filiaisGrid');
-                grid.innerHTML = '';
-                filiaisData.forEach(filial => {
-                    const card = document.createElement('div');
-                    card.className = 'filial-card';
-                    card.onclick = () => selectFilial(filial);
-                    card.innerHTML = `<h3>${filial.nome}</h3><p>${filial.descricao || 'Descrição não informada'}</p>`;
-                    grid.appendChild(card);
-                });
-                filiais = filiaisData;
-            } catch (error) {
-                document.getElementById('filiaisGrid').innerHTML = `<p class="text-red-500">Erro ao carregar filiais.</p>`;
-            }
-        }
 
-     // Remova a lógica de exibição de telas daqui
+// NOVO: Função para determinar e aplicar o acesso à filial
+async function determineFilialAccess() {
+    // 1. Identificar todas as filiais permitidas para o usuário
+    const allowedFiliais = filiais.filter(f => hasPermission(`acesso_filial_${f.nome}`));
+
+    if (allowedFiliais.length === 1) {
+        // Redirecionamento Automático: Apenas uma filial permitida
+        showNotification(`Acesso único à filial ${allowedFiliais[0].nome}. Redirecionando...`, 'info', 1500);
+        await selectFilial(allowedFiliais[0]); // Pula a tela de seleção e vai direto
+    } else if (allowedFiliais.length > 1) {
+        // Múltiplas filiais: Exibe a tela de seleção, mas apenas com as permitidas
+        document.getElementById('initialAuthContainer').style.display = 'none';
+        document.getElementById('filialSelectionContainer').style.display = 'block';
+        renderFiliaisSelection(allowedFiliais);
+    } else {
+        // Nenhuma filial permitida
+        document.getElementById('initialLoginAlert').innerHTML = '<div class="alert alert-error">Você não possui permissão para acessar nenhuma filial. Contate o administrador.</div>';
+        document.getElementById('initialAuthContainer').style.display = 'block';
+    }
+}
+
+
+       // SUBSTITUIR A VERSÃO EXISTENTE DE loadFiliais
+async function loadFiliais() {
+    try {
+        // 1. Carrega TODAS as filiais ativas para cache
+        const filiaisData = await supabaseRequest('filiais?select=nome,descricao,ativo,latitude_cd,longitude_cd&ativo=eq.true&order=nome', 'GET', null, false);
+        filiais = filiaisData || [];
+        
+        // 2. Determina quais filiais o usuário pode acessar e decide se redireciona
+        await determineFilialAccess();
+        
+    } catch (error) {
+        document.getElementById('filiaisGrid').innerHTML = `<p class="text-red-500">Erro ao carregar dados de filiais.</p>`;
+    }
+}
+
+
+// SUBSTITUIR A FUNÇÃO selectFilial COMPLETA
+// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
+
+// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
+
+// SUBSTITUIR A FUNÇÃO selectFilial COMPLETA (ADICIONANDO A CHAMADA NO FINAL)
 async function selectFilial(filial) {
-    // Verificar se o usuário tem permissão para a filial
+    // Verificar permissão para a filial
     if (!hasPermission(`acesso_filial_${filial.nome}`)) {
         showNotification('Você não tem permissão para acessar esta filial.', 'error');
         return;
     }
 
     try {
+        // Busca os dados completos da filial (sem filtro de filial na busca)
         const fullFilialData = await supabaseRequest(`filiais?nome=eq.${filial.nome}`, 'GET', null, false);
         selectedFilial = fullFilialData[0];
     } catch (error) {
@@ -188,218 +482,248 @@ async function selectFilial(filial) {
     
     document.getElementById('sidebarFilial').textContent = selectedFilial.nome;
     
-    // NOVO: Chama a função que gerencia a transição de telas
+    // 1. Inicia a transição para a tela principal
     await showMainSystem();
     
+    // 2. Carrega todos os dados estáticos e dinâmicos (abas)
     await loadAllTabData();
     await loadPontosInteresse();
-    showView('home', document.querySelector('.nav-item'));
-    setTimeout(() => {
-        const homeAutoRefreshCheckbox = document.getElementById('homeAutoRefresh');
-        if (homeAutoRefreshCheckbox) {
-            homeAutoRefreshCheckbox.checked = true;
-            toggleHomeAutoRefresh();
-        }
-    }, 2000);
-    showNotification(`Bem-vindo à filial: ${selectedFilial.nome}!`, 'success');
-}
+
+    // 🚨 NOVO FIX: Filtra as sub-abas ANTES de filtrar as abas principais 🚨
+    filterSubTabs();
+    
+    // 3. Filtra as abas de navegação e determina qual a primeira a ser mostrada
+    const firstPermittedViewId = filterNavigationMenu(); 
+
+    if (firstPermittedViewId) {
+        // Mostra a primeira aba permitida
+        const firstNavItem = document.querySelector(`.nav-item[href="#${firstPermittedViewId}"]`);
         
-        // NOVO: Carrega o conteúdo das abas originais para as divs de view
-        async function loadAllTabData() {
-            
-            document.getElementById('operacao').innerHTML = `
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">Operação</h1>
+        // NOVO AJUSTE: Se a aba principal for carregada, mas todas as sub-abas forem filtradas,
+        // garantimos que o conteúdo da aba principal (que agora é o container de sub-abas)
+        // ainda mostre alguma mensagem se necessário.
+        
+        showView(firstPermittedViewId, firstNavItem);
+        
+        // Configura o refresh automático da Home (se for a primeira aba permitida)
+        if (firstPermittedViewId === 'home') {
+             setTimeout(() => {
+                const homeAutoRefreshCheckbox = document.getElementById('homeAutoRefresh');
+                if (homeAutoRefreshCheckbox) {
+                    homeAutoRefreshCheckbox.checked = true;
+                    toggleHomeAutoRefresh();
+                }
+            }, 2000);
+        }
+        
+    } else {
+        // Se não houver nenhuma permissão de aba (erro de acesso final)
+        document.getElementById('home').classList.add('active'); // Garante que a div está visível
+        document.getElementById('home').innerHTML = '<div class="alert alert-error">Seu grupo de acesso não possui permissão para visualizar nenhuma aba. Contate o administrador.</div>';
+    }
     
-    <div class="sub-tabs">
-        <button class="sub-tab active" onclick="showSubTab('operacao', 'lancamento', this)">Lançamento</button>
-        <button class="sub-tab" onclick="showSubTab('operacao', 'identificacao', this)">Identificação</button>
-    </div>
-
-    <div id="lancamento" class="sub-tab-content active">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Lançamento de Expedição</h2>
-        <div class="bg-white p-6 rounded-lg shadow-md max-w-4xl mx-auto">
-            <p class="text-sm text-gray-500 mb-4">A data e hora da expedição serão registradas automaticamente no momento do lançamento.</p>
-            <form id="expeditionForm">
-              <div class="form-grid">
-                <div class="form-group">
-                    <label for="lancar_lojaSelect">Loja:</label>
-                    <select id="lancar_lojaSelect" class="loja-select" required></select>
-                </div>
-                <div class="form-group">
-                    <label for="lancar_docaSelect">Doca de Preparação:</label>
-                    <select id="lancar_docaSelect" required></select>
-                </div>
-                <div class="form-group">
-                    <label for="lancar_palletsInput">Pallets:</label>
-                    <input type="number" id="lancar_palletsInput" class="pallets-input" min="0" required placeholder="0">
-                </div>
-                <div class="form-group">
-                    <label for="lancar_rolltrainersInput">RollTainers:</label>
-                    <input type="number" id="lancar_rolltrainersInput" class="rolltrainers-input" min="0" required placeholder="0">
-                </div>
-                <div class="form-group md:col-span-2">
-                    <label for="lancar_numerosCarga">Números de Carga (separados por vírgula):</label>
-                    <input type="text" id="lancar_numerosCarga" placeholder="Ex: CG001, CG002, CG003" class="w-full">
-                    <small class="text-gray-500">Deixe em branco se não houver números específicos</small>
-                </div>
-                <div class="form-group md:col-span-2">
-                     <label for="lancar_liderSelect">Líder Responsável:</label>
-                     <select id="lancar_liderSelect" required></select>
-                </div>
-                <div class="form-group md:col-span-2">
-                    <label for="lancar_observacoes">Observações:</label>
-                    <textarea id="lancar_observacoes" placeholder="Observações para esta carga específica..." class="w-full"></textarea>
-                </div>
-            </div>
-            <div class="mt-6 text-center">
-                <button type="submit" class="btn btn-primary w-full md:w-auto">Lançar Expedição</button>
-            </div>
-            </form>
-            <div id="operacaoAlert" class="mt-4"></div>
-        </div>
-    </div>
-
-    <div id="identificacao" class="sub-tab-content">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Impressão de Identificação</h2>
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <p class="text-sm text-gray-500 mb-4">Expedições aguardando impressão de etiquetas de identificação</p>
-            <div id="expedicoesParaIdentificacao" class="loading">
-                <div class="spinner"></div>
-                Carregando expedições...
-            </div>
-        </div>
-    </div>
-`;
-            
-            document.getElementById('transporte').innerHTML = `
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Agrupamento e Alocação de Cargas</h1>
-                <div id="availabilityInfo" class="availability-info" style="max-width: 600px; margin: 0 auto 2rem auto;">
-                    <div class="availability-stat">
-                        <div class="stat-number" id="availableVehicles">0</div>
-                        <div class="stat-label">Veículos Disponíveis</div>
-                    </div>
-                    <div class="availability-stat">
-                        <div class="stat-number" id="availableDrivers">0</div>
-                        <div class="stat-label">Motoristas Disponíveis</div>
-                    </div>
-                </div>
-                
-                <div class="transport-card mb-6">
-                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Cargas Disponíveis para Agrupamento</h3>
-                    <div id="cargasDisponiveisList" class="loading">
-                        <div class="spinner"></div>
-                        Carregando cargas...
-                    </div>
-                </div>
-                
-                <div class="transport-card">
-                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Montar Expedição</h3>
-                    <div class="stats-grid mb-6">
-                        <div class="stat-card" style="background: var(--secondary-gradient);"><div class="stat-number" id="summaryLojas">0</div><div class="stat-label">Lojas</div></div>
-                        <div class="stat-card"><div class="stat-number" id="summaryPallets">0</div><div class="stat-label">Pallets</div></div>
-                        <div class="stat-card" style="background: var(--accent-gradient);"><div class="stat-number" id="summaryRolls">0</div><div class="stat-label">RollTrainers</div></div>
-                        <div class="stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC);"><div class="stat-number" id="summaryCargaTotal">0</div><div class="stat-label">Carga Total</div></div>
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="alocar_veiculoSelect">Selecione o Veículo:</label>
-                            <select id="alocar_veiculoSelect" required class="w-full"></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="alocar_motoristaSelect">Selecione o Motorista:</label>
-                            <select id="alocar_motoristaSelect" required class="w-full"></select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="alocar_observacoes">Observações da Expedição:</label>
-                        <textarea id="alocar_observacoes" placeholder="Observações gerais para a viagem..." class="w-full"></textarea>
-                    </div>
-                    <div class="text-center mt-6">
-                        <button class="btn btn-primary w-full md:w-auto" onclick="agruparEAlocar()">Agrupar e Alocar Transporte</button>
-                    </div>
-                </div>
-            `;
-            
-            document.getElementById('faturamento').innerHTML = `
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">Controle de Faturamento</h1>
+    showNotification(`Bem-vindo à filial: ${selectedFilial.nome}!`, 'success');
     
-    <div class="sub-tabs">
-        <button class="sub-tab active" onclick="showSubTab('faturamento', 'faturamentoAtivo', this)">Faturamento Ativo</button>
-        <button class="sub-tab" onclick="showSubTab('faturamento', 'historicoFaturamento', this)">Histórico de Faturamento</button>
+    // 🚨 CHAMADA FINAL PARA GARANTIR VISIBILIDADE 🚨
+    toggleFilialLinkVisibility();
+}
+
+// SUBSTITUIR A FUNÇÃO loadAllTabData COMPLETA
+async function loadAllTabData() {
+            
+    document.getElementById('operacao').innerHTML = `
+<h1 class="text-3xl font-bold text-gray-800 mb-6">Operação</h1>
+
+<div class="sub-tabs">
+    <button class="sub-tab active" onclick="showSubTab('operacao', 'lancamento', this)" data-permission="acesso_operacao_lancamento">Lançamento</button>
+    <button class="sub-tab" onclick="showSubTab('operacao', 'identificacao', this)" data-permission="acesso_operacao_identificacao">Identificação</button>
+</div>
+
+<div id="lancamento" class="sub-tab-content active">
+    <h2 class="text-2xl font-bold text-gray-800 mb-4">Lançamento de Expedição</h2>
+    <div class="bg-white p-6 rounded-lg shadow-md max-w-4xl mx-auto">
+        <p class="text-sm text-gray-500 mb-4">A data e hora da expedição serão registradas automaticamente no momento do lançamento.</p>
+        <form id="expeditionForm">
+          <div class="form-grid">
+            <div class="form-group">
+                <label for="lancar_lojaSelect">Loja:</label>
+                <select id="lancar_lojaSelect" class="loja-select" required></select>
+            </div>
+            <div class="form-group">
+                <label for="lancar_docaSelect">Doca de Preparação:</label>
+                <select id="lancar_docaSelect" required></select>
+            </div>
+            <div class="form-group">
+                <label for="lancar_palletsInput">Pallets:</label>
+                <input type="number" id="lancar_palletsInput" class="pallets-input" min="0" required placeholder="0">
+            </div>
+            <div class="form-group">
+                <label for="lancar_rolltrainersInput">RollTainers:</label>
+                <input type="number" id="lancar_rolltrainersInput" class="rolltrainers-input" min="0" required placeholder="0">
+            </div>
+            <div class="form-group md:col-span-2">
+                <label for="lancar_numerosCarga">Números de Carga (separados por vírgula):</label>
+                <input type="text" id="lancar_numerosCarga" placeholder="Ex: CG001, CG002, CG003" class="w-full">
+                <small class="text-gray-500">Deixe em branco se não houver números específicos</small>
+            </div>
+            <div class="form-group md:col-span-2">
+                 <label for="lancar_liderSelect">Líder Responsável:</label>
+                 <select id="lancar_liderSelect" required></select>
+            </div>
+            <div class="form-group md:col-span-2">
+                <label for="lancar_observacoes">Observações:</label>
+                <textarea id="lancar_observacoes" placeholder="Observações para esta carga específica..." class="w-full"></textarea>
+            </div>
+        </div>
+        <div class="mt-6 text-center">
+            <button type="submit" class="btn btn-primary w-full md:w-auto">Lançar Expedição</button>
+        </div>
+        </form>
+        <div id="operacaoAlert" class="mt-4"></div>
     </div>
+</div>
 
-    <div id="faturamentoAtivo" class="sub-tab-content active">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-number" id="totalCarregadas">0</div>
-                <div class="stat-label">Aguardando Faturamento</div>
-            </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);">
-                <div class="stat-number" id="emFaturamento">0</div>
-                <div class="stat-label">Em Faturamento</div>
-            </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, #00D4AA, #00B4D8);">
-                <div class="stat-number" id="faturadas">0</div>
-                <div class="stat-label">Faturadas</div>
-            </div>
-        </div>
-
-        <div class="time-stats-grid max-w-xs mx-auto">
-            <div class="time-stat-card">
-                <div class="stat-number" id="tempoMedioFaturamento">-</div>
-                <div class="stat-label">Tempo Médio<br>Faturamento (HH:mm)</div>
-            </div>
-        </div>
-
-        <div id="faturamentoList" class="loading">
+<div id="identificacao" class="sub-tab-content">
+    <h2 class="text-2xl font-bold text-gray-800 mb-4">Impressão de Identificação</h2>
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <p class="text-sm text-gray-500 mb-4">Expedições aguardando impressão de etiquetas de identificação</p>
+        <div id="expedicoesParaIdentificacao" class="loading">
             <div class="spinner"></div>
             Carregando expedições...
         </div>
     </div>
-
-    <div id="historicoFaturamento" class="sub-tab-content">
-        <div class="filters-section">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">Filtros de Pesquisa</h3>
-            <div class="filters-grid">
-                <div class="form-group">
-                    <label for="historicoFaturamentoDataInicio">Data Início:</label>
-                    <input type="date" id="historicoFaturamentoDataInicio" onchange="loadHistoricoFaturamento()">
-                </div>
-                <div class="form-group">
-                    <label for="historicoFaturamentoDataFim">Data Fim:</label>
-                    <input type="date" id="historicoFaturamentoDataFim" onchange="loadHistoricoFaturamento()">
-                </div>
-                <div class="form-group">
-                    <label for="historicoFaturamentoSearch">Pesquisar:</label>
-                    <input type="text" id="historicoFaturamentoSearch" placeholder="Buscar por placa, loja..." onkeyup="loadHistoricoFaturamento()">
-                </div>
+</div>
+`;
+            
+    document.getElementById('transporte').innerHTML = `
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Agrupamento e Alocação de Cargas</h1>
+        <div id="availabilityInfo" class="availability-info" style="max-width: 600px; margin: 0 auto 2rem auto;">
+            <div class="availability-stat">
+                <div class="stat-number" id="availableVehicles">0</div>
+                <div class="stat-label">Veículos Disponíveis</div>
             </div>
-            <div class="text-right mt-4">
-                <button class="btn btn-primary btn-small" onclick="clearHistoricoFaturamentoFilters()">Limpar Filtros</button>
+            <div class="availability-stat">
+                <div class="stat-number" id="availableDrivers">0</div>
+                <div class="stat-label">Motoristas Disponíveis</div>
             </div>
         </div>
-
-        <div class="stats-grid mb-6">
-            <div class="stat-card">
-                <div class="stat-number" id="historicoTotalFaturadas">0</div>
-                <div class="stat-label">Total Faturadas</div>
-            </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC);">
-                <div class="stat-number" id="historicoTempoMedio">00:00</div>
-                <div class="stat-label">Tempo Médio Faturamento</div>
-            </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);">
-                <div class="stat-number" id="historicoMenorTempo">00:00</div>
-                <div class="stat-label">Menor Tempo</div>
-            </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, #D62828, #F77F00);">
-                <div class="stat-number" id="historicoMaiorTempo">00:00</div>
-                <div class="stat-label">Maior Tempo</div>
+        
+        <div class="transport-card mb-6">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Cargas Disponíveis para Agrupamento</h3>
+            <div id="cargasDisponiveisList" class="loading">
+                <div class="spinner"></div>
+                Carregando cargas...
             </div>
         </div>
+        
+        <div class="transport-card">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Montar Expedição</h3>
+            <div class="stats-grid mb-6">
+                <div class="stat-card" style="background: var(--secondary-gradient);"><div class="stat-number" id="summaryLojas">0</div><div class="stat-label">Lojas</div></div>
+                <div class="stat-card"><div class="stat-number" id="summaryPallets">0</div><div class="stat-label">Pallets</div></div>
+                <div class="stat-card" style="background: var(--accent-gradient);"><div class="stat-number" id="summaryRolls">0</div><div class="stat-label">RollTrainers</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC);"><div class="stat-number" id="summaryCargaTotal">0</div><div class="stat-label">Carga Total</div></div>
+            </div>
 
-        <div class="table-container bg-white rounded-lg shadow-md">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="alocar_veiculoSelect">Selecione o Veículo:</label>
+                    <select id="alocar_veiculoSelect" required class="w-full"></select>
+                </div>
+                <div class="form-group">
+                    <label for="alocar_motoristaSelect">Selecione o Motorista:</label>
+                    <select id="alocar_motoristaSelect" required class="w-full"></select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="alocar_observacoes">Observações da Expedição:</label>
+                <textarea id="alocar_observacoes" placeholder="Observações gerais para a viagem..." class="w-full"></textarea>
+            </div>
+            <div class="text-center mt-6">
+                <button class="btn btn-primary w-full md:w-auto" onclick="agruparEAlocar()">Agrupar e Alocar Transporte</button>
+            </div>
+        </div>
+    `;
+            
+    document.getElementById('faturamento').innerHTML = `
+<h1 class="text-3xl font-bold text-gray-800 mb-6">Controle de Faturamento</h1>
+
+<div class="sub-tabs">
+    <button class="sub-tab active" onclick="showSubTab('faturamento', 'faturamentoAtivo', this)" data-permission="acesso_faturamento_ativo">Faturamento Ativo</button>
+    <button class="sub-tab" onclick="showSubTab('faturamento', 'historicoFaturamento', this)" data-permission="acesso_faturamento_historico">Histórico de Faturamento</button>
+</div>
+
+<div id="faturamentoAtivo" class="sub-tab-content active">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number" id="totalCarregadas">0</div>
+            <div class="stat-label">Aguardando Faturamento</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);">
+            <div class="stat-number" id="emFaturamento">0</div>
+            <div class="stat-label">Em Faturamento</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #00D4AA, #00B4D8);">
+            <div class="stat-number" id="faturadas">0</div>
+            <div class="stat-label">Faturadas</div>
+        </div>
+    </div>
+
+    <div class="time-stats-grid max-w-xs mx-auto">
+        <div class="time-stat-card">
+            <div class="stat-number" id="tempoMedioFaturamento">-</div>
+            <div class="stat-label">Tempo Médio<br>Faturamento (HH:mm)</div>
+        </div>
+    </div>
+
+    <div id="faturamentoList" class="loading">
+        <div class="spinner"></div>
+        Carregando expedições...
+    </div>
+</div>
+
+<div id="historicoFaturamento" class="sub-tab-content">
+    <div class="filters-section">
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">Filtros de Pesquisa</h3>
+        <div class="filters-grid">
+            <div class="form-group">
+                <label for="historicoFaturamentoDataInicio">Data Início:</label>
+                <input type="date" id="historicoFaturamentoDataInicio" onchange="loadHistoricoFaturamento()">
+            </div>
+            <div class="form-group">
+                <label for="historicoFaturamentoDataFim">Data Fim:</label>
+                <input type="date" id="historicoFaturamentoDataFim" onchange="loadHistoricoFaturamento()">
+            </div>
+            <div class="form-group">
+                <label for="historicoFaturamentoSearch">Pesquisar:</label>
+                <input type="text" id="historicoFaturamentoSearch" placeholder="Buscar por placa, loja..." onkeyup="loadHistoricoFaturamento()">
+            </div>
+        </div>
+        <div class="text-right mt-4">
+            <button class="btn btn-primary btn-small" onclick="clearHistoricoFaturamentoFilters()">Limpar Filtros</button>
+        </div>
+    </div>
+
+    <div class="stats-grid mb-6">
+        <div class="stat-card">
+            <div class="stat-number" id="historicoTotalFaturadas">0</div>
+            <div class="stat-label">Total Faturadas</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC);">
+            <div class="stat-number" id="historicoTempoMedio">00:00</div>
+            <div class="stat-label">Tempo Médio Faturamento</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);">
+            <div class="stat-number" id="historicoMenorTempo">00:00</div>
+            <div class="stat-label">Menor Tempo</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #D62828, #F77F00);">
+            <div class="stat-number" id="historicoMaiorTempo">00:00</div>
+            <div class="stat-label">Maior Tempo</div>
+        </div>
+    </div>
+
+    <div class="table-container bg-white rounded-lg shadow-md">
 <table class="w-full" style="min-width: 1100px;">
     <thead>
         <tr>
@@ -426,514 +750,602 @@ async function selectFilial(filial) {
     </div>
 `;
 
-            document.getElementById('motoristas').innerHTML = `
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Painel de Motoristas</h1>
-                <div class="sub-tabs">
-                    <button class="sub-tab active" onclick="showSubTab('motoristas', 'statusFrota', this)">Status da Frota</button>
-                    <button class="sub-tab" onclick="showSubTab('motoristas', 'relatorioMotoristas', this)">Relatório</button>
-                </div>
+   document.getElementById('motoristas').innerHTML = `
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Painel de Motoristas</h1>
+        <div class="sub-tabs">
+            <button class="sub-tab active" onclick="showSubTab('motoristas', 'statusFrota', this)" data-permission="acesso_motoristas_status">Status da Frota</button>
+            <button class="sub-tab" onclick="showSubTab('motoristas', 'relatorioMotoristas', this)" data-permission="acesso_motoristas_relatorio">Relatório</button>
+        </div>
 
-                <div id="statusFrota" class="sub-tab-content active">
-                    <div class="transport-card mb-6">
-                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Consulta por Placa</h3>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="placaMotorista">Placa do Veículo:</label>
-                                <select id="placaMotorista" class="w-full">
-                                    <option value="">Selecione a placa</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <button class="btn btn-primary w-full" onclick="consultarExpedicoesPorPlaca()">Consultar Expedições</button>
-                            </div>
-                        </div>
-                        <div id="resultadosMotorista" class="mt-4"></div>
+        <div id="statusFrota" class="sub-tab-content active">
+            <div class="transport-card mb-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Consulta por Placa</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="placaMotorista">Placa do Veículo:</label>
+                        <select id="placaMotorista" class="w-full">
+                            <option value="">Selecione a placa</option>
+                        </select>
                     </div>
-                    
-                     <div id="motoristasStatusList">
-                         <div class="loading"><div class="spinner"></div>Carregando status...</div>
+                    <div class="form-group">
+                        <button class="btn btn-primary w-full" onclick="consultarExpedicoesPorPlaca()">Consultar Expedições</button>
                     </div>
                 </div>
-               
-                <div id="relatorioMotoristas" class="sub-tab-content">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">Relatório de Desempenho dos Motoristas</h2>
-                    <div class="filters-section">
-                        <div class="filters-grid">
-                            <div class="form-group">
-                                <label for="relatorioMotoristaDataInicio">Data Início:</label>
-                                <input type="date" id="relatorioMotoristaDataInicio" onchange="generateMotoristaReports()">
-                            </div>
-                            <div class="form-group">
-                                <label for="relatorioMotoristaDataFim">Data Fim:</label>
-                                <input type="date" id="relatorioMotoristaDataFim" onchange="generateMotoristaReports()">
-                            </div>
-                        </div>
+                <div id="resultadosMotorista" class="mt-4"></div>
+            </div>
+            
+             <div class="filters-section my-4" style="padding: 12px;">
+                <div class="filters-grid" style="grid-template-columns: 1fr;">
+                     <div class="form-group" style="grid-column: span 1 / span 1; margin-bottom: 0;">
+                        <label for="motoristaStatusFilter">Filtrar por Status:</label>
+                        <select id="motoristaStatusFilter" onchange="applyMotoristaStatusFilter()" class="w-full">
+                            <option value="">Todos os Status</option>
+                            <option value="disponivel">Disponível</option>
+                            <option value="em_viagem,saiu_para_entrega">Em Atividade (Viagem/Descarga)</option>
+                            <option value="retornando_cd,retornando_com_imobilizado,descarregando_imobilizado">Retornando/Desc. Imobilizado</option>
+                            <option value="folga">Folga</option>
+                        </select>
                     </div>
-                    <div id="motoristaReportSummary" class="stats-grid" style="display:none;"></div>
-                    <div class="bg-white p-4 rounded-lg shadow-md mt-8">
-                         <h3 class="text-lg font-semibold text-center mb-4">Ranking de Motoristas por Entregas</h3>
+                </div>
+            </div>
+            <div id="motoristasStatusList">
+                 <div class="loading"><div class="spinner"></div>Carregando status...</div>
+            </div>
+        </div>
+
+        <div id="relatorioMotoristas" class="sub-tab-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Relatório de Produtividade</h2>
+            
+            <div class="filters-section">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Filtros de Período</h3>
+                <div class="filters-grid">
+                    <div class="form-group">
+                        <label for="relatorioMotoristaDataInicio">Data Início:</label>
+                        <input type="date" id="relatorioMotoristaDataInicio" onchange="generateMotoristaReports()">
+                    </div>
+                    <div class="form-group">
+                        <label for="relatorioMotoristaDataFim">Data Fim:</label>
+                        <input type="date" id="relatorioMotoristaDataFim" onchange="generateMotoristaReports()">
+                    </div>
+                </div>
+                <div class="text-right mt-4">
+                    <button class="btn btn-primary btn-small" onclick="generateMotoristaReports()">Gerar Relatório</button>
+                </div>
+            </div>
+
+            <div id="motoristaReportSummary" class="stats-grid">
+                 <div class="stat-card"><div class="stat-number">0</div><div class="stat-label">Motoristas Ativos</div></div>
+                <div class="stat-card" style="background: var(--secondary-gradient);"><div class="stat-number">0</div><div class="stat-label">Total Viagens</div></div>
+                <div class="stat-card" style="background: var(--accent-gradient);"><div class="stat-number">0</div><div class="stat-label">Total Entregas</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC);"><div class="stat-number">0</div><div class="stat-label">Total Pallets</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);"><div class="stat-number">0</div><div class="stat-label">Média Entregas/Motorista</div></div>
+            </div>
+            
+            <div class="space-y-8 mt-8">
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <h3 class="text-lg font-semibold text-center mb-4">Ranking de Entregas (Top 10)</h3>
+                    <div class="relative" style="height: 350px; width: 100%;">
                         <canvas id="motoristasRankingChart"></canvas>
                     </div>
-                    <div id="motoristaTableContainer" class="table-container bg-white rounded-lg shadow-md mt-8"></div>
                 </div>
-            `;
-
-            document.getElementById('acompanhamento').innerHTML = `
-                 <h1 class="text-3xl font-bold text-gray-800 mb-6">Acompanhamento de Tempos</h1>
-               <div class="sub-tabs">
-    <button class="sub-tab active" onclick="showSubTab('acompanhamento', 'expedicoesEmAndamento', this)">Expedições</button>
-    <button class="sub-tab" onclick="showSubTab('acompanhamento', 'rastreio', this)">Rastreio</button>
-    <button class="sub-tab" onclick="showSubTab('acompanhamento', 'frota', this)">Frota</button>
-</div>
-
-                <div id="expedicoesEmAndamento" class="sub-tab-content active">
-                    <div class="stats-grid">
-                        <div class="stat-card"><div class="stat-number" id="totalExpedicoes">0</div><div class="stat-label">Total</div></div>
-                        <div class="stat-card" style="background: linear-gradient(135deg, #D62828, #F77F00);"><div class="stat-number" id="pendentesCount">0</div><div class="stat-label">Pendentes</div></div>
-                        <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);"><div class="stat-number" id="emAndamentoCount">0</div><div class="stat-label">Em Andamento</div></div>
-                    </div>
-
-                    <div class="time-stats-grid">
-                        <div class="time-stat-card"><div class="stat-number" id="tempoMedioAlocar">-</div><div class="stat-label">T.M. Alocar Placa</div></div>
-                        <div class="time-stat-card"><div class="stat-number" id="tempoMedioChegada">-</div><div class="stat-label">T.M. Chegada Doca</div></div>
-                        <div class="time-stat-card"><div class="stat-number" id="tempoMedioCarregamento">-</div><div class="stat-label">T.M. Carregamento</div></div>
-                        <div class="time-stat-card"><div class="stat-number" id="tempoMedioTotal">-</div><div class="stat-label">T.M. Total Pátio</div></div>
-                    </div>
-
-                    <div class="filters-section">
-                        <div class="filters-grid">
-                            <div class="form-group"><label for="filtroDataInicio">Data Início:</label><input type="date" id="filtroDataInicio" onchange="applyFilters()"></div>
-                            <div class="form-group"><label for="filtroDataFim">Data Fim:</label><input type="date" id="filtroDataFim" onchange="applyFilters()"></div>
-                            <div class="form-group"><label for="filtroStatus">Status:</label><select id="filtroStatus" onchange="applyFilters()"><option value="">Todos</option></select></div>
-                            <div class="form-group"><label for="searchInput">Pesquisar:</label><input type="text" id="searchInput" placeholder="Loja, doca, líder..." onkeyup="applyFilters()"></div>
-                        </div>
-                        <div class="text-right mt-4"><button class="btn btn-primary btn-small" onclick="clearFilters()">Limpar Filtros</button></div>
-                    </div>
-
-                    <div class="table-container bg-white rounded-lg shadow-md mt-6">
-                        <table class="w-full" style="min-width: 1200px;">
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <h3 class="text-lg font-semibold text-center mb-4">Detalhes da Produtividade</h3>
+                    <div class="table-container bg-white rounded-lg shadow-md" id="motoristaTableContainer">
+                         <table class="w-full">
                             <thead>
                                 <tr>
-                                    <th>Data/Hora</th><th>Lojas/Cargas</th><th>Pallets</th><th>Rolls</th><th>Doca</th><th>Líder</th>
-                                    <th>Status</th><th>Veículo</th><th>Ocupação</th><th>Motorista</th><th>Tempos</th><th>Ações</th>
+                                    <th class="text-left p-3">Ranking</th>
+                                    <th class="text-left p-3">Nome</th>
+                                    <th class="text-left p-3">Produtivo</th>
+                                    <th class="text-left p-3">Viagens</th>
+                                    <th class="text-left p-3">Entregas</th>
+                                    <th class="text-left p-3">Entregas/Viagem</th>
+                                    <th class="text-left p-3">Total Pallets</th>
+                                    <th class="text-left p-3">Tempo Médio Viagem</th>
+                                    <th class="text-left p-3">Ocupação Média</th>
                                 </tr>
                             </thead>
-                            <tbody id="acompanhamentoBody"></tbody>
-                        </table>
+                            <tbody>
+                                <tr><td colspan="9" class="text-center py-8 text-gray-500">Aguardando geração do relatório...</td></tr>
+                            </tbody>
+                         </table>
                     </div>
-               </div>
-
-<div id="rastreio" class="sub-tab-content">
-    <div class="stats-grid mb-6">
-        <div class="stat-card">
-            <div class="stat-number" id="veiculosEmRota">0</div>
-            <div class="stat-label">Veículos em Rota</div>
-        </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #00D4AA, #00B4D8);">
-            <div class="stat-number" id="entregasAndamento">0</div>
-            <div class="stat-label">Entregas em Andamento</div>
-        </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);">
-            <div class="stat-number" id="proximasEntregas">0</div>
-            <div class="stat-label">Próximas Entregas</div>
-        </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC);">
-            <div class="stat-number" id="tempoMedioRota">--:--</div>
-            <div class="stat-label">Tempo Médio em Rota</div>
-        </div>
-    </div>
-
-    <div class="filters-section mb-6">
-        <div class="filters-grid">
-            <div class="form-group">
-                <label for="rastreioFiltroMotorista">Motorista:</label>
-                <select id="rastreioFiltroMotorista" onchange="applyRastreioFilters()">
-                    <option value="">Todos os Motoristas</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="rastreioFiltroStatus">Status:</label>
-                <select id="rastreioFiltroStatus" onchange="applyRastreioFilters()">
-                    <option value="">Todos</option>
-                    <option value="saiu_para_entrega">Em Rota</option>
-                    <option value="em_descarga">Em Descarga</option>
-                    <option value="retornando">Retornando</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Atualização:</label>
-                <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-600">Auto-refresh</span>
-                    <input type="checkbox" id="autoRefreshRastreio" checked onchange="toggleAutoRefresh()">
-                    <span class="text-xs text-green-600" id="lastUpdateRastreio">Última atualização: --:--</span>
                 </div>
             </div>
         </div>
-    </div>
+    `;
 
-    <div id="rastreioList" class="space-y-4">
-        <div class="loading">
-            <div class="spinner"></div>
-            Carregando dados de rastreio...
+    document.getElementById('acompanhamento').innerHTML = `
+         <h1 class="text-3xl font-bold text-gray-800 mb-6">Acompanhamento de Tempos</h1>
+       <div class="sub-tabs">
+<button class="sub-tab active" onclick="showSubTab('acompanhamento', 'expedicoesEmAndamento', this)" data-permission="acesso_acompanhamento_expedicoes">Expedições</button>
+<button class="sub-tab" onclick="showSubTab('acompanhamento', 'rastreio', this)" data-permission="acesso_acompanhamento_rastreio">Rastreio</button>
+<button class="sub-tab" onclick="showSubTab('acompanhamento', 'frota', this)" data-permission="acesso_acompanhamento_frota">Frota</button>
+</div>
+
+        <div id="expedicoesEmAndamento" class="sub-tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-number" id="totalExpedicoes">0</div><div class="stat-label">Total</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #D62828, #F77F00);"><div class="stat-number" id="pendentesCount">0</div><div class="stat-label">Pendentes</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);"><div class="stat-number" id="emAndamentoCount">0</div><div class="stat-label">Em Andamento</div></div>
+            </div>
+
+            <div class="time-stats-grid">
+                <div class="time-stat-card"><div class="stat-number" id="tempoMedioAlocar">-</div><div class="stat-label">T.M. Alocar Placa</div></div>
+                <div class="time-stat-card"><div class="stat-number" id="tempoMedioChegada">-</div><div class="stat-label">T.M. Chegada Doca</div></div>
+                <div class="time-stat-card"><div class="stat-number" id="tempoMedioCarregamento">-</div><div class="stat-label">T.M. Carregamento</div></div>
+                <div class="time-stat-card"><div class="stat-number" id="tempoMedioTotal">-</div><div class="stat-label">T.M. Total Pátio</div></div>
+            </div>
+
+            <div class="filters-section">
+                <div class="filters-grid">
+                    <div class="form-group"><label for="filtroDataInicio">Data Início:</label><input type="date" id="filtroDataInicio" onchange="applyFilters()"></div>
+                    <div class="form-group"><label for="filtroDataFim">Data Fim:</label><input type="date" id="filtroDataFim" onchange="applyFilters()"></div>
+                    <div class="form-group"><label for="filtroStatus">Status:</label><select id="filtroStatus" onchange="applyFilters()"><option value="">Todos</option></select></div>
+                    <div class="form-group"><label for="searchInput">Pesquisar:</label><input type="text" id="searchInput" placeholder="Loja, doca, líder..." onkeyup="applyFilters()"></div>
+                </div>
+                <div class="text-right mt-4"><button class="btn btn-primary btn-small" onclick="clearFilters()">Limpar Filtros</button></div>
+            </div>
+
+            <div class="table-container bg-white rounded-lg shadow-md mt-6">
+                <table class="w-full"> 
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th><th>Lojas/Cargas</th><th>Pallets</th><th>Rolls</th><th>Doca</th><th>Líder</th>
+                            <th>Status</th><th>Veículo</th><th>Ocupação</th><th>Motorista</th><th>Tempos</th><th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="acompanhamentoBody"></tbody>
+                </table>
+            </div>
+       </div>
+
+<div id="rastreio" class="sub-tab-content">
+<div class="stats-grid mb-6">
+    <div class="stat-card">
+        <div class="stat-number" id="veiculosEmRota">0</div>
+        <div class="stat-label">Veículos em Rota</div>
+    </div>
+    <div class="stat-card" style="background: linear-gradient(135deg, #00D4AA, #00B4D8);">
+        <div class="stat-number" id="entregasAndamento">0</div>
+        <div class="stat-label">Entregas em Andamento</div>
+    </div>
+    <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);">
+        <div class="stat-number" id="proximasEntregas">0</div>
+        <div class="stat-label">Próximas Entregas</div>
+    </div>
+    <div class="stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC);">
+        <div class="stat-number" id="tempoMedioRota">--:--</div>
+        <div class="stat-label">Tempo Médio em Rota</div>
+    </div>
+</div>
+
+<div class="filters-section mb-6">
+    <div class="filters-grid">
+        <div class="form-group">
+            <label for="rastreioFiltroMotorista">Motorista:</label>
+            <select id="rastreioFiltroMotorista" onchange="applyRastreioFilters()">
+                <option value="">Todos os Motoristas</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="rastreioFiltroStatus">Status:</label>
+            <select id="rastreioFiltroStatus" onchange="applyRastreioFilters()">
+                <option value="">Todos</option>
+                <option value="saiu_para_entrega">Em Rota</option>
+                <option value="em_descarga">Em Descarga</option>
+                <option value="retornando">Retornando</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Atualização:</label>
+            <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600">Auto-refresh</span>
+                <input type="checkbox" id="autoRefreshRastreio" checked onchange="toggleAutoRefresh()">
+                <span class="text-xs text-green-600" id="lastUpdateRastreio">Última atualização: --:--</span>
+            </div>
         </div>
     </div>
+</div>
+
+<div id="rastreioList" class="space-y-4">
+    <div class="loading">
+        <div class="spinner"></div>
+        Carregando dados de rastreio...
+    </div>
+</div>
 </div>
 
 <div id="frota" class="sub-tab-content">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">Análise de Ociosidade da Frota</h2>
-                    <div class="filters-section">
-                        <div class="filters-grid">
-                            <div class="form-group"><label for="frotaFiltroDataInicio">Data Início:</label><input type="date" id="frotaFiltroDataInicio" onchange="loadFrotaData()"></div>
-                            <div class="form-group"><label for="frotaFiltroDataFim">Data Fim:</label><input type="date" id="frotaFiltroDataFim" onchange="loadFrotaData()"></div>
-                        </div>
-                    </div>
-                    <div class="time-stats-grid">
-                        <div class="time-stat-card"><div class="stat-number" id="totalOciosidade">-</div><div class="stat-label">Ociosidade Média</div></div>
-                        <div class="time-stat-card"><div class="stat-number" id="frotaAtiva">0</div><div class="stat-label">Veículos Ativos Hoje</div></div>
-                        <div class="time-stat-card"><div class="stat-number" id="frotaOciosa">0</div><div class="stat-label">Veículos Ociosos Agora</div></div>
-                    </div>
-                     <div class="table-container bg-white rounded-lg shadow-md mt-6">
-                        <table class="w-full">
-                            <thead><tr><th>Veículo</th><th>Status</th><th>Início Ociosidade</th><th>Tempo Ocioso</th><th>Última Ação</th></tr></thead>
-                            <tbody id="ociosidadeBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
+    <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">Análise de Ociosidade da Frota</h2>
+    <div class="filters-section">
+        <div class="filters-grid">
+            <div class="form-group"><label for="frotaFiltroDataInicio">Data Início:</label><input type="date" id="frotaFiltroDataInicio" onchange="loadFrotaData()"></div>
+            <div class="form-group"><label for="frotaFiltroDataFim">Data Fim:</label><input type="date" id="frotaFiltroDataFim" onchange="loadFrotaData()"></div>
+        </div>
+    </div>
+    <div class="time-stats-grid">
+        <div class="time-stat-card"><div class="stat-number" id="totalOciosidade">-</div><div class="stat-label">Ociosidade Média</div></div>
+        <div class="time-stat-card"><div class="stat-number" id="frotaAtiva">0</div><div class="stat-label">Veículos Ativos Hoje</div></div>
+        <div class="time-stat-card"><div class="stat-number" id="frotaOciosa">0</div><div class="stat-label">Veículos Ociosos Agora</div></div>
+    </div>
+     <div class="table-container bg-white rounded-lg shadow-md mt-6">
+        <table class="w-full">
+            <thead><tr><th>Veículo</th><th>Status</th><th>Início Ociosidade</th><th>Tempo Ocioso</th><th>Última Ação</th></tr></thead>
+            <tbody id="ociosidadeBody"></tbody>
+        </table>
+    </div>
+</div>
+`;
             
-            document.getElementById('historico').innerHTML = `
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Histórico de Entregas</h1>
-                <div class="sub-tabs">
-                    <button class="sub-tab active" onclick="showSubTab('historico', 'listaEntregas', this)">Entregas</button>
-                    <button class="sub-tab" onclick="showSubTab('historico', 'indicadores', this)">Indicadores</button>
-                </div>
+   document.getElementById('historico').innerHTML = `
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Histórico de Entregas</h1>
+        <div class="sub-tabs">
+            <button class="sub-tab active" onclick="showSubTab('historico', 'listaEntregas', this)" data-permission="acesso_historico_entregas">Entregas</button>
+            <button class="sub-tab" onclick="showSubTab('historico', 'indicadores', this)" data-permission="acesso_historico_indicadores">Indicadores</button>
+        </div>
 
-                <div id="listaEntregas" class="sub-tab-content active">
-                    <div class="filters-section">
-                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Filtros e Pesquisa</h3>
-                        <div class="filters-grid">
-                            <div class="form-group">
-                                <label for="historicoFiltroDataInicio">Data Início:</label>
-                                <input type="date" id="historicoFiltroDataInicio" onchange="applyHistoricoFilters()">
-                            </div>
-                            <div class="form-group">
-                                <label for="historicoFiltroDataFim">Data Fim:</label>
-                                <input type="date" id="historicoFiltroDataFim" onchange="applyHistoricoFilters()">
-                            </div>
-                            <div class="form-group">
-                                <label for="historicoSearchInput">Pesquisar:</label>
-                                <input type="text" id="historicoSearchInput" placeholder="Buscar por loja, placa, motorista..." onkeyup="applyHistoricoFilters()">
-                            </div>
-                        </div>
-                        <div class="text-right mt-4">
-                            <button class="btn btn-primary btn-small" onclick="clearHistoricoFilters()">Limpar Filtros</button>
-                        </div>
+        <div id="listaEntregas" class="sub-tab-content active">
+            <div class="filters-section">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Filtros e Pesquisa</h3>
+                <div class="filters-grid">
+                    <div class="form-group">
+                        <label for="historicoFiltroDataInicio">Data Início:</label>
+                        <input type="date" id="historicoFiltroDataInicio" onchange="applyHistoricoFilters()">
                     </div>
-                    <div id="historicoList" class="loading">
-                        <div class="spinner"></div>
-                        Carregando histórico...
+                    <div class="form-group">
+                        <label for="historicoFiltroDataFim">Data Fim:</label>
+                        <input type="date" id="historicoFiltroDataFim" onchange="applyHistoricoFilters()">
+                    </div>
+                    <div class="form-group">
+                        <label for="historicoSearchInput">Pesquisar:</label>
+                        <input type="text" id="historicoSearchInput" placeholder="Buscar por loja, placa, motorista..." onkeyup="applyHistoricoFilters()">
                     </div>
                 </div>
+                <div class="text-right mt-4">
+                    <button class="btn btn-primary btn-small" onclick="clearHistoricoFilters()">Limpar Filtros</button>
+                </div>
+            </div>
+            <div id="historicoList" class="loading">
+                <div class="spinner"></div>
+                Carregando histórico...
+            </div>
+        </div>
 
-                <div id="indicadores" class="sub-tab-content">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">Indicadores de Desempenho</h2>
-                    <div class="filters-section">
-                         <div class="filters-grid">
-                            <div class="form-group">
-                                <label for="indicadoresFiltroDataInicio">Data Início:</label>
-                                <input type="date" id="indicadoresFiltroDataInicio" onchange="applyHistoricoFilters()">
-                            </div>
-                            <div class="form-group">
-                                <label for="indicadoresFiltroDataFim">Data Fim:</label>
-                                <input type="date" id="indicadoresFiltroDataFim" onchange="applyHistoricoFilters()">
-                            </div>
-                        </div>
+        <div id="indicadores" class="sub-tab-content">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Revisão de Indicadores (KPI Review)</h2>
+            <div class="filters-section">
+                 <div class="filters-grid">
+                    <div class="form-group">
+                        <label for="indicadoresFiltroDataInicio">Data Início:</label>
+                        <input type="date" id="indicadoresFiltroDataInicio" onchange="applyHistoricoFilters()">
                     </div>
-                    <div id="indicadoresSummary" class="time-stats-grid">
-                        </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-                        <div class="bg-white p-4 rounded-lg shadow-md">
-                            <h3 class="text-lg font-semibold text-center mb-4">Ranking de Lojas por Tempo de Descarga</h3>
-                            <canvas id="lojasRankingChart"></canvas>
-                        </div>
-                        <div class="bg-white p-4 rounded-lg shadow-md">
-                            <h3 class="text-lg font-semibold text-center mb-4">Distribuição de Entregas (Fort x Comper)</h3>
-                            <canvas id="entregasChart"></canvas>
-                        </div>
+                    <div class="form-group">
+                        <label for="indicadoresFiltroDataFim">Data Fim:</label>
+                        <input type="date" id="indicadoresFiltroDataFim" onchange="applyHistoricoFilters()">
+                    </div>
+                     <div class="form-group md:col-span-1">
+                        <label for="indicadoresSearchInput">Pesquisar Loja/Placa:</label>
+                        <input type="text" id="indicadoresSearchInput" placeholder="Filtro nos gráficos..." onkeyup="applyHistoricoFilters()">
                     </div>
                 </div>
-            `;
+            </div>
             
-            document.getElementById('configuracoes').innerHTML = `
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">Configurações</h1>
-    <div id="passwordFormContainer" class="transport-card max-w-md mx-auto">
-        <p class="text-center text-gray-600 mb-4">Acesso restrito. Por favor, insira suas credenciais.</p>
-        <form id="passwordForm">
-            <div class="form-group">
-                <label for="userInput">Usuário:</label>
-                <input type="text" id="userInput" required>
+            <h3 class="text-xl font-semibold text-gray-700 mb-4">Volume e Eficiência</h3>
+            <div id="indicadoresVolumeStats" class="stats-grid mb-8 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+                </div>
+            
+            <h3 class="text-xl font-semibold text-gray-700 mb-4">Tempos Operacionais (Média)</h3>
+            <div id="indicadoresTimeSummary" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-4 mb-8">
+                </div>
+            
+            <h3 class="text-xl font-semibold text-gray-700 mb-4">Análise Detalhada</h3>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+                <div class="bg-white p-4 rounded-lg shadow-md" data-aos="fade-right">
+                    <h3 class="text-lg font-semibold text-center mb-4">Ranking de Lojas por Tempo de Descarga</h3>
+                    <div class="relative" style="height: 400px;">
+                        <canvas id="lojasRankingChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-md" data-aos="fade-left">
+                    <h3 class="text-lg font-semibold text-center mb-4">Distribuição de Entregas (Fort x Comper)</h3>
+                    <div class="relative mx-auto" style="height: 400px; max-width: 450px;">
+                        <canvas id="entregasChart"></canvas>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="passwordInput">Senha:</label>
-                <input type="password" id="passwordInput" required>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+                 <div class="bg-white p-4 rounded-lg shadow-md" data-aos="fade-up">
+                    <h3 class="text-lg font-semibold text-center mb-4">Total de Entregas por Loja (Volume de Saídas)</h3>
+                    <div class="relative" style="height: 400px;">
+                        <canvas id="totalEntregasLojaChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-md" data-aos="fade-up" data-aos-delay="100">
+                    <h3 class="text-lg font-semibold text-center mb-4">Participação % no Total de Entregas</h3>
+                    <div class="relative mx-auto" style="height: 400px; max-width: 450px;">
+                        <canvas id="participacaoEntregasLojaChart"></canvas>
+                    </div>
+                </div>
             </div>
-            <div class="mt-4"><button type="submit" class="btn btn-primary w-full">Acessar</button></div>
-        </form>
-        <div id="passwordAlert" class="mt-4"></div>
+            
+            <div class="grid grid-cols-1 gap-8 mt-8">
+                <div class="bg-white p-4 rounded-lg shadow-md lg:col-span-1" data-aos="fade-up">
+                    <h3 class="text-lg font-semibold text-center mb-4">Total de Pallets por Loja</h3>
+                    <div class="relative" style="height: 400px;">
+                        <canvas id="palletsPorLojaChart"></canvas>
+                    </div>
+                </div>
+                </div>
+        </div>
+    `;
+            
+    document.getElementById('configuracoes').innerHTML = `
+<h1 class="text-3xl font-bold text-gray-800 mb-6">Configurações</h1>
+<div id="passwordFormContainer" class="transport-card max-w-md mx-auto">
+    <p class="text-center text-gray-600 mb-4">Acesso restrito. Por favor, insira suas credenciais.</p>
+    <form id="passwordForm">
+        <div class="form-group">
+            <label for="userInput">Usuário:</label>
+            <input type="text" id="userInput" required>
+        </div>
+        <div class="form-group">
+            <label for="passwordInput">Senha:</label>
+            <input type="password" id="passwordInput" required>
+        </div>
+        <div class="mt-4"><button type="submit" class="btn btn-primary w-full">Acessar</button></div>
+    </form>
+    <div id="passwordAlert" class="mt-4"></div>
+</div>
+
+<div id="configuracoesContent" style="display: none;">
+    <div class="sub-tabs">
+        <button class="sub-tab active" onclick="showSubTab('configuracoes', 'filiais', this)" data-permission="acesso_configuracoes_filiais">Filiais</button>
+        <button class="sub-tab" onclick="showSubTab('configuracoes', 'lojas', this)" data-permission="acesso_configuracoes_lojas">Lojas</button>
+        <button class="sub-tab" onclick="showSubTab('configuracoes', 'docas', this)" data-permission="acesso_configuracoes_docas">Docas</button>
+        <button class="sub-tab" onclick="showSubTab('configuracoes', 'veiculos', this)" data-permission="acesso_configuracoes_veiculos">Veículos</button>
+        <button class="sub-tab" onclick="showSubTab('configuracoes', 'motoristasConfig', this)" data-permission="acesso_configuracoes_motoristas">Motoristas</button>
+        <button class="sub-tab" onclick="showSubTab('configuracoes', 'lideres', this)" data-permission="acesso_configuracoes_lideres">Líderes</button>
+        <button class="sub-tab" onclick="showSubTab('configuracoes', 'pontosInteresse', this)" data-permission="acesso_configuracoes_pontos">Pontos</button>
+        <button class="sub-tab" onclick="showSubTab('configuracoes', 'acessos', this)" data-permission="acesso_configuracoes_acessos">Acessos</button>
+        <button class="sub-tab" onclick="showSubTab('configuracoes', 'sistema', this)" data-permission="acesso_configuracoes_sistema">Sistema</button>
     </div>
 
-    <div id="configuracoesContent" style="display: none;">
-        <div class="sub-tabs">
-            <button class="sub-tab active" onclick="showSubTab('configuracoes', 'filiais', this)">Filiais</button>
-            <button class="sub-tab" onclick="showSubTab('configuracoes', 'lojas', this)">Lojas</button>
-            <button class="sub-tab" onclick="showSubTab('configuracoes', 'docas', this)">Docas</button>
-            <button class="sub-tab" onclick="showSubTab('configuracoes', 'veiculos', this)">Veículos</button>
-            <button class="sub-tab" onclick="showSubTab('configuracoes', 'motoristasConfig', this)">Motoristas</button>
-            <button class="sub-tab" onclick="showSubTab('configuracoes', 'lideres', this)">Líderes</button>
-            <button class="sub-tab" onclick="showSubTab('configuracoes', 'pontosInteresse', this)">Pontos</button>
-            <button class="sub-tab" onclick="showSubTab('configuracoes', 'acessos', this)">Acessos</button>
-            <button class="sub-tab" onclick="showSubTab('configuracoes', 'sistema', this)">Sistema</button>
-        </div>
-
-        <!-- FILIAIS -->
-        <div id="filiais" class="sub-tab-content active">
-            <div class="transport-card">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">Gerenciar Filiais</h3>
-                    <button class="btn btn-success" onclick="showAddForm('filial')">+ Nova Filial</button>
-                </div>
-                <div class="table-container bg-white rounded-lg shadow-md">
-                    <table class="w-full">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Descrição</th>
-                                <th>Endereço CD</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="filiaisConfigBody">
-                            <tr><td colspan="5" class="loading"><div class="spinner"></div>Carregando filiais...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+    <div id="filiais" class="sub-tab-content active">
+        <div class="transport-card">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Gerenciar Filiais</h3>
+                <button class="btn btn-success" onclick="showAddForm('filial')">+ Nova Filial</button>
+            </div>
+            <div class="table-container bg-white rounded-lg shadow-md">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Descrição</th>
+                            <th>Endereço CD</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="filiaisConfigBody">
+                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Carregando filiais...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+    </div>
 
-        <!-- LOJAS -->
-        <div id="lojas" class="sub-tab-content">
-            <div class="transport-card">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">Gerenciar Lojas</h3>
-                    <div class="flex gap-2">
-                        <button class="btn btn-primary" onclick="showAllLojasMap()">Ver no Mapa</button>
-                        <button class="btn btn-success" onclick="showAddForm('loja')">+ Nova Loja</button>
-                    </div>
+    <div id="lojas" class="sub-tab-content">
+        <div class="transport-card">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Gerenciar Lojas</h3>
+                <div class="flex gap-2">
+                    <button class="btn btn-primary" onclick="showAllLojasMap()">Ver no Mapa</button>
+                    <button class="btn btn-success" onclick="showAddForm('loja')">+ Nova Loja</button>
                 </div>
-                <div class="table-container bg-white rounded-lg shadow-md">
-                    <table class="w-full">
-                        <thead>
-                            <tr>
-                                <th>Código</th>
-                                <th>Nome</th>
-                                <th>Cidade</th>
-                                <th>QR Code</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="lojasConfigBody">
-                            <tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando lojas...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            </div>
+            <div class="table-container bg-white rounded-lg shadow-md">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Nome</th>
+                            <th>Cidade</th>
+                            <th>QR Code</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lojasConfigBody">
+                        <tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando lojas...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+    </div>
 
-        <!-- DOCAS -->
-        <div id="docas" class="sub-tab-content">
-            <div class="transport-card">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">Gerenciar Docas</h3>
-                    <button class="btn btn-success" onclick="showAddForm('doca')">+ Nova Doca</button>
-                </div>
-                <div class="table-container bg-white rounded-lg shadow-md">
-                    <table class="w-full">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Capacidade (Pallets)</th>
-                                <th>Código QR</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="docasConfigBody">
-                            <tr><td colspan="5" class="loading"><div class="spinner"></div>Carregando docas...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+    <div id="docas" class="sub-tab-content">
+        <div class="transport-card">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Gerenciar Docas</h3>
+                <button class="btn btn-success" onclick="showAddForm('doca')">+ Nova Doca</button>
+            </div>
+            <div class="table-container bg-white rounded-lg shadow-md">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Capacidade (Pallets)</th>
+                            <th>Código QR</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="docasConfigBody">
+                        <tr><td colspan="5" class="loading"><div class="spinner"></div>Carregando docas...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+    </div>
 
-        <!-- VEÍCULOS -->
-        <div id="veiculos" class="sub-tab-content">
-            <div class="transport-card">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">Gerenciar Frota</h3>
-                    <button class="btn btn-success" onclick="showAddForm('veiculo')">+ Novo Veículo</button>
-                </div>
-                <div class="table-container bg-white rounded-lg shadow-md">
-                    <table class="w-full">
-                        <thead>
-                            <tr>
-                                <th>Placa</th>
-                                <th>Modelo</th>
-                                <th>Tipo</th>
-                                <th>Capacidade (P)</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="veiculosConfigBody">
-                            <tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando veículos...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+    <div id="veiculos" class="sub-tab-content">
+        <div class="transport-card">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Gerenciar Frota</h3>
+                <button class="btn btn-success" onclick="showAddForm('veiculo')">+ Novo Veículo</button>
+            </div>
+            <div class="table-container bg-white rounded-lg shadow-md">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Placa</th>
+                            <th>Modelo</th>
+                            <th>Tipo</th>
+                            <th>Capacidade (P)</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="veiculosConfigBody">
+                        <tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando veículos...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+    </div>
 
-        <!-- MOTORISTAS -->
-        <div id="motoristasConfig" class="sub-tab-content">
-            <div class="transport-card">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">Gerenciar Motoristas</h3>
-                    <button class="btn btn-success" onclick="showAddForm('motorista')">+ Novo Motorista</button>
-                </div>
-                <div class="table-container bg-white rounded-lg shadow-md">
-                    <table class="w-full">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Produtivo</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="motoristasConfigBody">
-                            <tr><td colspan="4" class="loading"><div class="spinner"></div>Carregando motoristas...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+    <div id="motoristasConfig" class="sub-tab-content">
+        <div class="transport-card">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Gerenciar Motoristas</h3>
+                <button class="btn btn-success" onclick="showAddForm('motorista')">+ Novo Motorista</button>
+            </div>
+            <div class="table-container bg-white rounded-lg shadow-md">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Produtivo</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="motoristasConfigBody">
+                        <tr><td colspan="4" class="loading"><div class="spinner"></div>Carregando motoristas...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+    </div>
 
-        <!-- LÍDERES -->
-        <div id="lideres" class="sub-tab-content">
-            <div class="transport-card">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">Gerenciar Líderes</h3>
-                    <button class="btn btn-success" onclick="showAddForm('lider')">+ Novo Líder</button>
-                </div>
-                <div class="table-container bg-white rounded-lg shadow-md">
-                    <table class="w-full">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Código Funcionário</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="lideresConfigBody">
-                            <tr><td colspan="4" class="loading"><div class="spinner"></div>Carregando líderes...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+    <div id="lideres" class="sub-tab-content">
+        <div class="transport-card">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Gerenciar Líderes</h3>
+                <button class="btn btn-success" onclick="showAddForm('lider')">+ Novo Líder</button>
+            </div>
+            <div class="table-container bg-white rounded-lg shadow-md">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Código Funcionário</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lideresConfigBody">
+                        <tr><td colspan="4" class="loading"><div class="spinner"></div>Carregando líderes...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+    </div>
 
-        <!-- PONTOS DE INTERESSE -->
-        <div id="pontosInteresse" class="sub-tab-content">
-            <div class="transport-card">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">Gerenciar Pontos de Interesse</h3>
-                    <div class="flex gap-2">
-                        <button class="btn btn-primary" onclick="showPontosInteresseMap()">Ver no Mapa</button>
-                        <button class="btn btn-success" onclick="showAddPontoInteresse()">+ Novo Ponto</button>
-                    </div>
+    <div id="pontosInteresse" class="sub-tab-content">
+        <div class="transport-card">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Gerenciar Pontos de Interesse</h3>
+                <div class="flex gap-2">
+                    <button class="btn btn-primary" onclick="showPontosInteresseMap()">Ver no Mapa</button>
+                    <button class="btn btn-success" onclick="showAddForm('pontoInteresse')">+ Novo Ponto</button>
                 </div>
-                <div class="table-container bg-white rounded-lg shadow-md">
-                    <table class="w-full">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Tipo</th>
-                                <th>Coordenadas</th>
-                                <th>Raio (m)</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="pontosInteresseConfigBody">
-                            <tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando pontos...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            </div>
+            <div class="table-container bg-white rounded-lg shadow-md">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Tipo</th>
+                            <th>Coordenadas</th>
+                            <th>Raio (m)</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pontosInteresseConfigBody">
+                        <tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando pontos...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+    </div>
 
-        <!-- ACESSOS -->
-        <div id="acessos" class="sub-tab-content">
-            <div class="transport-card">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">Gerenciar Acessos</h3>
-                    <button class="btn btn-success" onclick="showAddForm('acesso')">+ Novo Acesso</button>
+    <div id="acessos" class="sub-tab-content">
+        <div class="transport-card">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Gerenciar Acessos</h3>
+                <div class="flex gap-2">
+                    <button class="btn btn-primary" onclick="showAddForm('grupo')">+ Novo Grupo</button>
+                    <button class="btn btn-success" onclick="showAddForm('acesso')">+ Novo Usuário</button>
                 </div>
-                <div class="table-container bg-white rounded-lg shadow-md">
-                    <table class="w-full">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Tipo de Acesso</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="acessosConfigBody">
-                            <tr><td colspan="3" class="loading"><div class="spinner"></div>Carregando acessos...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            </div>
+            <div class="table-container bg-white rounded-lg shadow-md">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Tipo de Acesso</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="acessosConfigBody">
+                        <tr><td colspan="3" class="loading"><div class="spinner"></div>Carregando acessos...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+    </div>
 
-        <!-- SISTEMA -->
-        <div id="sistema" class="sub-tab-content">
-            <div class="transport-card">
-                <h3 class="text-xl font-semibold mb-4">Status do Sistema</h3>
-                <pre id="systemStatus" class="bg-gray-100 p-4 rounded-md text-sm whitespace-pre-wrap"></pre>
-            </div>
+    <div id="sistema" class="sub-tab-content">
+        <div class="transport-card">
+            <h3 class="text-xl font-semibold mb-4">Status do Sistema</h3>
+            <pre id="systemStatus" class="bg-gray-100 p-4 rounded-md text-sm whitespace-pre-wrap"></pre>
         </div>
     </div>
 </div>
 `;
+            
+    // Adicionar event listeners aos formulários
+    document.getElementById('expeditionForm').addEventListener('submit', (e) => { e.preventDefault(); lancarCarga(); });
+    document.getElementById('editExpeditionForm').addEventListener('submit', (e) => { e.preventDefault(); saveEditedExpedition(); });
+    document.getElementById('passwordForm').addEventListener('submit', (e) => { e.preventDefault(); checkPassword(); });
+    document.getElementById('addForm').addEventListener('submit', (e) => { e.preventDefault(); handleSave(); });
+    // Event listener para o formulário de autenticação de edição
+    document.getElementById('authEditForm').addEventListener('submit', (e) => { 
+        e.preventDefault(); 
+        checkAuthForEdit(); 
+    });
+
+    // Carregar dados para os selects
+    await loadSelectData();
+}
 
 
-// Adicionar event listeners aos formulários
-document.getElementById('expeditionForm').addEventListener('submit', (e) => { e.preventDefault(); lancarCarga(); });
-document.getElementById('editExpeditionForm').addEventListener('submit', (e) => { e.preventDefault(); saveEditedExpedition(); });
-document.getElementById('passwordForm').addEventListener('submit', (e) => { e.preventDefault(); checkPassword(); });
-document.getElementById('addForm').addEventListener('submit', (e) => { e.preventDefault(); handleSave(); });
-// Event listener para o formulário de autenticação de edição
-document.getElementById('authEditForm').addEventListener('submit', (e) => { 
-    e.preventDefault(); 
-    checkAuthForEdit(); 
-});
-
-            // Carregar dados para os selects
-            await loadSelectData();
-        }
 
         async function loadSelectData() {
     try {
@@ -1014,18 +1426,16 @@ document.getElementById('authEditForm').addEventListener('submit', (e) => {
 }
         
         function getStatusLabel(status) {
-            const labels = {
-                'pendente': 'Pendente', 'aguardando_agrupamento': 'Aguard. Agrupamento', 'aguardando_doca': 'Aguard. Doca',
-                'aguardando_veiculo': 'Aguard. Veículo', 'em_carregamento': 'Carregando', 'carregado': 'Carregado',
-                'aguardando_faturamento': 'Aguard. Faturamento', 'faturamento_iniciado': 'Faturando', 'faturado': 'Faturado',
-                'saiu_para_entrega': 'Saiu p/ Entrega', 'entregue': 'Entregue', 'retornando_cd': 'Retornando CD',
-                'cancelado': 'Cancelado', 'disponivel': 'Disponível', 'em_viagem': 'Em Viagem', 'folga': 'Folga',
-                'retornando_com_imobilizado': 'Ret. c/ Imobilizado', 'descarregando_imobilizado': 'Desc. Imobilizado',
-                'em_uso': 'Em Uso', 'manutencao': 'Manutenção'
-            };
-            return labels[status] || status.replace(/_/g, ' ');
-        }
-        
+    const labels = {
+        // ... (seus status existentes)
+        'faturamento_iniciado': 'Faturando', 'faturado': 'Faturado',
+        // NOVO STATUS COMBINADO
+        'em_carregamento_faturando': 'Carregando/Faturando',
+        // ... (o resto dos status)
+    };
+    return labels[status] || status.replace(/_/g, ' ');
+}
+
         function minutesToHHMM(minutes) {
             if (minutes === null || isNaN(minutes) || minutes < 0) return '-';
             const hours = Math.floor(minutes / 60);
@@ -1310,56 +1720,128 @@ async function loadHomeData() {
             }, [ocupacaoText]);
         }
 
-        function renderFrotaProdutividadeChart(motoristasData) {
-            if (!motoristasData || motoristasData.length === 0) {
-                destroyChart('frotaProdutividadeChart');
-                return;
-            }
-            const data = {
-                labels: motoristasData.map(f => f.nome),
-                datasets: [{
-                    label: 'Total de Entregas',
-                    data: motoristasData.map(f => f.entregas),
-                    backgroundColor: '#00D4AA',
-                    borderColor: '#00B4D8',
-                    borderWidth: 1,
-                    borderRadius: 4,
-                }]
-            };
+    function renderFrotaProdutividadeChart(motoristasData) {
+    if (!motoristasData || motoristasData.length === 0) {
+        destroyChart('frotaProdutividadeChart');
+        return;
+    }
+    
+    // Pega apenas os top 5 e ordena por entregas
+    const top5 = [...motoristasData]
+        .sort((a, b) => b.entregas - a.entregas)
+        .slice(0, 5);
+    
+    const data = {
+        labels: top5.map(m => m.nome),
+        datasets: [{
+            label: 'Entregas',
+            data: top5.map(m => m.entregas),
+            backgroundColor: [
+                'rgba(255, 215, 0, 0.8)',    // Ouro - 1º lugar
+                'rgba(192, 192, 192, 0.8)',  // Prata - 2º lugar
+                'rgba(205, 127, 50, 0.8)',   // Bronze - 3º lugar
+                'rgba(0, 212, 170, 0.8)',    // Turquesa - 4º
+                'rgba(0, 119, 182, 0.8)'     // Azul - 5º
+            ],
+            borderColor: [
+                'rgba(255, 215, 0, 1)',
+                'rgba(192, 192, 192, 1)',
+                'rgba(205, 127, 50, 1)',
+                'rgba(0, 212, 170, 1)',
+                'rgba(0, 119, 182, 1)'
+            ],
+            borderWidth: 2,
+            borderRadius: 6,
+            barThickness: 35 // 🚨 Tamanho fixo das barras
+        }]
+    };
 
-            renderChart('frotaProdutividadeChart', 'bar', data, {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    datalabels: {
-                        color: '#023047',
-                        font: { weight: 'bold' },
-                        anchor: 'end',
-                        align: 'end',
-                        offset: 5,
-                        formatter: (value) => value
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return `Total de Entregas: ${context.raw}`;
-                            }
-                        }
-                    }
+    renderChart('frotaProdutividadeChart', 'bar', data, {
+        indexAxis: 'y', // Barras horizontais
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { 
+                display: false 
+            },
+            tooltip: {
+                enabled: true, // 🚨 Habilita apenas o tooltip padrão
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                padding: 12,
+                titleFont: {
+                    size: 14,
+                    weight: 'bold'
                 },
-                scales: {
-                    y: {
-                        display: false,
-                        beginAtZero: true
-                    },
-                    x: {
-                        title: { display: true, text: 'Motorista' }
+                bodyFont: {
+                    size: 13
+                },
+                callbacks: {
+                    label: function(context) {
+                        return `Entregas: ${context.raw}`;
                     }
                 }
-            });
+            },
+            datalabels: {
+                display: true,
+                color: '#FFFFFF',
+                font: { 
+                    weight: 'bold',
+                    size: 16
+                },
+                anchor: 'center',
+                align: 'center',
+                formatter: (value) => value // Mostra apenas o número
+            }
+        },
+        scales: {
+            x: {
+                beginAtZero: true,
+                max: Math.max(...top5.map(m => m.entregas)) * 1.15, // 15% de margem
+                grid: {
+                    display: true,
+                    color: 'rgba(0, 0, 0, 0.05)',
+                    drawBorder: false
+                },
+                ticks: {
+                    font: {
+                        size: 12
+                    },
+                    stepSize: 1
+                },
+                title: {
+                    display: false
+                }
+            },
+            y: {
+                grid: {
+                    display: false,
+                    drawBorder: false
+                },
+                ticks: {
+                    font: {
+                        size: 13,
+                        weight: '500'
+                    },
+                    color: '#374151',
+                    padding: 10,
+                    autoSkip: false
+                }
+            }
+        },
+        layout: {
+            padding: {
+                left: 15,
+                right: 35,
+                top: 15,
+                bottom: 15
+            }
+        },
+        animation: {
+            duration: 800,
+            easing: 'easeInOutQuart'
         }
-
+    });
+}
         function renderLojaDesempenhoChart(lojasData) {
             if (!lojasData || lojasData.length === 0) {
                 destroyChart('lojaDesempenhoChart');
@@ -1874,66 +2356,83 @@ async function loadHomeMapDataForFullscreen() {
     }
 }
 
-        // --- FUNCIONALIDADES DA ABA OPERAÇÃO ---
-        async function lancarCarga() {
-            const lojaId = document.getElementById('lancar_lojaSelect').value;
-            const docaId = document.getElementById('lancar_docaSelect').value;
-            const pallets = parseInt(document.getElementById('lancar_palletsInput').value);
-            const rolltrainers = parseInt(document.getElementById('lancar_rolltrainersInput').value);
-            const liderId = document.getElementById('lancar_liderSelect').value;
-            const numerosCargaInput = document.getElementById('lancar_numerosCarga').value.trim();
-            const observacoes = document.getElementById('lancar_observacoes').value;
+    
 
-            if (!lojaId || !liderId || !docaId || (isNaN(pallets) && isNaN(rolltrainers))) {
-                showNotification('Preencha Loja, Doca, Líder e ao menos um tipo de carga!', 'error');
-                return;
-            }
-            if ((pallets < 0) || (rolltrainers < 0)) {
-                showNotification('As quantidades não podem ser negativas.', 'error');
-                return;
-            }
+// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
-            try {
-                // Processar números de carga
-                let numerosCarga = [];
-                if (numerosCargaInput) {
-                    numerosCarga = numerosCargaInput.split(',').map(num => num.trim()).filter(num => num.length > 0);
-                }
+async function lancarCarga() {
+    const lojaId = document.getElementById('lancar_lojaSelect').value;
+    const docaId = document.getElementById('lancar_docaSelect').value;
+    const pallets = parseInt(document.getElementById('lancar_palletsInput').value);
+    const rolltrainers = parseInt(document.getElementById('lancar_rolltrainersInput').value);
+    const liderId = document.getElementById('lancar_liderSelect').value;
+    const numerosCargaInput = document.getElementById('lancar_numerosCarga').value.trim();
+    const observacoes = document.getElementById('lancar_observacoes').value;
 
-                const expeditionData = { 
-                    data_hora: new Date().toISOString(), 
-                    lider_id: liderId, 
-                    doca_id: docaId, 
-                    observacoes: observacoes || null, 
-                    status: 'aguardando_agrupamento',
-                    numeros_carga: numerosCarga.length > 0 ? numerosCarga : null
-                };
-                
-                const expeditionResponse = await supabaseRequest('expeditions', 'POST', expeditionData);
-                if (!expeditionResponse || expeditionResponse.length === 0) {
-                    throw new Error("A criação da expedição falhou e não retornou um ID.");
-                }
-                const newExpeditionId = expeditionResponse[0].id;
+    if (!lojaId || !liderId || !docaId || (isNaN(pallets) && isNaN(rolltrainers))) {
+        showNotification('Preencha Loja, Doca, Líder e ao menos um tipo de carga!', 'error');
+        return;
+    }
+    if ((pallets < 0) || (rolltrainers < 0)) {
+        showNotification('As quantidades não podem ser negativas.', 'error');
+        return;
+    }
 
-                const itemData = { expedition_id: newExpeditionId, loja_id: lojaId, pallets: pallets || 0, rolltrainers: rolltrainers || 0, status_descarga: 'pendente' };
-                await supabaseRequest('expedition_items', 'POST', itemData);
-
-                const lojaNome = lojas.find(l => l.id === lojaId)?.nome || 'Loja';
-                const cargasInfo = numerosCarga.length > 0 ? ` (Cargas: ${numerosCarga.join(', ')})` : '';
-                showNotification(`Expedição para ${lojaNome}${cargasInfo} lançada com sucesso!`, 'success');
-
-                document.getElementById('expeditionForm').reset();
-                document.getElementById('lancar_lojaSelect').focus();
-                
-                if(document.getElementById('home').classList.contains('active')) {
-                    await loadHomeData();
-                }
-
-            } catch (error) {
-                console.error('Erro ao lançar carga:', error);
-                showNotification(`Erro ao lançar carga: ${error.message}`, 'error');
-            }
+    try {
+        let numerosCarga = [];
+        if (numerosCargaInput) {
+            numerosCarga = numerosCargaInput.split(',').map(num => num.trim()).filter(num => num.length > 0);
         }
+
+        const expeditionData = { 
+            data_hora: new Date().toISOString(), 
+            lider_id: liderId, 
+            doca_id: docaId, 
+            observacoes: observacoes || null, 
+            status: 'aguardando_agrupamento',
+            numeros_carga: numerosCarga.length > 0 ? numerosCarga : null
+            // filial será injetada automaticamente pela função supabaseRequest
+        };
+        
+        // 1. Cria a Expedição principal COM filtro de filial (true)
+        const expeditionResponse = await supabaseRequest('expeditions', 'POST', expeditionData, true);
+        
+        if (!expeditionResponse || expeditionResponse.length === 0) {
+            throw new Error("A criação da expedição falhou.");
+        }
+        
+        const newExpeditionId = expeditionResponse[0].id;
+
+        // 2. Cria o item da expedição SEM enviar campo filial (o trigger cuida)
+        const itemData = { 
+            expedition_id: newExpeditionId, 
+            loja_id: lojaId, 
+            pallets: pallets || 0, 
+            rolltrainers: rolltrainers || 0, 
+            status_descarga: 'pendente'
+            // NÃO incluir campo filial aqui - o trigger set_filial_expedition_items cuida disso
+        };
+        
+        // IMPORTANTE: Não precisa passar false, pois a função já sabe que não deve enviar filial para expedition_items
+        await supabaseRequest('expedition_items', 'POST', itemData);
+
+        const lojaNome = lojas.find(l => l.id === lojaId)?.nome || 'Loja';
+        const cargasInfo = numerosCarga.length > 0 ? ` (Cargas: ${numerosCarga.join(', ')})` : '';
+        showNotification(`Expedição para ${lojaNome}${cargasInfo} lançada com sucesso!`, 'success');
+
+        document.getElementById('expeditionForm').reset();
+        document.getElementById('lancar_lojaSelect').focus();
+        
+        if(document.getElementById('home').classList.contains('active')) {
+            await loadHomeData();
+        }
+
+    } catch (error) {
+        console.error('Erro ao lançar carga:', error);
+        showNotification(`Erro ao lançar carga: ${error.message}`, 'error');
+    }
+}
+
         // --- FUNCIONALIDADES DA ABA TRANSPORTE ---
         async function loadTransportList() {
             try {
@@ -2100,131 +2599,147 @@ await openOrdemCarregamentoModal(newExpeditionId);
             }
         }
 
-        // --- FUNCIONALIDADES DA ABA FATURAMENTO ---
-       async function loadFaturamento() {
-    showSubTab('faturamento', 'faturamentoAtivo', document.querySelector('#faturamento .sub-tab'));
+      // SUBSTITUIR A FUNÇÃO loadFaturamento
+async function loadFaturamento() {
+    // Busca e aplica a lógica para auto-abrir a única sub-aba permitida
+    const permittedFaturamentoTabs = getPermittedSubTabs('faturamento');
     
-    try {
-        const expeditions = await supabaseRequest("expeditions?status=in.(aguardando_faturamento,faturamento_iniciado,faturado)&order=data_hora.desc");
-        const items = await supabaseRequest('expedition_items');
-
-        const expeditionsWithItems = expeditions.map(exp => {
-            const expItems = items.filter(item => item.expedition_id === exp.id);
-            const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
-            return {
-                ...exp,
-                items: expItems,
-                total_pallets: expItems.reduce((sum, item) => sum + (item.pallets || 0), 0),
-                total_rolltrainers: expItems.reduce((sum, item) => sum + (item.rolltrainers || 0), 0),
-                lojas_count: expItems.length,
-                lojas_info: expItems.map(item => {
-                    const loja = lojas.find(l => l.id === item.loja_id);
-                    return loja ? `${loja.codigo} - ${loja.nome}` : 'N/A';
-                }).join(', '),
-                doca_nome: docas.find(d => d.id === exp.doca_id)?.nome || 'N/A',
-                lider_nome: lideres.find(l => l.id === exp.lider_id)?.nome || 'N/A',
-                veiculo_placa: veiculo?.placa || null,
-                veiculo_modelo: veiculo?.modelo || null,
-                motorista_nome: motoristas.find(m => m.id === exp.motorista_id)?.nome || null
-            };
-        });
-
-        updateFaturamentoStats(expeditionsWithItems);
-        renderFaturamentoList(expeditionsWithItems);
+    if (permittedFaturamentoTabs.length > 0) {
+        const initialSubTab = permittedFaturamentoTabs.length === 1 ? permittedFaturamentoTabs[0] : 'faturamentoAtivo';
+        const initialElement = document.querySelector(`#faturamento .sub-tabs button[onclick*="'${initialSubTab}'"]`);
         
-        // Definir datas padrão para o histórico (últimos 30 dias)
-        const hoje = new Date();
-        const ha30Dias = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
-        
-        const historicoDataInicio = document.getElementById('historicoFaturamentoDataInicio');
-        const historicoDataFim = document.getElementById('historicoFaturamentoDataFim');
-        
-        if (historicoDataInicio && !historicoDataInicio.value) {
-            historicoDataInicio.value = ha30Dias.toISOString().split('T')[0];
+        // NOVO: Garantir que o elemento exista e que a função showSubTab seja chamada
+        if (initialElement) {
+            showSubTab('faturamento', initialSubTab, initialElement);
+        } else {
+             // Fallback: Se o botão não for encontrado (filtrado), chama a função de carregamento manual para garantir o estado
+             await loadFaturamentoData(initialSubTab);
         }
-        if (historicoDataFim && !historicoDataFim.value) {
-            historicoDataFim.value = hoje.toISOString().split('T')[0];
-        }
-        
-    } catch (error) {
-        document.getElementById('faturamentoList').innerHTML = `<div class="alert alert-error">Erro: ${error.message}</div>`;
     }
 }
 
-        function renderFaturamentoList(expeditionsList) {
-            const container = document.getElementById('faturamentoList');
+       function renderFaturamentoList(expeditionsList) {
+    const container = document.getElementById('faturamentoList');
 
-            if (expeditionsList.length === 0) {
-                container.innerHTML = '<div class="alert alert-success">Nenhuma expedição pendente de faturamento!</div>';
-                return;
+    if (expeditionsList.length === 0) {
+        container.innerHTML = '<div class="alert alert-success">Nenhuma expedição pendente de faturamento!</div>';
+        return;
+    }
+
+    container.innerHTML = expeditionsList.map(exp => {
+        // Usa a data de saída do veículo (fim do carregamento) se existir, senão usa a data de criação
+        const carregadoEm = exp.data_saida_veiculo ? new Date(exp.data_saida_veiculo) : new Date(exp.data_hora);
+        const tempoEspera = Math.round((new Date() - carregadoEm) / 60000);
+        
+        let actionButtons = '', statusInfo = '';
+        
+        // 1. STATUS DE CARREGAMENTO (permissão para faturar antecipadamente)
+        if (exp.status === 'em_carregamento') {
+            statusInfo = `<div class="text-gray-600 font-semibold mb-2">🚚 Carregando (Permite Faturamento Antecipado)</div>`;
+            actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento (Antecipado)</button>`;
+        } else if (exp.status === 'carregado' || exp.status === 'aguardando_faturamento') {
+            // 2. STATUS DE PRONTO PARA FATURAR
+            statusInfo = `<div class="text-blue-600 font-semibold mb-2">📄 Pronto para iniciar faturamento</div>`;
+            actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento</button>`;
+        } else if (exp.status === 'faturamento_iniciado' || exp.status === 'em_carregamento_faturando') { 
+            // 3. STATUS DE FATURANDO (Inclui o status combinado)
+            const iniciadoEm = exp.data_inicio_faturamento ? new Date(exp.data_inicio_faturamento) : null;
+            const tempoFaturamento = iniciadoEm ? Math.round((new Date() - iniciadoEm) / 60000) : 0;
+            
+            const faturandoTexto = exp.status === 'em_carregamento_faturando' ? 'Carregando/Faturando' : 'Faturamento em andamento';
+            statusInfo = `<div class="text-yellow-600 font-semibold mb-2">📄 ${faturandoTexto} há ${minutesToHHMM(tempoFaturamento)}</div>`;
+            actionButtons = `<button class="btn btn-primary" onclick="finalizarFaturamento('${exp.id}')">Finalizar Faturamento</button>`;
+        } else if (exp.status === 'faturado') {
+            // 4. STATUS FATURADO (Com bloqueio de saída)
+            statusInfo = `<div class="text-green-600 font-semibold mb-2">✅ Faturado</div>`;
+            
+            // AJUSTE CRÍTICO: 'Marcar Saída' liberado apenas se carregamento finalizado (`data_saida_veiculo` presente)
+            if (exp.data_saida_veiculo) {
+                actionButtons = `<button class="btn btn-warning" onclick="marcarSaiuEntrega('${exp.id}')">Marcar Saída</button>`;
+            } else {
+                // Botão desabilitado com dica, forçando a finalização do carregamento antes de liberar a saída.
+                actionButtons = `<button class="btn btn-secondary" disabled title="Aguardando Finalização do Carregamento (data_saida_veiculo)">Marcar Saída</button>`;
             }
-
-            container.innerHTML = expeditionsList.map(exp => {
-                const carregadoEm = exp.data_saida_veiculo ? new Date(exp.data_saida_veiculo) : new Date(exp.data_hora);
-                const tempoEspera = Math.round((new Date() - carregadoEm) / 60000);
-                
-                let actionButtons = '', statusInfo = '';
-                if (exp.status === 'aguardando_faturamento') {
-                    statusInfo = `<div class="text-blue-600 font-semibold mb-2">📄 Pronto para iniciar faturamento</div>`;
-                    actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento</button>`;
-                } else if (exp.status === 'faturamento_iniciado') {
-                    const iniciadoEm = exp.data_inicio_faturamento ? new Date(exp.data_inicio_faturamento) : null;
-                    const tempoFaturamento = iniciadoEm ? Math.round((new Date() - iniciadoEm) / 60000) : 0;
-                    statusInfo = `<div class="text-yellow-600 font-semibold mb-2">📄 Faturamento em andamento há ${minutesToHHMM(tempoFaturamento)}</div>`;
-                    actionButtons = `<button class="btn btn-primary" onclick="finalizarFaturamento('${exp.id}')">Finalizar Faturamento</button>`;
-                } else if (exp.status === 'faturado') {
-                    statusInfo = `<div class="text-green-600 font-semibold mb-2">✅ Faturado</div>`;
-                    actionButtons = `<button class="btn btn-warning" onclick="marcarSaiuEntrega('${exp.id}')">Marcar Saída</button>`;
-                }
-
-                return `
-                    <div class="faturamento-card">
-                       <h3 class="text-lg font-bold text-gray-800">${exp.lojas_count} loja${exp.lojas_count > 1 ? 's' : ''} - ${exp.veiculo_placa || 'N/A'}</h3>
-                        <p class="text-sm text-gray-500 mb-2">${exp.lojas_info}</p>
-                        ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mb-2 inline-block">📦 Cargas: ${exp.numeros_carga.join(', ')}</p>` : ''}
-                        ${statusInfo}
-                        <div class="time-display">
-                            <strong>Carregado há:</strong> ${minutesToHHMM(tempoEspera)}
-                        </div>
-                        <div class="grid grid-cols-2 gap-4 my-4 text-sm">
-                            <p><strong>Pallets:</strong> ${exp.total_pallets}</p>
-                            <p><strong>RollTrainers:</strong> ${exp.total_rolltrainers}</p>
-                            <p><strong>Motorista:</strong> ${exp.motorista_nome || 'N/A'}</p>
-                            <p><strong>Líder:</strong> ${exp.lider_nome || 'N/A'}</p>
-                        </div>
-                        <div class="text-center mt-4">
-                            ${actionButtons}
-                        </div>
-                    </div>
-                `;
-            }).join('');
         }
+
+        return `
+            <div class="faturamento-card">
+               <h3 class="text-lg font-bold text-gray-800">${exp.lojas_count} loja${exp.lojas_count > 1 ? 's' : ''} - ${exp.veiculo_placa || 'N/A'}</h3>
+                <p class="text-sm text-gray-500 mb-2">${exp.lojas_info}</p>
+                ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mb-2 inline-block">📦 Cargas: ${exp.numeros_carga.join(', ')}</p>` : ''}
+                ${statusInfo}
+                <div class="time-display">
+                    <strong>Tempo de Espera/Carregamento:</strong> ${minutesToHHMM(tempoEspera)}
+                </div>
+                <div class="grid grid-cols-2 gap-4 my-4 text-sm">
+                    <p><strong>Pallets:</strong> ${exp.total_pallets}</p>
+                    <p><strong>RollTrainers:</strong> ${exp.total_rolltrainers}</p>
+                    <p><strong>Motorista:</strong> ${exp.motorista_nome || 'N/A'}</p>
+                    <p><strong>Líder:</strong> ${exp.lider_nome || 'N/A'}</p>
+                </div>
+                <div class="text-center mt-4">
+                    ${actionButtons}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
 
         function updateFaturamentoStats(expeditions) {
-            document.getElementById('totalCarregadas').textContent = expeditions.filter(e => e.status === 'aguardando_faturamento').length;
-            document.getElementById('emFaturamento').textContent = expeditions.filter(e => e.status === 'faturamento_iniciado').length;
-            document.getElementById('faturadas').textContent = expeditions.filter(e => e.status === 'faturado').length;
-            
-            const expedicoesComFaturamento = expeditions.filter(e => e.data_inicio_faturamento && e.data_fim_faturamento);
-            if (expedicoesComFaturamento.length > 0) {
-                const tempos = expedicoesComFaturamento.map(e => (new Date(e.data_fim_faturamento) - new Date(e.data_inicio_faturamento)) / 60000);
-                const tempoMedio = tempos.reduce((a, b) => a + b, 0) / tempos.length;
-                document.getElementById('tempoMedioFaturamento').textContent = minutesToHHMM(tempoMedio);
-            } else {
-                document.getElementById('tempoMedioFaturamento').textContent = '-';
-            }
-        }
+    // NOVO: Conta a partir de 'em_carregamento' e 'carregado' que aguardam faturamento
+    document.getElementById('totalCarregadas').textContent = expeditions.filter(e => 
+        e.status === 'em_carregamento' || 
+        e.status === 'carregado' || 
+        e.status === 'aguardando_faturamento'
+    ).length;
+    
+    // NOVO: Inclui o status combinado 'em_carregamento_faturando'
+    document.getElementById('emFaturamento').textContent = expeditions.filter(e => 
+        e.status === 'faturamento_iniciado' || 
+        e.status === 'em_carregamento_faturando'
+    ).length;
+    
+    document.getElementById('faturadas').textContent = expeditions.filter(e => e.status === 'faturado').length;
+    
+    const expedicoesComFaturamento = expeditions.filter(e => e.data_inicio_faturamento && e.data_fim_faturamento);
+    if (expedicoesComFaturamento.length > 0) {
+        const tempos = expedicoesComFaturamento.map(e => (new Date(e.data_fim_faturamento) - new Date(e.data_inicio_faturamento)) / 60000);
+        const tempoMedio = tempos.reduce((a, b) => a + b, 0) / tempos.length;
+        document.getElementById('tempoMedioFaturamento').textContent = minutesToHHMM(tempoMedio);
+    } else {
+        document.getElementById('tempoMedioFaturamento').textContent = '-';
+    }
+}
 
-        async function iniciarFaturamento(expeditionId) {
-            try {
-                const updateData = { status: 'faturamento_iniciado', data_inicio_faturamento: new Date().toISOString() };
-                await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', updateData);
-                showNotification(`Faturamento iniciado!`, 'success');
-                loadFaturamento();
-            } catch (error) {
-                showNotification('Erro ao iniciar faturamento: ' + error.message, 'error');
-            }
+    async function iniciarFaturamento(expeditionId) {
+    try {
+        const currentExp = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=status`);
+        const currentStatus = currentExp[0].status;
+        
+        let newStatus;
+        if (currentStatus === 'em_carregamento') {
+             // NOVO: Define o status combinado se o carregamento estiver em andamento
+             newStatus = 'em_carregamento_faturando'; 
+        } else if (currentStatus === 'carregado' || currentStatus === 'aguardando_faturamento') {
+             // Fluxo normal: inicia o faturamento após o carregamento
+             newStatus = 'faturamento_iniciado';
+        } else if (currentStatus === 'em_carregamento_faturando' || currentStatus === 'faturamento_iniciado') {
+             showNotification('Faturamento já está em andamento!', 'info');
+             return;
+        } else {
+             showNotification(`Não é possível iniciar faturamento no status atual: ${getStatusLabel(currentStatus)}`, 'error');
+             return;
         }
+        
+        const updateData = { status: newStatus, data_inicio_faturamento: new Date().toISOString() };
+        await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', updateData);
+        
+        showNotification(`Faturamento iniciado! Status: ${getStatusLabel(newStatus)}`, 'success');
+        loadFaturamentoData(); 
+    } catch (error) {
+        showNotification('Erro ao iniciar faturamento: ' + error.message, 'error');
+    }
+}
 
         async function finalizarFaturamento(expeditionId) {
              try {
@@ -2419,58 +2934,37 @@ function clearHistoricoFaturamentoFilters() {
     loadHistoricoFaturamento();
 }
 
-      // Nova função para sub-abas (SUBSTITUÍDA)
+
+
+// SUBSTITUIR A FUNÇÃO showSubTab (INCLUINDO A NOVA CHAMADA)
 function showSubTab(tabName, subTabName, element) {
-    // Verificar permissão da sub-aba
-    const permissionMap = {
-        'operacao': {
-            'lancamento': 'acesso_operacao_lancamento',
-            'identificacao': 'acesso_operacao_identificacao'
-        },
-        'faturamento': {
-            'faturamentoAtivo': 'acesso_faturamento_ativo',
-            'historicoFaturamento': 'acesso_faturamento_historico'
-        },
-        'motoristas': {
-            'statusFrota': 'acesso_motoristas_status',
-            'relatorioMotoristas': 'acesso_motoristas_relatorio'
-        },
-        'acompanhamento': {
-            'expedicoesEmAndamento': 'acesso_acompanhamento_expedicoes',
-            'rastreio': 'acesso_acompanhamento_rastreio',
-            'frota': 'acesso_acompanhamento_frota'
-        },
-        'historico': {
-            'listaEntregas': 'acesso_historico_entregas',
-            'indicadores': 'acesso_historico_indicadores'
-        },
-        'configuracoes': {
-            'filiais': 'acesso_configuracoes_filiais',
-            'lojas': 'acesso_configuracoes_lojas',
-            'docas': 'acesso_configuracoes_docas',
-            'veiculos': 'acesso_configuracoes_veiculos',
-            'motoristasConfig': 'acesso_configuracoes_motoristas',
-            'lideres': 'acesso_configuracoes_lideres',
-            'pontosInteresse': 'acesso_configuracoes_pontos',
-            'acessos': 'acesso_configuracoes_acessos',
-            'sistema': 'acesso_configuracoes_sistema'
-        }
-    };
+    // Permissão lida do atributo data-permission do botão clicado
+    const permission = element ? element.dataset.permission : null; 
     
-    if (permissionMap[tabName] && permissionMap[tabName][subTabName] && !hasPermission(permissionMap[tabName][subTabName])) {
-        showNotification('Você não tem permissão para acessar esta seção.', 'error');
-        return;
+    // Apenas faz a checagem se o botão realmente tiver uma permissão e o usuário não for MASTER
+    if (permission && !masterUserPermission) {
+        const requiredPermission = permission.trim().toLowerCase();
+        const mappedPermission = requiredPermission.replace('acesso_', 'view_'); // Ex: 'view_faturamento_ativo'
+        
+        // Se não tem a permissão do HTML NEM a permissão mapeada do BD (que deveria ter sido filtrada antes, mas checamos para segurança)
+        if (!userPermissions.includes(requiredPermission) && !userPermissions.includes(mappedPermission)) {
+             showNotification('Você não tem permissão para acessar esta seção.', 'error');
+             return; 
+        }
     }
 
     const tabContent = document.getElementById(tabName);
     if (!tabContent) return;
     
+    // Desativa todas as sub-abas e conteúdos para começar
     tabContent.querySelectorAll('.sub-tab').forEach(tab => tab.classList.remove('active'));
     tabContent.querySelectorAll('.sub-tab-content').forEach(content => content.classList.remove('active'));
 
+    // Ativa a sub-aba clicada
     if(element) element.classList.add('active');
     document.getElementById(subTabName).classList.add('active');
     
+    // Lógica para carregar os dados específicos da sub-aba (mantida)
     if (tabName === 'acompanhamento') {
         if (subTabName === 'frota') {
             loadFrotaData();
@@ -2482,8 +2976,13 @@ function showSubTab(tabName, subTabName, element) {
         }
     } else if (tabName === 'historico' && subTabName === 'indicadores') {
         applyHistoricoFilters();
-    } else if (tabName === 'faturamento' && subTabName === 'historicoFaturamento') {
-        loadHistoricoFaturamento();
+    } else if (tabName === 'faturamento') {
+        // 🚨 NOVO: Chama a função de dados de faturamento (Faturamento Ativo ou Histórico)
+        if (subTabName === 'faturamentoAtivo') {
+            loadFaturamentoData('faturamentoAtivo');
+        } else if (subTabName === 'historicoFaturamento') {
+            loadHistoricoFaturamento();
+        }
     } else if (tabName === 'configuracoes') {
         if (subTabName === 'filiais') {
             renderFiliaisConfig();
@@ -2509,133 +3008,241 @@ function showSubTab(tabName, subTabName, element) {
         if (subTabName === 'identificacao') {
             loadIdentificacaoExpedicoes();
         }
-    } else if (tabName === 'motoristas' && subTabName === 'relatorioMotoristas') {
-        generateMotoristaReports();
+    } else if (tabName === 'motoristas') {
+        // 🚨 NOVO: Chama a função de dados de motoristas (Status da Frota ou Relatório)
+        if (subTabName === 'statusFrota') {
+            renderMotoristasStatusList(); // Função que carrega e renderiza o status da frota
+        } else if (subTabName === 'relatorioMotoristas') {
+            generateMotoristaReports();
+        }
     }
     feather.replace();
 }
 
-        async function loadMotoristaTab() {
-            ('motoristas', 'statusFrota', document.querySelector('#motoristas .sub-tab'));
-            await renderMotoristasStatusList();
-            
-            // Definir datas padrão para o relatório (últimos 30 dias)
-            const hoje = new Date();
-            const ha30Dias = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
-            
-            const dataInicio = document.getElementById('relatorioMotoristaDataInicio');
-            const dataFim = document.getElementById('relatorioMotoristaDataFim');
-            
-            if (dataInicio && !dataInicio.value) {
-                dataInicio.value = ha30Dias.toISOString().split('T')[0];
-            }
-            if (dataFim && !dataFim.value) {
-                dataFim.value = hoje.toISOString().split('T')[0];
-            }
+// Novo: Mapa de Permissões de Sub-Abas e Views que contêm sub-abas
+const subTabViewIds = new Set(['operacao', 'faturamento', 'motoristas', 'acompanhamento', 'historico', 'configuracoes']);
+const subTabPermissionMap = {
+    'operacao': {
+        'lancamento': 'acesso_operacao_lancamento',
+        'identificacao': 'acesso_operacao_identificacao'
+    },
+    'faturamento': {
+        'faturamentoAtivo': 'acesso_faturamento_ativo',
+        'historicoFaturamento': 'acesso_faturamento_historico'
+    },
+    'motoristas': {
+        'statusFrota': 'acesso_motoristas_status',
+        'relatorioMotoristas': 'acesso_motoristas_relatorio'
+    },
+    'acompanhamento': {
+        'expedicoesEmAndamento': 'acesso_acompanhamento_expedicoes',
+        'rastreio': 'acesso_acompanhamento_rastreio',
+        'frota': 'acesso_acompanhamento_frota'
+    },
+    'historico': {
+        'listaEntregas': 'acesso_historico_entregas',
+        'indicadores': 'acesso_historico_indicadores'
+    },
+    'configuracoes': {
+        'filiais': 'acesso_configuracoes_filiais',
+        'lojas': 'acesso_configuracoes_lojas',
+        'docas': 'acesso_configuracoes_docas',
+        'veiculos': 'acesso_configuracoes_veiculos',
+        'motoristasConfig': 'acesso_configuracoes_motoristas',
+        'lideres': 'acesso_configuracoes_lideres',
+        'pontosInteresse': 'acesso_configuracoes_pontos',
+        'acessos': 'acesso_configuracoes_acessos',
+        'sistema': 'acesso_configuracoes_sistema'
+    }
+};
+
+
+function getPermittedSubTabs(viewId) {
+    if (!subTabPermissionMap[viewId]) return [];
+    
+    const permittedSubTabs = [];
+    const subTabs = subTabPermissionMap[viewId];
+    
+    for (const subTabId in subTabs) {
+        const requiredPermission = subTabs[subTabId]; // Ex: 'acesso_faturamento_ativo'
+        const mappedPermission = requiredPermission.replace('acesso_', 'view_'); // Ex: 'view_faturamento_ativo'
+        
+        // Checa a permissão do HTML e a permissão mapeada do banco
+        if (hasPermission(requiredPermission) || hasPermission(mappedPermission)) {
+            permittedSubTabs.push(subTabId);
         }
+    }
+    return permittedSubTabs;
+}
 
-        async function renderMotoristasStatusList() {
-            const container = document.getElementById('motoristasStatusList');
-            if (!container) return;
-            container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando status...</div>`;
-            Object.values(activeTimers).forEach(clearInterval);
-            activeTimers = {};
 
-            const [activeExpeditions, recentlyCompletedExpeditions, allItems] = await Promise.all([
-                 supabaseRequest(`expeditions?status=not.in.(entregue,cancelado)`),
-                 supabaseRequest(`expeditions?status=eq.entregue&order=data_hora.desc&limit=50`),
-                 supabaseRequest('expedition_items')
-            ]);
-            
-            let html = `<div class="stats-grid">
-                <div class="stat-card"><div class="stat-number">${motoristas.filter(m => m.status === 'disponivel').length}</div><div class="stat-label">Disponíveis</div></div>
-                <div class="stat-card" style="background: var(--secondary-gradient);"><div class="stat-number">${motoristas.filter(m => ['em_viagem', 'descarregando_imobilizado', 'saiu_para_entrega'].includes(m.status)).length}</div><div class="stat-label">Em Atividade</div></div>
-                <div class="stat-card" style="background: var(--accent-gradient);"><div class="stat-number">${motoristas.filter(m => ['retornando_cd', 'retornando_com_imobilizado'].includes(m.status)).length}</div><div class="stat-label">Retornando</div></div>
-            </div>
-            <h3 class="text-xl font-semibold text-gray-800 my-4">Status dos Motoristas</h3>
+
+   // SUBSTITUIR A FUNÇÃO loadMotoristaTab
+async function loadMotoristaTab() {
+    // Busca e aplica a lógica para auto-abrir a única sub-aba permitida
+    const permittedMotoristasTabs = getPermittedSubTabs('motoristas');
+    
+    if (permittedMotoristasTabs.length > 0) {
+        const initialSubTab = permittedMotoristasTabs.length === 1 ? permittedMotoristasTabs[0] : 'statusFrota';
+        const initialElement = document.querySelector(`#motoristas .sub-tabs button[onclick*="'${initialSubTab}'"]`);
+        
+        if (initialElement) {
+            showSubTab('motoristas', initialSubTab, initialElement);
+        } else {
+             // Fallback: Se o botão não for encontrado, chama a função de carregamento manual
+             await renderMotoristasStatusList();
+        }
+    }
+    
+    // Configurar datas padrão
+    const hoje = new Date();
+    // Inicia com o dia de hoje, não os últimos 30 dias para evitar sobrecarga inicial
+    const hojeFormatado = hoje.toISOString().split('T')[0];
+    const dataInicio = document.getElementById('relatorioMotoristaDataInicio');
+    const dataFim = document.getElementById('relatorioMotoristaDataFim');
+    if (dataInicio && !dataInicio.value) dataInicio.value = hojeFormatado;
+    if (dataFim && !dataFim.value) dataFim.value = hojeFormatado;
+}
+
+// SUBSTITUIR A FUNÇÃO renderMotoristasStatusList COMPLETA (aproximadamente linha 2246)
+async function renderMotoristasStatusList() {
+    const container = document.getElementById('motoristasStatusList');
+    if (!container) return;
+    container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando status...</div>`;
+    Object.values(activeTimers).forEach(clearInterval);
+    activeTimers = {};
+
+    const [activeExpeditions, recentlyCompletedExpeditions, allItems] = await Promise.all([
+         // Busca expedições ativas
+         supabaseRequest(`expeditions?status=not.in.(entregue,cancelado)`),
+         // Busca expedições recentemente concluídas (para achar o último veículo de quem retornou)
+         supabaseRequest(`expeditions?status=eq.entregue&order=data_hora.desc&limit=50`),
+         supabaseRequest('expedition_items')
+    ]);
+    
+    // Contagem de status para o Dashboard
+    const dispCount = motoristas.filter(m => m.status === 'disponivel').length;
+    const ativoCount = motoristas.filter(m => ['em_viagem', 'descarregando_imobilizado', 'saiu_para_entrega'].includes(m.status)).length;
+    const retornandoCount = motoristas.filter(m => ['retornando_cd', 'retornando_com_imobilizado'].includes(m.status)).length;
+    
+    // Mapeia motoristas com status e info do veículo
+    const motoristasComStatus = motoristas.map(m => {
+        const activeExp = activeExpeditions.find(exp => exp.motorista_id === m.id);
+        let veiculoPlaca = 'N/A';
+        let veiculoId = null;
+        let displayStatus = m.status; // Status padrão do motorista
+        
+        if (activeExp) {
+            // 1. Se tem expedição ativa, o status é o da expedição (ex: saiu_para_entrega)
+            veiculoId = activeExp.veiculo_id;
+            veiculoPlaca = veiculos.find(v => v.id === veiculoId)?.placa || 'N/A';
+            displayStatus = activeExp.status; // Exibe o status da expedição
+            return { ...m, displayStatus, veiculoPlaca, veiculoId, activeExp: { ...activeExp, items: allItems.filter(i => i.expedition_id === activeExp.id) } };
+        } 
+        
+        // 2. Se o motorista está em um status de retorno, tenta achar o último veículo
+        if (['retornando_cd', 'retornando_com_imobilizado', 'descarregando_imobilizado'].includes(m.status)) {
+             const lastExp = recentlyCompletedExpeditions.find(exp => exp.motorista_id === m.id);
+             veiculoId = lastExp?.veiculo_id;
+             veiculoPlaca = veiculos.find(v => v.id === veiculoId)?.placa || 'N/A';
+        }
+        
+        // Retorna status normal (disponivel, folga, etc.)
+        return { ...m, displayStatus, veiculoPlaca, veiculoId };
+    });
+
+    motoristasComStatus.sort((a, b) => a.nome.localeCompare(b.nome));
+
+    // HTML principal (sem o filtro, que foi movido)
+    let html = `
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-number">${dispCount}</div><div class="stat-label">Disponíveis</div></div>
+            <div class="stat-card" style="background: var(--secondary-gradient);"><div class="stat-number">${ativoCount}</div><div class="stat-label">Em Atividade</div></div>
+            <div class="stat-card" style="background: var(--accent-gradient);"><div class="stat-number">${retornandoCount}</div><div class="stat-label">Retornando</div></div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC);"><div class="stat-number">${motoristas.filter(m => m.status === 'folga').length}</div><div class="stat-label">Em Folga</div></div>
+        </div>
+        
+        <h3 class="text-xl font-semibold text-gray-800 my-4">Status dos Motoristas</h3>
+        <div id="motoristaListFiltered">
+            ${renderMotoristasListHtml(motoristasComStatus)}
+        </div>
+        `;
+    container.innerHTML = html;
+    
+    // Armazena o array completo (não filtrado) na memória para o filtro
+    window.motoristasDataCache = motoristasComStatus; 
+    
+    // Iniciar timers
+    motoristasComStatus.forEach(m => {
+        if (m.activeExp && m.displayStatus === 'saiu_para_entrega') {
+             startMotoristaTimer(m);
+        }
+    });
+}
+
+
+
+
+// SUBSTITUA TODA E QUALQUER DEFINIÇÃO DESTA FUNÇÃO PELA ABAIXO:
+function renderMotoristasListHtml(motoristasData) {
+    if (motoristasData.length === 0) {
+        return '<div class="alert alert-info mt-4">Nenhum motorista encontrado com o filtro selecionado.</div>';
+    }
+    
+    return motoristasData.map(m => {
+        let actionButton = '';
+        
+        // Determinar classe CSS baseada no status
+        let placaClass = 'placa-destaque';
+        if (m.displayStatus === 'saiu_para_entrega' || m.displayStatus === 'em_viagem') {
+            placaClass += ' em-viagem';
+        } else if (m.displayStatus === 'retornando_cd' || m.displayStatus === 'retornando_com_imobilizado') {
+            placaClass += ' retornando';
+        } else if (m.displayStatus === 'disponivel') {
+            placaClass += ' disponivel';
+        }
+        
+        // Placa animada com destaque
+        const veiculoPlacaNoNome = m.veiculoPlaca && m.veiculoPlaca !== 'N/A' ? 
+            `<span class="${placaClass}" title="Veículo: ${m.veiculoPlaca}">${m.veiculoPlaca}</span>` : '';
+
+        // AÇÕES PERMITIDAS NA ABA MOTORISTAS (APENAS CHEGADA E DESCARGA IMOBILIZADO)
+        
+        // 1. Chegada no CD (para quem está retornando)
+        if ((m.displayStatus === 'retornando_cd' || m.displayStatus === 'retornando_com_imobilizado') && m.veiculoId) {
+            actionButton = `<button class="btn btn-primary btn-small" onclick="marcarRetornoCD('${m.id}', '${m.veiculoId}')">Cheguei no CD</button>`;
+        } 
+        // 2. Finalizar Descarga de Imobilizado
+        else if (m.displayStatus === 'descarregando_imobilizado' && m.veiculoId) {
+            actionButton = `<button class="btn btn-warning btn-small" onclick="finalizarDescargaImobilizado('${m.id}', '${m.veiculoId}')">Finalizar Descarga</button>`;
+        }
+        
+        // O BLOCO DE LÓGICA DO CARREGAMENTO FOI REMOVIDO DEFINITIVAMENTE.
+        // Nenhuma lógica para 'aguardando_veiculo' ou 'em_carregamento' deve existir aqui.
+
+        let timeInfo = '';
+        if (m.activeExp && m.displayStatus === 'saiu_para_entrega') {
+            timeInfo = `
+                <div class="text-xs text-gray-500 mt-1">
+                    <span id="loja_timer_${m.id}">Loja: --:--</span> | 
+                    <span id="desloc_timer_${m.id}">Desloc.: --:--</span>
+                </div>
             `;
-
-            const motoristasComStatus = motoristas.map(m => {
-                const activeExp = activeExpeditions.find(exp => exp.motorista_id === m.id);
-                if (activeExp) {
-                    const itemsForExp = allItems.filter(i => i.expedition_id === activeExp.id);
-                    return { ...m, displayStatus: activeExp.status, veiculoId: activeExp.veiculo_id, activeExp: { ...activeExp, items: itemsForExp } };
-                } else {
-                    const lastCompletedExp = recentlyCompletedExpeditions.find(exp => exp.motorista_id === m.id);
-                    return { ...m, displayStatus: m.status, veiculoId: lastCompletedExp ? lastCompletedExp.veiculo_id : null };
-                }
-            });
-
-            motoristasComStatus.sort((a, b) => a.nome.localeCompare(b.nome));
-
-            motoristasComStatus.forEach(m => {
-                let actionButton = '';
-                if ((m.status === 'retornando_cd' || m.status === 'retornando_com_imobilizado') && m.veiculoId) {
-                    actionButton = `<button class="btn btn-primary btn-small" onclick="marcarRetornoCD('${m.id}', '${m.veiculoId}')">Cheguei no CD</button>`;
-                } else if (m.status === 'descarregando_imobilizado' && m.veiculoId) {
-                    actionButton = `<button class="btn btn-warning btn-small" onclick="finalizarDescargaImobilizado('${m.id}', '${m.veiculoId}')">Finalizar Descarga</button>`;
-                }
-
-                let timeInfo = '';
-                if (m.activeExp && m.displayStatus === 'saiu_para_entrega') {
-                    timeInfo = `
-                        <div class="text-xs text-gray-500 mt-1">
-                            <span id="loja_timer_${m.id}">Loja: --:--</span> | 
-                            <span id="desloc_timer_${m.id}">Desloc.: --:--</span>
-                        </div>
-                    `;
-                }
-
-                html += `
-                    <div class="motorista-status-item">
-                        <div>
-                            <strong class="text-gray-800">${m.nome}</strong>
-                            ${timeInfo}
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <span class="status-badge status-${m.displayStatus.replace(/ /g, '_')}">${getStatusLabel(m.displayStatus)}</span>
-                            ${actionButton}
-                        </div>
-                    </div>`;
-            });
-            container.innerHTML = html;
-
-            // Iniciar timers
-            motoristasComStatus.forEach(m => {
-                if(m.activeExp && m.displayStatus === 'saiu_para_entrega') {
-                    const timerId = `motorista_${m.id}`;
-                    if(activeTimers[timerId]) clearInterval(activeTimers[timerId]);
-                    
-                    activeTimers[timerId] = setInterval(() => {
-                        let tempoEmLoja = 0, tempoDeslocamento = 0;
-                        let lastEventTime = new Date(m.activeExp.data_saida_entrega);
-
-                        m.activeExp.items.sort((a,b) => new Date(a.data_inicio_descarga) - new Date(b.data_inicio_descarga)).forEach(item => {
-                            if(item.data_inicio_descarga) {
-                               const inicio = new Date(item.data_inicio_descarga);
-                               tempoDeslocamento += (inicio - lastEventTime);
-                               if(item.data_fim_descarga) {
-                                   const fim = new Date(item.data_fim_descarga);
-                                   tempoEmLoja += (fim - inicio);
-                                   lastEventTime = fim;
-                               } else {
-                                   tempoEmLoja += (new Date() - inicio);
-                                   lastEventTime = new Date();
-                               }
-                            }
-                        });
-                        
-                        const elLoja = document.getElementById(`loja_timer_${m.id}`);
-                        const elDesloc = document.getElementById(`desloc_timer_${m.id}`);
-
-                        if(elLoja) elLoja.textContent = `Loja: ${minutesToHHMM(tempoEmLoja / 60000)}`;
-                        if(elDesloc) elDesloc.textContent = `Desloc.: ${minutesToHHMM(tempoDeslocamento / 60000)}`;
-
-                    }, 1000);
-                }
-            });
         }
 
+        return `
+            <div class="motorista-status-item">
+                <div>
+                    <strong class="text-gray-800">${m.nome} ${veiculoPlacaNoNome}</strong>
+                    ${timeInfo}
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="status-badge status-${m.displayStatus.replace(/ /g, '_')}">${getStatusLabel(m.displayStatus)}</span>
+                    ${actionButton}
+                </div>
+            </div>`;
+    }).join('');
+}
         async function consultarExpedicoesPorPlaca() {
             const placa = document.getElementById('placaMotorista').value;
             if (!placa) {
@@ -2937,61 +3544,127 @@ function showSubTab(tabName, subTabName, element) {
             summaryContainer.style.display = 'grid';
         }
 
-        function renderMotoristaRankingChart(motoristasData) {
-            if (motoristasData.length === 0) {
-                destroyChart('motoristasRankingChart');
-                return;
-            }
 
-            const backgroundColors = motoristasData.map((_, index) => {
-                if (index === 0) return 'rgba(255, 215, 0, 0.8)'; // Ouro para 1º lugar
-                if (index === 1) return 'rgba(192, 192, 192, 0.8)'; // Prata para 2º lugar  
-                if (index === 2) return 'rgba(205, 127, 50, 0.8)'; // Bronze para 3º lugar
-                return 'rgba(0, 119, 182, 0.7)'; // Azul padrão para os demais
-            });
+// SUBSTITUIR A FUNÇÃO renderMotoristaRankingChart COMPLETA
+function renderMotoristaRankingChart(motoristasData) {
+    if (!motoristasData || motoristasData.length === 0) {
+        destroyChart('motoristasRankingChart');
+        return;
+    }
+    
+    // Pega apenas os top 10 e ordena por entregas
+    const top10 = [...motoristasData]
+        .sort((a, b) => b.entregas - a.entregas)
+        .slice(0, 10);
+    
+    const data = {
+        labels: top10.map(m => m.nome),
+        datasets: [{
+            label: 'Entregas',
+            data: top10.map(m => m.entregas),
+            backgroundColor: [
+                'rgba(255, 215, 0, 0.8)',    // Ouro - 1º
+                'rgba(192, 192, 192, 0.8)',  // Prata - 2º
+                'rgba(205, 127, 50, 0.8)',   // Bronze - 3º
+                'rgba(0, 212, 170, 0.8)',    // 4º
+                'rgba(0, 180, 216, 0.8)',    // 5º
+                'rgba(0, 119, 182, 0.8)',    // 6º
+                'rgba(114, 9, 183, 0.8)',    // 7º
+                'rgba(166, 99, 204, 0.8)',   // 8º
+                'rgba(247, 127, 0, 0.8)',    // 9º
+                'rgba(252, 191, 73, 0.8)'    // 10º
+            ],
+            borderColor: 'rgba(255, 255, 255, 1)',
+            borderWidth: 2,
+            borderRadius: 8
+        }]
+    };
 
-            renderChart('motoristasRankingChart', 'bar', {
-                labels: motoristasData.map(m => m.nome),
-                datasets: [{
-                    label: 'Número de Entregas',
-                    data: motoristasData.map(m => m.entregas),
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors.map(color => color.replace('0.7', '1').replace('0.8', '1')),
-                    borderWidth: 2
-                }]
-            }, {
-                indexAxis: 'y',
-                plugins: {
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'end',
-                        color: '#333',
-                        font: { weight: 'bold' }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const motorista = motoristasData[context.dataIndex];
-                                return [
-                                    `Entregas: ${context.raw}`,
-                                    `Viagens: ${motorista.viagens}`,
-                                    `Tempo Médio: ${minutesToHHMM(motorista.tempoMedioViagem)}`
-                                ];
-                            }
-                        }
-                    }
+    renderChart('motoristasRankingChart', 'bar', data, {
+        indexAxis: 'y', // Barras horizontais
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { 
+                display: false 
+            },
+            tooltip: {
+                enabled: true,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                padding: 12,
+                titleFont: {
+                    size: 14,
+                    weight: 'bold'
                 },
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Número de Entregas'
-                        }
+                bodyFont: {
+                    size: 13
+                },
+                callbacks: {
+                    label: function(context) {
+                        const motorista = top10[context.dataIndex];
+                        return [
+                            `Entregas: ${context.raw}`,
+                            `Viagens: ${motorista.viagens}`,
+                            `Entregas/Viagem: ${motorista.entregasPorViagem}`
+                        ];
                     }
                 }
-            });
+            },
+            datalabels: {
+                display: true,
+                color: '#FFFFFF',
+                font: { 
+                    weight: 'bold',
+                    size: 14
+                },
+                anchor: 'end',
+                align: 'start',
+                offset: 10,
+                formatter: (value) => value
+            }
+        },
+        scales: {
+            x: {
+                beginAtZero: true,
+                max: Math.max(...top10.map(m => m.entregas)) * 1.2,
+                grid: {
+                    display: true,
+                    color: 'rgba(0, 0, 0, 0.05)',
+                    drawBorder: false
+                },
+                ticks: {
+                    font: {
+                        size: 12
+                    },
+                    stepSize: 1
+                }
+            },
+            y: {
+                grid: {
+                    display: false,
+                    drawBorder: false
+                },
+                ticks: {
+                    font: {
+                        size: 12,
+                        weight: '500'
+                    },
+                    color: '#374151',
+                    padding: 8,
+                    autoSkip: false
+                }
+            }
+        },
+        layout: {
+            padding: {
+                left: 10,
+                right: 40,
+                top: 10,
+                bottom: 10
+            }
         }
+    });
+}
 
         function renderMotoristaTable(motoristasData) {
             const container = document.getElementById('motoristaTableContainer');
@@ -3115,75 +3788,93 @@ function showSubTab(tabName, subTabName, element) {
         }
 
         async function finalizarDescarga(itemId) {
-            try {
-                await supabaseRequest(`expedition_items?id=eq.${itemId}`, 'PATCH', { status_descarga: 'descarregado', data_fim_descarga: new Date().toISOString() });
-                
-                const itemData = await supabaseRequest(`expedition_items?id=eq.${itemId}&select=expedition_id`);
-                const expeditionId = itemData[0].expedition_id;
-                const allItems = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`);
-
-                if (allItems.every(item => item.status_descarga === 'descarregado')) {
-                    await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', { status: 'entregue' });
-                    const comImobilizado = await showYesNoModal('Retornando com imobilizados?');
-                    const novoStatus = comImobilizado ? 'retornando_com_imobilizado' : 'retornando_cd';
-                    
-                    const expDetails = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=motorista_id`);
-                    await supabaseRequest(`motoristas?id=eq.${expDetails[0].motorista_id}`, 'PATCH', { status: novoStatus }, false);
-                    
-                    showNotification(`Última entrega finalizada! Viagem concluída.`, 'success');
-                } else {
-                    showNotification('Descarga da loja finalizada!', 'success');
-                }
-                consultarExpedicoesPorPlaca();
-            } catch(error) {
-                showNotification('Erro ao finalizar descarga: ' + error.message, 'error');
-            }
-        }
+    try {
+        await supabaseRequest(`expedition_items?id=eq.${itemId}`, 'PATCH', { status_descarga: 'descarregado', data_fim_descarga: new Date().toISOString() });
         
-        // --- FUNCIONALIDADES DA ABA ACOMPANHAMENTO ---
-        async function loadAcompanhamento() {
-            showSubTab('acompanhamento', 'expedicoesEmAndamento', document.querySelector('#acompanhamento .sub-tab'));
-            setDefaultDateFilters();
+        const itemData = await supabaseRequest(`expedition_items?id=eq.${itemId}&select=expedition_id`);
+        const expeditionId = itemData[0].expedition_id;
+        const allItems = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`);
+
+        if (allItems.every(item => item.status_descarga === 'descarregado')) {
+            await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', { status: 'entregue' });
+            const comImobilizado = await showYesNoModal('Retornando com imobilizados?');
+            const novoStatus = comImobilizado ? 'retornando_com_imobilizado' : 'retornando_cd';
             
-            const tbody = document.getElementById('acompanhamentoBody');
-            tbody.innerHTML = `<tr><td colspan="12" class="loading"><div class="spinner"></div>Carregando expedições...</td></tr>`;
+            // 🚨 AJUSTE CRÍTICO: Buscar o veiculo_id E o motorista_id
+            const expDetails = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=motorista_id,veiculo_id`);
+            const motoristaId = expDetails[0].motorista_id;
+            const veiculoId = expDetails[0].veiculo_id;
+            
+            // 1. Atualiza status do Motorista
+            if (motoristaId) {
+                await supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'PATCH', { status: novoStatus }, false);
+            }
+            
+            // 2. NOVO CÓDIGO: Atualiza status do Veículo para o mesmo status de retorno
+            if (veiculoId) {
+                await supabaseRequest(`veiculos?id=eq.${veiculoId}`, 'PATCH', { status: novoStatus }, false);
+            }
+            
+            showNotification(`Última entrega finalizada! Viagem concluída.`, 'success');
+        } else {
+            showNotification('Descarga da loja finalizada!', 'success');
+        }
+        consultarExpedicoesPorPlaca();
+    } catch(error) {
+        showNotification('Erro ao finalizar descarga: ' + error.message, 'error');
+    }
+}
+        
+       // SUBSTITUIR A FUNÇÃO loadAcompanhamento
+async function loadAcompanhamento() {
+    const permittedAcompanhamentoTabs = getPermittedSubTabs('acompanhamento');
+    
+    if (permittedAcompanhamentoTabs.length > 0) {
+        const initialSubTab = permittedAcompanhamentoTabs.length === 1 ? permittedAcompanhamentoTabs[0] : 'expedicoesEmAndamento';
+        const initialElement = document.querySelector(`#acompanhamento .sub-tabs button[onclick*="'${initialSubTab}'"]`);
+        showSubTab('acompanhamento', initialSubTab, initialElement);
+    }
+    
+    // O restante da lógica de carregamento de dados (expeditions, items) permanece aqui
+    setDefaultDateFilters();
+    const tbody = document.getElementById('acompanhamentoBody');
+    tbody.innerHTML = `<tr><td colspan="12" class="loading"><div class="spinner"></div>Carregando expedições...</td></tr>`;
 
-            try {
-                const expeditions = await supabaseRequest('expeditions?status=not.eq.entregue&order=data_hora.desc');
-                const items = await supabaseRequest('expedition_items');
-                
-                allExpeditions = expeditions.map(exp => {
-                    const expItems = items.filter(item => item.expedition_id === exp.id);
-                    const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
-                    const totalCarga = (expItems.reduce((s, i) => s + (i.pallets || 0), 0)) + ((expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0)) / 2);
+    try {
+        const expeditions = await supabaseRequest('expeditions?status=not.eq.entregue&order=data_hora.desc');
+        const items = await supabaseRequest('expedition_items');
+        // ... (o resto da lógica de loadAcompanhamento, que popula allExpeditions, etc., deve permanecer)
+        
+        allExpeditions = expeditions.map(exp => {
+            const expItems = items.filter(item => item.expedition_id === exp.id);
+            const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
+            const totalCarga = (expItems.reduce((s, i) => s + (i.pallets || 0), 0)) + ((expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0)) / 2);
 
-                    return {
-                        ...exp, items: expItems,
-                        total_pallets: expItems.reduce((s, i) => s + (i.pallets || 0), 0),
-                        total_rolltrainers: expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0),
-                        lojas_count: expItems.length,
-                        lojas_info: expItems.map(item => {
+            return {
+                ...exp, items: expItems,
+                total_pallets: expItems.reduce((s, i) => s + (i.pallets || 0), 0),
+                total_rolltrainers: expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0),
+                lojas_count: expItems.length,
+                lojas_info: expItems.map(item => {
     const loja = lojas.find(l => l.id === item.loja_id);
     return loja ? `${loja.codigo} - ${loja.nome}` : 'N/A';
 }).join(', '),
-                        doca_nome: docas.find(d => d.id === exp.doca_id)?.nome || 'N/A',
-                        lider_nome: lideres.find(l => l.id === exp.lider_id)?.nome || 'N/A',
-                        veiculo_placa: veiculo?.placa,
-                        motorista_nome: motoristas.find(m => m.id === exp.motorista_id)?.nome,
-                        ocupacao: veiculo && veiculo.capacidade_pallets > 0 ? (totalCarga / veiculo.capacidade_pallets) * 100 : 0
-                    };
-                });
-                
-                populateStatusFilter();
-applyFilters();
+                doca_nome: docas.find(d => d.id === exp.doca_id)?.nome || 'N/A',
+                lider_nome: lideres.find(l => l.id === exp.lider_id)?.nome || 'N/A',
+                veiculo_placa: veiculo?.placa,
+                motorista_nome: motoristas.find(m => m.id === exp.motorista_id)?.nome,
+                ocupacao: veiculo && veiculo.capacidade_pallets > 0 ? (totalCarga / veiculo.capacidade_pallets) * 100 : 0
+            };
+        });
+        
+        populateStatusFilter();
+        applyFilters();
 
-// Popula filtro de motoristas para rastreio
-populateRastreioFilters();
-
-            } catch(error) {
-                tbody.innerHTML = `<tr><td colspan="12" class="alert alert-error">Erro ao carregar dados: ${error.message}</td></tr>`;
-            }
-        }
+        populateRastreioFilters();
+    } catch(error) {
+        tbody.innerHTML = `<tr><td colspan="12" class="alert alert-error">Erro ao carregar dados: ${error.message}</td></tr>`;
+    }
+}
         
         function populateStatusFilter() {
             const filtroStatus = document.getElementById('filtroStatus');
@@ -3252,176 +3943,215 @@ populateRastreioFilters();
             document.getElementById('tempoMedioTotal').textContent = minutesToHHMM(calcularMedia(temposTotal));
         }
         
-        function renderAcompanhamentoTable(expeditions) {
-            const tbody = document.getElementById('acompanhamentoBody');
-            if (expeditions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" class="text-center py-8 text-gray-500">Nenhuma expedição encontrada para os filtros selecionados.</td></tr>';
-                return;
-            }
+        // SUBSTITUIR A FUNÇÃO renderAcompanhamentoTable COMPLETA
+function renderAcompanhamentoTable(expeditions) {
+    const tbody = document.getElementById('acompanhamentoBody');
+    if (expeditions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center py-8 text-gray-500">Nenhuma expedição encontrada para os filtros selecionados.</td></tr>';
+        return;
+    }
 
-            tbody.innerHTML = expeditions.map(exp => {
-                const ocupacaoPerc = Math.round(exp.ocupacao || 0);
-                let barColor = 'progress-green';
-                if (ocupacaoPerc > 90) barColor = 'progress-orange';
-                if (ocupacaoPerc > 100) barColor = 'progress-red';
-                
-                const tempos = {
-                    
-                    alocar: exp.data_alocacao_veiculo ? minutesToHHMM((new Date(exp.data_alocacao_veiculo) - new Date(exp.data_hora)) / 60000) : '-',
-                    chegada: exp.data_chegada_veiculo ? minutesToHHMM((new Date(exp.data_chegada_veiculo) - new Date(exp.data_hora)) / 60000) : '-',
-                    carreg: (exp.data_chegada_veiculo && exp.data_saida_veiculo) ? minutesToHHMM((new Date(exp.data_saida_veiculo) - new Date(exp.data_chegada_veiculo)) / 60000) : '-'
-                };
-// Verificar se pode editar/excluir
-const canEdit = exp.status !== 'saiu_para_entrega' && exp.status !== 'entregue';
-const editButton = canEdit ? 
-    `<button class="btn btn-warning btn-small" onclick="openEditModal('${exp.id}')">Editar</button>` :
-    `<button class="btn btn-secondary btn-small" disabled title="Não pode editar após saída para entrega">Editar</button>`;
-const deleteButton = canEdit ?
-    `<button class="btn btn-danger btn-small" onclick="deleteExpedition('${exp.id}')">Excluir</button>` :
-    `<button class="btn btn-secondary btn-small" disabled title="Não pode excluir após saída para entrega">Excluir</button>`;
-                return `
-                    <tr class="hover:bg-gray-50 text-sm">
-                        <td>${new Date(exp.data_hora).toLocaleString('pt-BR')}</td>
-                        <td class="whitespace-normal">
-                            ${exp.lojas_info}
-                            ${exp.numeros_carga_display ? `<br><span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">📦 ${exp.numeros_carga_display}</span>` : ''}
-                        </td>
-                        <td>${exp.total_pallets}</td>
-                        <td>${exp.total_rolltrainers}</td>
-                        <td>${exp.doca_nome}</td>
-                        <td>${exp.lider_nome}</td>
-                        <td><span class="status-badge status-${exp.status}">${getStatusLabel(exp.status)}</span></td>
-                        <td>${exp.veiculo_placa || '-'}</td>
-                        <td>
-                            <div class="progress-container"><div class="progress-bar ${barColor}" style="width: ${Math.min(100, ocupacaoPerc)}%;">${ocupacaoPerc}%</div></div>
-                        </td>
-                        <td>${exp.motorista_nome || '-'}</td>
-                        <td class="text-xs">
-                            <div>Aloc: ${tempos.alocar}</div>
-                            <div>Cheg: ${tempos.chegada}</div>
-                            <div>Carr: ${tempos.carreg}</div>
-                        </td>
-                      <td>
-    <div class="flex gap-2">
-        ${editButton}
-        ${deleteButton}
-    </div>
-</td>
-                    </tr>
-                `;
-            }).join('');
-        }
+    tbody.innerHTML = expeditions.map(exp => {
+        const ocupacaoPerc = Math.round(exp.ocupacao || 0);
+        let barColor = 'progress-green';
+        
+        // NOVO: Cores de alerta para a barra de progresso simples
+        if (ocupacaoPerc > 90) barColor = 'progress-orange';
+        if (ocupacaoPerc > 100) barColor = 'progress-red';
+        
+        const tempos = {
+            alocar: exp.data_alocacao_veiculo ? minutesToHHMM((new Date(exp.data_alocacao_veiculo) - new Date(exp.data_hora)) / 60000) : '-',
+            chegada: exp.data_chegada_veiculo ? minutesToHHMM((new Date(exp.data_chegada_veiculo) - new Date(exp.data_hora)) / 60000) : '-',
+            carreg: (exp.data_chegada_veiculo && exp.data_saida_veiculo) ? minutesToHHMM((new Date(exp.data_saida_veiculo) - new Date(exp.data_chegada_veiculo)) / 60000) : '-'
+        };
+        
+        // Verificar se pode editar/excluir
+        const canEdit = exp.status !== 'saiu_para_entrega' && exp.status !== 'entregue';
+        const editButton = canEdit ? 
+            `<button class="btn btn-warning btn-small" onclick="openEditModal('${exp.id}')">Editar</button>` :
+            `<button class="btn btn-secondary btn-small" disabled title="Não pode editar após saída para entrega">Editar</button>`;
+        const deleteButton = canEdit ?
+            `<button class="btn btn-danger btn-small" onclick="deleteExpedition('${exp.id}')">Excluir</button>` :
+            `<button class="btn btn-secondary btn-small" disabled title="Não pode excluir após saída para entrega">Excluir</button>`;
+            
+        return `
+            <tr class="hover:bg-gray-50 text-sm">
+                <td>${new Date(exp.data_hora).toLocaleString('pt-BR')}</td>
+                <td class="whitespace-normal">
+                    ${exp.lojas_info}
+                    ${exp.numeros_carga_display ? `<br><span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">📦 ${exp.numeros_carga_display}</span>` : ''}
+                </td>
+                <td>${exp.total_pallets}</td>
+                <td>${exp.total_rolltrainers}</td>
+                <td>${exp.doca_nome}</td>
+                <td>${exp.lider_nome}</td>
+                <td><span class="status-badge status-${exp.status}">${getStatusLabel(exp.status)}</span></td>
+                <td>${exp.veiculo_placa || '-'}</td>
+                <td style="min-width: 120px;">
+                    <div class="progress-container"><div class="progress-bar ${barColor}" style="width: ${Math.min(100, ocupacaoPerc)}%;">${ocupacaoPerc}%</div></div>
+                </td>
+                <td>${exp.motorista_nome || '-'}</td>
+                <td class="text-xs">
+                    <div>Aloc: ${tempos.alocar}</div>
+                    <div>Cheg: ${tempos.chegada}</div>
+                    <div>Carr: ${tempos.carreg}</div>
+                </td>
+              <td>
+                <div class="flex gap-2">
+                    <button class="btn btn-primary btn-small" onclick="showDetalhesExpedicao('${exp.id}')">Detalhes</button>
+                    ${editButton}
+                    ${deleteButton}
+                </div>
+            </td>
+            </tr>
+        `;
+    }).join('');
+}
         
         async function loadFrotaData() {
-            if (!selectedFilial) {
-                document.getElementById('ociosidadeBody').innerHTML = '<tr><td colspan="5" class="alert alert-error">Selecione uma filial primeiro!</td></tr>';
-                return;
-            }
+    if (!selectedFilial) {
+        document.getElementById('ociosidadeBody').innerHTML = '<tr><td colspan="5" class="alert alert-error">Selecione uma filial primeiro!</td></tr>';
+        return;
+    }
 
-            const tbody = document.getElementById('ociosidadeBody');
-            tbody.innerHTML = `<tr><td colspan="5" class="loading"><div class="spinner"></div>Calculando ociosidade...</td></tr>`;
+    const tbody = document.getElementById('ociosidadeBody');
+    tbody.innerHTML = `<tr><td colspan="5" class="loading"><div class="spinner"></div>Calculando ociosidade...</td></tr>`;
 
-            try {
-                // 1. Definir Período de Análise
-                const hoje = new Date();
-                const dataInicio = document.getElementById('frotaFiltroDataInicio').value || new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString().split('T')[0];
-                const dataFimInput = document.getElementById('frotaFiltroDataFim').value || hoje.toISOString().split('T')[0];
+    try {
+        // 1. Definir Período de Análise
+        const hoje = new Date();
+        const dataInicio = document.getElementById('frotaFiltroDataInicio').value || new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString().split('T')[0];
+        const dataFimInput = document.getElementById('frotaFiltroDataFim').value || hoje.toISOString().split('T')[0];
 
-                const startOfAnalysis = new Date(dataInicio + 'T00:00:00.000Z');
-                const endOfAnalysis = new Date(dataFimInput + 'T23:59:59.999Z');
+        const startOfAnalysis = new Date(dataInicio + 'T00:00:00.000Z');
+        const endOfAnalysis = new Date(dataFimInput + 'T23:59:59.999Z');
 
-                // 2. Buscar histórico de status relevante
-                const startQuery = new Date(startOfAnalysis);
-                startQuery.setDate(startQuery.getDate() - 1); // Pega um dia antes para garantir o status inicial
+        // 2. Buscar histórico de status relevante
+        const startQuery = new Date(startOfAnalysis);
+        startQuery.setDate(startQuery.getDate() - 1); // Pega um dia antes para garantir o status inicial
+        
+        // NOVO: A requisição agora busca o histórico de status de veículos da filial
+        const statusHistory = await supabaseRequest(`veiculos_status_historico?created_at=gte.${startQuery.toISOString()}&created_at=lte.${endOfAnalysis.toISOString()}&order=created_at.asc`, 'GET', null, false);
+
+        const ociosidadeData = [];
+
+        // NOVO: Filtrar veículos que NÃO estão em 'manutencao' e pertencem à filial
+        const veiculosFiltrados = veiculos.filter(v => v.filial === selectedFilial.nome && v.status !== 'manutencao');
+
+        for (const veiculo of veiculosFiltrados) {
+            const veiculoHistory = statusHistory.filter(h => h.veiculo_id === veiculo.id);
+
+            const lastStatusBeforePeriod = veiculoHistory
+                .filter(h => new Date(h.created_at) < startOfAnalysis)
+                .pop();
+            
+            let statusAtual = lastStatusBeforePeriod ? lastStatusBeforePeriod.status_novo : (veiculo.status || 'disponivel');
+            let ultimoTimestamp = startOfAnalysis;
+            let tempoOciosoTotal = 0;
+            let inicioOciosidadeAtual = statusAtual === 'disponivel' ? startOfAnalysis : null;
+
+            const historyInPeriod = veiculoHistory.filter(h => new Date(h.created_at) >= startOfAnalysis);
+            
+            historyInPeriod.forEach(evento => {
+                const tempoEvento = new Date(evento.created_at);
                 
-                const statusHistory = await supabaseRequest(`veiculos_status_historico?created_at=gte.${startQuery.toISOString()}&created_at=lte.${endOfAnalysis.toISOString()}&order=created_at.asc`, 'GET', null, false);
-
-                const ociosidadeData = [];
-
-                for (const veiculo of veiculos) {
-                    if (veiculo.filial !== selectedFilial.nome) continue;
-
-                    const veiculoHistory = statusHistory.filter(h => h.veiculo_id === veiculo.id);
-
-                    const lastStatusBeforePeriod = veiculoHistory
-                        .filter(h => new Date(h.created_at) < startOfAnalysis)
-                        .pop();
-                    
-                    let statusAtual = lastStatusBeforePeriod ? lastStatusBeforePeriod.status_novo : (veiculo.status || 'disponivel');
-                    let ultimoTimestamp = startOfAnalysis;
-                    let tempoOciosoTotal = 0;
-                    let inicioOciosidadeAtual = statusAtual === 'disponivel' ? startOfAnalysis : null;
-
-                    const historyInPeriod = veiculoHistory.filter(h => new Date(h.created_at) >= startOfAnalysis);
-                    
-                    historyInPeriod.forEach(evento => {
-                        const tempoEvento = new Date(evento.created_at);
-                        
-                        if (statusAtual === 'disponivel') {
-                            tempoOciosoTotal += (tempoEvento - ultimoTimestamp);
-                        }
-
-                        statusAtual = evento.status_novo;
-                        ultimoTimestamp = tempoEvento;
-                        
-                        if (statusAtual === 'disponivel') {
-                            if (!inicioOciosidadeAtual) inicioOciosidadeAtual = tempoEvento;
-                        } else {
-                            inicioOciosidadeAtual = null;
-                        }
-                    });
-
-                    if (statusAtual === 'disponivel') {
-                        tempoOciosoTotal += (endOfAnalysis - ultimoTimestamp);
-                    }
-
-                    ociosidadeData.push({
-                        placa: veiculo.placa,
-                        status: veiculo.status,
-                        idleTime: tempoOciosoTotal / 60000, // para minutos
-                        idleSince: inicioOciosidadeAtual,
-                        lastAction: ultimoTimestamp > startOfAnalysis ? ultimoTimestamp : null
-                    });
+                if (statusAtual === 'disponivel') {
+                    // Soma o tempo ocioso acumulado entre a última ação e este evento
+                    tempoOciosoTotal += (tempoEvento - ultimoTimestamp);
                 }
-                
-                const mediaOciosidade = ociosidadeData.length > 0 ? ociosidadeData.reduce((sum, v) => sum + v.idleTime, 0) / ociosidadeData.length : 0;
-                document.getElementById('totalOciosidade').textContent = minutesToHHMM(mediaOciosidade);
-                document.getElementById('frotaAtiva').textContent = veiculos.filter(v => v.status !== 'disponivel' && v.status !== 'folga' && v.status !== 'manutencao').length;
-                document.getElementById('frotaOciosa').textContent = veiculos.filter(v => v.status === 'disponivel').length;
-                
-                renderOciosidadeTable(ociosidadeData.sort((a, b) => b.idleTime - a.idleTime));
 
-            } catch (error) {
-                console.error('Erro ao carregar dados da frota:', error);
-                tbody.innerHTML = `<tr><td colspan="5" class="alert alert-error">Erro ao calcular ociosidade: ${error.message}</td></tr>`;
+                statusAtual = evento.status_novo;
+                ultimoTimestamp = tempoEvento;
+                
+                if (statusAtual === 'disponivel') {
+                    if (!inicioOciosidadeAtual) inicioOciosidadeAtual = tempoEvento;
+                } else {
+                    inicioOciosidadeAtual = null;
+                }
+            });
+
+            // Considera o tempo ocioso até o momento atual (endOfAnalysis)
+            if (statusAtual === 'disponivel') {
+                tempoOciosoTotal += (endOfAnalysis - ultimoTimestamp);
             }
+
+            // NOVO CÓDIGO: Calcula o tempo ocioso 'agora'
+            let tempoOciosoAtual = 0;
+            if (veiculo.status === 'disponivel') {
+                // Tenta achar a última mudança para 'disponivel' dentro do período
+                const lastIdleChange = veiculoHistory
+                    .filter(h => h.status_novo === 'disponivel' && new Date(h.created_at) >= startOfAnalysis)
+                    .pop();
+                
+                // Se achou, calcula o tempo entre o evento e o tempo atual (agora)
+                const inicioIdle = lastIdleChange ? new Date(lastIdleChange.created_at) : (inicioOciosidadeAtual || new Date());
+                tempoOciosoAtual = (new Date() - inicioIdle) / 60000; // Tempo em minutos até o 'agora'
+            }
+
+
+            ociosidadeData.push({
+                placa: veiculo.placa,
+                status: veiculo.status,
+                idleTime: tempoOciosoTotal / 60000, // Tempo Ocioso Total no Período (em minutos)
+                idleSince: veiculo.status === 'disponivel' ? inicioOciosidadeAtual : null, // Início da Ociosidade no Período
+                lastAction: ultimoTimestamp, // Último evento de status no período (ou inicio da análise)
+                // NOVO: Adiciona o tempo ocioso atual (do status 'disponivel')
+                currentIdleTime: tempoOciosoAtual 
+            });
         }
         
+        const mediaOciosidade = ociosidadeData.length > 0 ? ociosidadeData.reduce((sum, v) => sum + v.idleTime, 0) / ociosidadeData.length : 0;
+        document.getElementById('totalOciosidade').textContent = minutesToHHMM(mediaOciosidade);
+        document.getElementById('frotaAtiva').textContent = veiculosFiltrados.filter(v => v.status !== 'disponivel' && v.status !== 'folga').length;
+        document.getElementById('frotaOciosa').textContent = veiculosFiltrados.filter(v => v.status === 'disponivel').length;
+        
+        // Ordena pela ociosidade ATUAL (currentIdleTime)
+        renderOciosidadeTable(ociosidadeData.sort((a, b) => b.currentIdleTime - a.currentIdleTime));
+
+    } catch (error) {
+        console.error('Erro ao carregar dados da frota:', error);
+        tbody.innerHTML = `<tr><td colspan="5" class="alert alert-error">Erro ao calcular ociosidade: ${error.message}</td></tr>`;
+    }
+}
+        
         function renderOciosidadeTable(data) {
-            const tbody = document.getElementById('ociosidadeBody');
-            if (!tbody) return;
+    const tbody = document.getElementById('ociosidadeBody');
+    if (!tbody) return;
 
-            if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">Nenhum dado de ociosidade encontrado para o período.</td></tr>';
-                return;
-            }
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">Nenhum veículo ativo (excluindo manutenção) encontrado para o período.</td></tr>';
+        return;
+    }
 
-            tbody.innerHTML = data.map(v => {
-                const tempoOciosoDisplay = v.idleTime > 0 ? minutesToHHMM(v.idleTime) : '-';
-                const ociosoDesdeDisplay = v.idleSince ? new Date(v.idleSince).toLocaleString('pt-BR') : '-';
-                const ultimaAcaoDisplay = v.lastAction ? new Date(v.lastAction).toLocaleString('pt-BR') : '-';
-
-                return `
-                    <tr class="hover:bg-gray-50 text-sm">
-                        <td class="font-semibold">${v.placa}</td>
-                        <td><span class="status-badge status-${v.status.replace(/ /g, '_')}">${getStatusLabel(v.status)}</span></td>
-                        <td>${ociosoDesdeDisplay}</td>
-                        <td>${tempoOciosoDisplay}</td>
-                        <td>${ultimaAcaoDisplay}</td>
-                    </tr>
-                `;
-            }).join('');
+    tbody.innerHTML = data.map(v => {
+        // NOVO: Exibe o tempo ocioso APENAS se o status for 'disponivel'
+        const tempoOciosoDisplay = v.status === 'disponivel' && v.currentIdleTime > 0 ? minutesToHHMM(v.currentIdleTime) : '-';
+        // A coluna 'Início Ociosidade' é o inicio da contagem atual (se disponível), senão é o tempo total da análise
+        const ociosoDesdeDisplay = v.status === 'disponivel' && v.idleSince ? new Date(v.idleSince).toLocaleTimeString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
+        // NOVO: A coluna 'Última Ação' agora exibe o último timestamp de mudança de status (mesmo que não seja ocioso)
+        const ultimaAcaoDisplay = v.lastAction && new Date(v.lastAction).getTime() > new Date(document.getElementById('frotaFiltroDataInicio').value + 'T00:00:00.000Z').getTime() ? 
+            new Date(v.lastAction).toLocaleTimeString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : 
+            'N/A'; // Não exibe se for o timestamp do início da análise
+        
+        // Define a cor da linha com base no tempo ocioso atual
+        let rowClass = '';
+        if (v.status === 'disponivel') {
+             if (v.currentIdleTime > 120) rowClass = 'bg-red-100'; // > 2h ocioso
+             else if (v.currentIdleTime > 60) rowClass = 'bg-orange-100'; // > 1h ocioso
+             else if (v.currentIdleTime > 0) rowClass = 'bg-green-100'; // < 1h ocioso
         }
+
+        return `
+            <tr class="hover:bg-gray-50 text-sm ${rowClass}">
+                <td class="font-semibold">${v.placa}</td>
+                <td><span class="status-badge status-${v.status.replace(/ /g, '_')}">${getStatusLabel(v.status)}</span></td>
+                <td>${ociosoDesdeDisplay}</td>
+                <td class="font-bold">${tempoOciosoDisplay}</td>
+                <td>${ultimaAcaoDisplay}</td>
+            </tr>
+        `;
+    }).join('');
+}
 // --- FUNCIONALIDADES DO RASTREIO EM TEMPO REAL ---
 
 function populateRastreioFilters() {
@@ -3436,16 +4166,20 @@ function populateRastreioFilters() {
 
 // --- FUNCIONALIDADES DO RASTREIO EM TEMPO REAL ---
 
-// Função de rastreio em tempo real (Versão corrigida)
+// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
+
+// SUBSTITUIR A FUNÇÃO loadRastreioData COMPLETA
+// SUBSTITUIR A FUNÇÃO loadRastreioData COMPLETA (aprox. linha 3866)
 async function loadRastreioData() {
     try {
         console.log("Iniciando carregamento dos dados de rastreio...");
+        // Garante que o status de retorno seja tratado (para Veículos e Motoristas)
         const expeditionsEmRota = await supabaseRequest('expeditions?status=eq.saiu_para_entrega&order=data_saida_entrega.desc');
         const items = await supabaseRequest('expedition_items');
         
         let locations = [];
-        const expeditionIds = expeditionsEmRota.map(exp => exp.id);
-        if (expeditionIds.length > 0) {
+        if (expeditionsEmRota.length > 0) {
+            const expeditionIds = expeditionsEmRota.map(exp => exp.id);
             const query = `gps_tracking?expedition_id=in.(${expeditionIds.join(',')})&order=data_gps.desc`;
             locations = await supabaseRequest(query, 'GET', null, false);
         }
@@ -3457,10 +4191,14 @@ async function loadRastreioData() {
             const currentLocation = locations.find(loc => loc.expedition_id === exp.id);
             
             if (!currentLocation || !currentLocation.latitude || !currentLocation.longitude) {
-                return;
+                return null;
             }
 
+            // Ordenar itens por ordem_entrega primeiro, depois por data_inicio_descarga
             const itemsOrdenados = expItems.sort((a, b) => {
+                const aOrdem = a.ordem_entrega || 999;
+                const bOrdem = b.ordem_entrega || 999;
+                if (aOrdem !== bOrdem) return aOrdem - bOrdem;
                 const aInicio = a.data_inicio_descarga ? new Date(a.data_inicio_descarga) : new Date('2099-01-01');
                 const bInicio = b.data_inicio_descarga ? new Date(b.data_inicio_descarga) : new Date('2099-01-01');
                 return aInicio - bInicio;
@@ -3498,34 +4236,98 @@ async function loadRastreioData() {
             const tempoSaida = new Date(exp.data_saida_entrega);
             const tempoDecorrido = (new Date() - tempoSaida) / 60000;
             
+            // 🚨 CÁLCULO DE DISTÂNCIA E TEMPO DA ROTA COMPLETA 🚨
             let distanciaTotalKm = 0;
             let tempoTotalRota = 0;
             let eta = new Date();
             
-            // Re-calcula a rota completa do CD até a última loja para obter a distância total
-            const waypoints = [
-                { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd },
-                ...itemsOrdenados.map(item => {
+            try {
+                // Construir waypoints para a rota completa
+                const waypoints = [
+                    { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd }
+                ];
+                
+                itemsOrdenados.forEach(item => {
                     const loja = lojas.find(l => l.id === item.loja_id);
-                    return { lat: loja.latitude, lng: loja.longitude };
-                })
-            ];
-
-            if (waypoints.length > 1) {
-                const rotaCompleta = await getRouteFromAPI(waypoints);
-                if (rotaCompleta) {
-                    distanciaTotalKm = rotaCompleta.distance / 1000;
-                    tempoTotalRota = rotaCompleta.duration / 60;
+                    if (loja && loja.latitude && loja.longitude) {
+                        waypoints.push({ 
+                            lat: parseFloat(loja.latitude), 
+                            lng: parseFloat(loja.longitude) 
+                        });
+                    }
+                });
+                
+                // Se há pelo menos 2 pontos, calcular a rota
+                if (waypoints.length >= 2) {
+                    const rotaCompleta = await getRouteFromAPI(waypoints);
+                    
+                    if (rotaCompleta) {
+                        distanciaTotalKm = rotaCompleta.distance / 1000; // Converter metros para km
+                        tempoTotalRota = rotaCompleta.duration / 60; // Converter segundos para minutos
+                    } else {
+                        // Fallback: calcular distância em linha reta
+                        let distanciaEstimada = 0;
+                        for (let i = 1; i < waypoints.length; i++) {
+                            distanciaEstimada += calculateDistance(
+                                waypoints[i-1].lat, waypoints[i-1].lng,
+                                waypoints[i].lat, waypoints[i].lng
+                            );
+                        }
+                        distanciaTotalKm = distanciaEstimada / 1000;
+                        tempoTotalRota = (distanciaEstimada / 1000) / 40 * 60; // Estimativa a 40km/h
+                    }
                 }
-            }
-
-            // Calcula a ETA para a próxima parada, se houver
-            if (proximaLoja && proximaLoja.latitude && proximaLoja.longitude) {
-                const rotaProximaLoja = await getRouteFromAPI([{ lat: currentLocation.latitude, lng: currentLocation.longitude }, { lat: proximaLoja.latitude, lng: proximaLoja.longitude }]);
-                if(rotaProximaLoja) {
-                    const tempoEstimadoMinutos = rotaProximaLoja.duration / 60;
-                    eta = new Date(new Date().getTime() + tempoEstimadoMinutos * 60000);
+                
+                // Calcular ETA para a próxima loja (se houver)
+                if (proximaLoja && proximaLoja.latitude && proximaLoja.longitude) {
+                    try {
+                        const rotaProximaLoja = await getRouteFromAPI([
+                            { lat: parseFloat(currentLocation.latitude), lng: parseFloat(currentLocation.longitude) },
+                            { lat: parseFloat(proximaLoja.latitude), lng: parseFloat(proximaLoja.longitude) }
+                        ]);
+                        
+                        if (rotaProximaLoja) {
+                            const tempoRestanteMinutos = rotaProximaLoja.duration / 60;
+                            eta = new Date(Date.now() + (tempoRestanteMinutos * 60000));
+                        } else {
+                            // Fallback: estimar baseado em distância reta
+                            const distReta = calculateDistance(
+                                parseFloat(currentLocation.latitude), parseFloat(currentLocation.longitude),
+                                parseFloat(proximaLoja.latitude), parseFloat(proximaLoja.longitude)
+                            );
+                            const tempoEstimado = (distReta / 1000) / 40 * 60; // 40 km/h
+                            eta = new Date(Date.now() + (tempoEstimado * 60000));
+                        }
+                    } catch (e) {
+                        console.warn("Falha ao calcular ETA específico:", e);
+                    }
                 }
+            } catch (error) {
+                console.error('Erro ao calcular rota completa:', error);
+                // Fallback completo: usar estimativa simples
+                let distanciaEstimada = 0;
+                const waypoints = [
+                    { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd }
+                ];
+                
+                itemsOrdenados.forEach(item => {
+                    const loja = lojas.find(l => l.id === item.loja_id);
+                    if (loja && loja.latitude && loja.longitude) {
+                        waypoints.push({ 
+                            lat: parseFloat(loja.latitude), 
+                            lng: parseFloat(loja.longitude) 
+                        });
+                    }
+                });
+                
+                for (let i = 1; i < waypoints.length; i++) {
+                    distanciaEstimada += calculateDistance(
+                        waypoints[i-1].lat, waypoints[i-1].lng,
+                        waypoints[i].lat, waypoints[i].lng
+                    );
+                }
+                distanciaTotalKm = distanciaEstimada / 1000;
+                tempoTotalRota = (distanciaEstimada / 1000) / 40 * 60; // Estimativa a 40km/h
             }
             
             return {
@@ -3538,8 +4340,8 @@ async function loadRastreioData() {
                 proxima_loja: proximaLoja,
                 progresso_rota: Math.round(progresso),
                 tempo_em_rota: Math.round(tempoDecorrido),
-                distancia_total_km: distanciaTotalKm,
-                tempo_total_rota: tempoTotalRota,
+                distancia_total_km: distanciaTotalKm, // ✅ VALOR REAL
+                tempo_total_rota: tempoTotalRota,     // ✅ VALOR REAL
                 coordenadas: {
                     lat: parseFloat(currentLocation.latitude),
                     lng: parseFloat(currentLocation.longitude)
@@ -3554,9 +4356,12 @@ async function loadRastreioData() {
             };
         });
 
-        const results = await Promise.all(promessasRoteamento);
-        rastreioData = results.filter(Boolean);
-
+        const resultsSettled = await Promise.allSettled(promessasRoteamento);
+        const results = resultsSettled
+            .filter(p => p.status === 'fulfilled' && p.value !== null)
+            .map(p => p.value);
+        
+        
         const motoristasRetornando = await supabaseRequest('motoristas?status=in.(retornando_cd,retornando_com_imobilizado)');
         const returningMotoristIds = motoristasRetornando.map(m => m.id);
 
@@ -3568,42 +4373,94 @@ async function loadRastreioData() {
 
         const promessasRetorno = motoristasRetornando.map(async m => {
             const currentLocation = returningLocations.find(loc => loc.motorista_id === m.id);
+            
+            const lastExpedition = await supabaseRequest(`expeditions?motorista_id=eq.${m.id}&select=veiculo_id&order=data_hora.desc&limit=1`, 'GET', null, false);
+            const lastVeiculoId = lastExpedition[0]?.veiculo_id;
+            const lastVehicle = lastVeiculoId ? veiculos.find(v => v.id === lastVeiculoId) : null;
+            
             if (currentLocation && currentLocation.latitude && currentLocation.longitude) {
-                const cdCoords = { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd };
-                const rota = await getRouteFromAPI([{ lat: currentLocation.latitude, lng: currentLocation.longitude }, { lat: cdCoords.lat, lng: cdCoords.lng }]);
-                const distanciaTotalKm = rota ? rota.distance / 1000 : 0;
-                const tempoEstimadoMinutos = rota ? rota.duration / 60 : 0;
-                const eta = new Date(new Date().getTime() + tempoEstimadoMinutos * 60000);
+                // Calcular distância e tempo de retorno ao CD
+                let distanciaTotalKm = 0;
+                let tempoEstimadoMinutos = 0;
+                let eta = new Date();
+                
+                try {
+                    const rota = await getRouteFromAPI([
+                        { lat: parseFloat(currentLocation.latitude), lng: parseFloat(currentLocation.longitude) },
+                        { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd }
+                    ]);
+                    
+                    if (rota) {
+                        distanciaTotalKm = rota.distance / 1000;
+                        tempoEstimadoMinutos = rota.duration / 60;
+                        eta = new Date(Date.now() + (tempoEstimadoMinutos * 60000));
+                    } else {
+                        // Fallback
+                        const distReta = calculateDistance(
+                            parseFloat(currentLocation.latitude), parseFloat(currentLocation.longitude),
+                            selectedFilial.latitude_cd, selectedFilial.longitude_cd
+                        );
+                        distanciaTotalKm = distReta / 1000;
+                        tempoEstimadoMinutos = (distReta / 1000) / 40 * 60;
+                        eta = new Date(Date.now() + (tempoEstimadoMinutos * 60000));
+                    }
+                } catch (error) {
+                    console.warn('Erro ao calcular rota de retorno, usando estimativa:', error);
+                    const distReta = calculateDistance(
+                        parseFloat(currentLocation.latitude), parseFloat(currentLocation.longitude),
+                        selectedFilial.latitude_cd, selectedFilial.longitude_cd
+                    );
+                    distanciaTotalKm = distReta / 1000;
+                    tempoEstimadoMinutos = (distReta / 1000) / 40 * 60;
+                    eta = new Date(Date.now() + (tempoEstimadoMinutos * 60000));
+                }
                 
                 return {
                     id: `return-${m.id}`,
+                    expedition_id: null,
                     motorista_id: m.id,
                     motorista_nome: m.nome,
-                    veiculo_placa: veiculos.find(v => v.id === m.veiculo_id)?.placa || 'N/A',
+                    veiculo_placa: lastVehicle?.placa || 'N/A', 
                     status_rastreio: 'retornando',
                     distancia_total_km: distanciaTotalKm,
+                    tempo_total_rota: tempoEstimadoMinutos,
+                    tempo_em_rota: 0, 
+                    entregas_concluidas: 0,
+                    total_entregas: 0,
+                    items: [],
+                    progresso_rota: 100,
+                    loja_atual: null,
+                    proxima_loja: null,
                     coordenadas: {
                         lat: parseFloat(currentLocation.latitude),
                         lng: parseFloat(currentLocation.longitude)
                     },
                     eta: eta,
                     last_update: new Date(currentLocation.data_gps),
+                    velocidade_media: currentLocation.velocidade || 0,
                     pontos_proximos: checkProximityToPontosInteresse(currentLocation.latitude, currentLocation.longitude)
                 };
             }
             return null;
         });
 
-        const returningResults = await Promise.all(promessasRetorno);
-        rastreioData.push(...returningResults.filter(Boolean));
-
+        const returningResultsSettled = await Promise.allSettled(promessasRetorno);
+        const returningResults = returningResultsSettled
+            .filter(p => p.status === 'fulfilled' && p.value !== null)
+            .map(p => p.value);
+            
+        rastreioData = results;
+        rastreioData.push(...returningResults);
+        
+        rastreioData = rastreioData.filter(Boolean);
+        
         updateRastreioStats();
         applyRastreioFilters();
         updateLastRefreshTime();
 
     } catch (error) {
-        console.error('Erro ao carregar dados de rastreio:', error);
-        document.getElementById('rastreioList').innerHTML = `<div class="alert alert-error">Erro ao carregar dados de rastreio: ${error.message}</div>`;
+        console.error('ERRO GERAL: Falha no loadRastreioData:', error);
+        document.getElementById('rastreioList').innerHTML = `<div class="alert alert-error">Erro ao carregar dados de rastreio. Verifique o servidor.</div>`;
     }
 }
 function updateRastreioStats() {
@@ -3643,19 +4500,30 @@ function applyRastreioFilters() {
     renderRastreioList(filteredData);
 }
 
+// SUBSTITUIR A FUNÇÃO renderRastreioList COMPLETA (Aprox. linha 3901)
 function renderRastreioList(data) {
     const container = document.getElementById('rastreioList');
     
-    if (data.length === 0) {
+    // Filtra explicitamente qualquer nulo ou undefined que possa ter entrado
+    const safeData = data.filter(Boolean); 
+    
+    if (safeData.length === 0) {
         container.innerHTML = '<div class="alert alert-info">Nenhum veículo em rota no momento.</div>';
         return;
     }
     
-    container.innerHTML = data.map(rastreio => {
+    container.innerHTML = safeData.map(rastreio => { 
         let statusInfo = '';
         let locationInfo = '';
         let nextActionInfo = '';
         
+        // 🚨 NOVO CÓDIGO: Verifica se o status é de retorno para desabilitar o botão de trajeto 🚨
+        const isReturning = rastreio.status_rastreio === 'retornando';
+        const trajectoryButton = isReturning ?
+            `<button class="btn btn-secondary btn-small" disabled title="Trajeto de retorno não disponível">Ver Trajeto</button>` :
+            `<button class="btn btn-warning btn-small" onclick="showTrajectoryMap('${rastreio.id}', '${rastreio.veiculo_placa}')">Ver Trajeto</button>`;
+
+
         if (rastreio.status_rastreio === 'em_transito') {
             statusInfo = `<div class="flex items-center gap-2 text-blue-600"><div class="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div><span class="font-semibold">Em Trânsito</span></div>`;
             locationInfo = `<div class="text-sm text-gray-600">Próxima parada: <strong>${rastreio.proxima_loja?.nome || 'N/A'}</strong></div>`;
@@ -3676,32 +4544,32 @@ function renderRastreioList(data) {
         }
         
         // Calcular tempo desde a última atualização
-const tempoUltimaAtualizacao = rastreio.last_update ? 
-    Math.round((new Date() - rastreio.last_update) / 60000) : null;
+        const tempoUltimaAtualizacao = rastreio.last_update ? 
+            Math.round((new Date() - rastreio.last_update) / 60000) : null;
 
-// Informações de proximidade
-let proximityInfo = '';
-if (rastreio.pontos_proximos && rastreio.pontos_proximos.length > 0) {
-    proximityInfo = `
-        <div class="proximity-alert">
-            <div class="text-sm font-medium">
-                <span class="proximity-icon">📍</span>Pontos Próximos:
-            </div>
-            ${rastreio.pontos_proximos.map(p => {
-                let icon = '';
-                if (p.ponto.tipo === 'CD') icon = '🏭';
-                else if (p.ponto.tipo === 'LOJA') icon = '🏪';
-                else if (p.ponto.tipo === 'POSTO') icon = '⛽';
-                else if (p.ponto.tipo === 'CASA') icon = '🏠';
-                else icon = '📍';
-                
-                return `<div class="text-xs mt-1">${icon} ${p.ponto.nome} - ${p.distancia}m</div>`;
-            }).join('')}
-        </div>
-    `;
-}
+        // Informações de proximidade
+        let proximityInfo = '';
+        if (rastreio.pontos_proximos && Array.isArray(rastreio.pontos_proximos) && rastreio.pontos_proximos.length > 0) {
+            proximityInfo = `
+                <div class="proximity-alert">
+                    <div class="text-sm font-medium">
+                        <span class="proximity-icon">📍</span>Pontos Próximos:
+                    </div>
+                    ${rastreio.pontos_proximos.map(p => {
+                        let icon = '';
+                        if (p.ponto.tipo === 'CD') icon = '🏭';
+                        else if (p.ponto.tipo === 'LOJA') icon = '🏪';
+                        else if (p.ponto.tipo === 'POSTO') icon = '⛽';
+                        else if (p.ponto.tipo === 'CASA') icon = '🏠';
+                        else icon = '📍';
+                        
+                        return `<div class="text-xs mt-1">${icon} ${p.ponto.nome} - ${p.distancia}m</div>`;
+                    }).join('')}
+                </div>
+            `;
+        }
 
-return `
+        return `
             <div class="bg-white rounded-lg shadow-md p-6 border-l-4 ${rastreio.status_rastreio === 'em_transito' ? 'border-blue-500' : rastreio.status_rastreio === 'em_descarga' ? 'border-orange-500' : 'border-green-500'}">
                 <div class="flex justify-between items-start mb-4">
                     <div>
@@ -3764,9 +4632,7 @@ ${proximityInfo}
     <button class="btn btn-success btn-small" onclick="showAllVehiclesMap()">
         Mapa Geral
     </button>
-    <button class="btn btn-warning btn-small" onclick="showTrajectoryMap('${rastreio.id}', '${rastreio.veiculo_placa}')">
-        Ver Trajeto
-    </button>
+    ${trajectoryButton}
 </div>
                     </div>
                 </div>
@@ -3781,13 +4647,12 @@ ${proximityInfo}
                             else if (item.status_descarga === 'em_descarga') iconStatus = '🚚';
                             else iconStatus = '⏳';
                             
-                            // ...
+                            
 return `<div class="flex items-center text-sm ...">
     <span class="mr-2">${iconStatus}</span>
     <span>${index + 1}. ${loja?.codigo || 'N/A'} - ${loja?.nome || 'N/A'}</span>
     ${item.data_fim_descarga ? `<span class="ml-auto text-xs">${new Date(item.data_fim_descarga).toLocaleTimeString('pt-BR')}</span>` : ''}
 </div>`;
-// ...
                         }).join('')}
                     </div>
                 </div>
@@ -3825,43 +4690,51 @@ function updateLastRefreshTime() {
     document.getElementById('lastUpdateRastreio').textContent = 
         `Última atualização: ${now.toLocaleTimeString('pt-BR')}`;
 }
-        // --- FUNCIONALIDADES DA ABA HISTÓRICO ---
-        async function loadHistorico() {
-            showSubTab('historico', 'listaEntregas', document.querySelector('#historico .sub-tab'));
-            const container = document.getElementById('historicoList');
-            container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando histórico...</div>`;
-            try {
-                const expeditions = await supabaseRequest('expeditions?status=eq.entregue&order=data_hora.desc');
-                const items = await supabaseRequest('expedition_items');
-                
-                allHistorico = expeditions.map(exp => {
-                    const expItems = items.filter(item => item.expedition_id === exp.id);
-                    const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
-                    const totalPallets = expItems.reduce((s, i) => s + (i.pallets || 0), 0);
-                    const totalRolls = expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0);
-                    const totalCarga = totalPallets + (totalRolls / 2);
-                    const ocupacao = veiculo && veiculo.capacidade_pallets > 0 ? (totalCarga / veiculo.capacidade_pallets) * 100 : 0;
-                    
-                    return {
-                        ...exp,
-                        items: expItems,
-                        lojas_count: expItems.length,
-                        lojas_info: expItems.map(item => {
-                            const loja = lojas.find(l => l.id === item.loja_id);
-                            return loja ? `${loja.codigo} - ${loja.nome}` : 'N/A';
-                        }).join(', '),
-                        veiculo_placa: veiculo?.placa,
-                        motorista_nome: motoristas.find(m => m.id === exp.motorista_id)?.nome,
-                        total_pallets: totalPallets,
-                        ocupacao: ocupacao.toFixed(1)
-                    };
-                });
+     // SUBSTITUIR A FUNÇÃO loadHistorico
+async function loadHistorico() {
+    const permittedHistoricoTabs = getPermittedSubTabs('historico');
+    
+    if (permittedHistoricoTabs.length > 0) {
+        const initialSubTab = permittedHistoricoTabs.length === 1 ? permittedHistoricoTabs[0] : 'listaEntregas';
+        const initialElement = document.querySelector(`#historico .sub-tabs button[onclick*="'${initialSubTab}'"]`);
+        showSubTab('historico', initialSubTab, initialElement);
+    }
+    
+    const container = document.getElementById('historicoList');
+    container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando histórico...</div>`;
+    try {
+        // 🚨 FIX CRÍTICO: Adicionar limit=1000 para garantir que todos os registros sejam carregados
+        const expeditions = await supabaseRequest('expeditions?status=eq.entregue&order=data_hora.desc&limit=1000');
+        const items = await supabaseRequest('expedition_items');
+        
+        allHistorico = expeditions.map(exp => {
+            const expItems = items.filter(item => item.expedition_id === exp.id);
+            const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
+            const totalPallets = expItems.reduce((s, i) => s + (i.pallets || 0), 0);
+            const totalRolls = expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0);
+            const totalCarga = totalPallets + (totalRolls / 2);
+            const ocupacao = veiculo && veiculo.capacidade_pallets > 0 ? (totalCarga / veiculo.capacidade_pallets) * 100 : 0;
+            
+            return {
+                ...exp,
+                items: expItems,
+                lojas_count: expItems.length,
+                lojas_info: expItems.map(item => {
+                    const loja = lojas.find(l => l.id === item.loja_id);
+                    return loja ? `${loja.codigo} - ${loja.nome}` : 'N/A';
+                }).join(', '),
+                veiculo_placa: veiculo?.placa,
+                motorista_nome: motoristas.find(m => m.id === exp.motorista_id)?.nome,
+                total_pallets: totalPallets,
+                ocupacao: ocupacao.toFixed(1)
+            };
+        });
 
-                applyHistoricoFilters();
-            } catch(error) {
-                container.innerHTML = `<div class="alert alert-error">Erro ao carregar histórico: ${error.message}</div>`;
-            }
-        }
+        applyHistoricoFilters();
+    } catch(error) {
+        container.innerHTML = `<div class="alert alert-error">Erro ao carregar histórico: ${error.message}</div>`;
+    }
+}
 
         function applyHistoricoFilters() {
             const dataInicio = document.getElementById('historicoFiltroDataInicio').value || document.getElementById('indicadoresFiltroDataInicio').value;
@@ -3892,65 +4765,143 @@ function updateLastRefreshTime() {
             applyHistoricoFilters();
         }
 
-        function renderHistorico(data) {
-            const container = document.getElementById('historicoList');
-            if (data.length === 0) {
-                container.innerHTML = '<div class="alert alert-success">Nenhum registro encontrado para os filtros.</div>';
-                return;
-            }
+      // SUBSTITUIR A FUNÇÃO renderHistorico COMPLETA (CORRIGIDA)
+function renderHistorico(data) {
+    const container = document.getElementById('historicoList');
+    if (data.length === 0) {
+        container.innerHTML = '<div class="alert alert-success">Nenhum registro encontrado para os filtros.</div>';
+        return;
+    }
 
-            container.innerHTML = data.map(exp => {
-                 const tempos = {
-                    patio: (exp.data_saida_veiculo && exp.data_hora) ? minutesToHHMM((new Date(exp.data_saida_veiculo) - new Date(exp.data_hora)) / 60000) : '-',
-                    carregamento: (exp.data_chegada_veiculo && exp.data_saida_veiculo) ? minutesToHHMM((new Date(exp.data_saida_veiculo) - new Date(exp.data_chegada_veiculo)) / 60000) : '-',
-                };
+    container.innerHTML = data.map(exp => {
+        // 1. CÁLCULO DE TEMPOS DA EXPEDIÇÃO (Tudo em minutos)
+        const tempos = {
+            patio: (exp.data_saida_veiculo && exp.data_hora) ? minutesToHHMM((new Date(exp.data_saida_veiculo) - new Date(exp.data_hora)) / 60000) : 'N/A',
+            alocacao: (exp.data_alocacao_veiculo && exp.data_hora) ? minutesToHHMM((new Date(exp.data_alocacao_veiculo) - new Date(exp.data_hora)) / 60000) : 'N/A',
+            carregamento: (exp.data_chegada_veiculo && exp.data_saida_veiculo) ? minutesToHHMM((new Date(exp.data_saida_veiculo) - new Date(exp.data_chegada_veiculo)) / 60000) : 'N/A',
+            faturamento: (exp.data_inicio_faturamento && exp.data_fim_faturamento) ? minutesToHHMM((new Date(exp.data_fim_faturamento) - new Date(exp.data_inicio_faturamento)) / 60000) : 'N/A',
+        };
+        
+        let roteiroHtml = '';
+        let totalTempoEmTransito = 0;
+        let totalTempoEmLoja = 0;
+        let lastDeparture = exp.data_saida_entrega ? new Date(exp.data_saida_entrega) : new Date(exp.data_saida_veiculo);
 
-                let roteiroHtml = '<div class="mt-4 space-y-2">';
-                if (exp.items && exp.items.length > 0) {
-                     exp.items.sort((a,b) => new Date(a.data_inicio_descarga) - new Date(b.data_inicio_descarga)).forEach((item, index) => {
-                        const loja = lojas.find(l => l.id === item.loja_id);
-                        const t_chegada = item.data_inicio_descarga ? new Date(item.data_inicio_descarga) : null;
-                        const t_saida = item.data_fim_descarga ? new Date(item.data_fim_descarga) : null;
-                        const tempoEmLoja = t_saida && t_chegada ? (t_saida - t_chegada) / 60000 : null;
 
-                        roteiroHtml += `
-                            <div class="loja-descarga-card" style="padding: 10px; margin-bottom: 8px;">
-                                <strong class="text-sm">${index + 1}. ${loja.codigo} - ${loja.nome}</strong>
-                                ${tempoEmLoja !== null ? `<div class="time-display good text-xs p-1"><strong>Em Loja:</strong> ${minutesToHHMM(tempoEmLoja)}</div>` : ''}
-                            </div>`;
-                     });
+        // 2. ROTEIRO DE ENTREGAS E CÁLCULO DE TEMPOS DE TRÂNSITO/LOJA
+        if (exp.items && exp.items.length > 0) {
+             // Ordena para garantir a ordem correta na renderização e cálculo
+             exp.items.sort((a, b) => (a.ordem_entrega || 999) - (b.ordem_entrega || 999)).forEach((item, index) => {
+                const loja = lojas.find(l => l.id === item.loja_id);
+                const t_chegada = item.data_inicio_descarga ? new Date(item.data_inicio_descarga) : null;
+                const t_saida = item.data_fim_descarga ? new Date(item.data_fim_descarga) : null;
+                
+                let tempoEmLojaMin = 0;
+                let tempoTransitoMin = 0;
+
+                // Calcula o Tempo em Trânsito (do último ponto de saída até a chegada atual)
+                if (t_chegada && lastDeparture) {
+                    tempoTransitoMin = (t_chegada - lastDeparture) / 60000;
+                    totalTempoEmTransito += tempoTransitoMin;
                 }
-                roteiroHtml += '</div>';
+                
+                // Calcula o Tempo em Loja (descarga)
+                if (t_saida && t_chegada) {
+                    tempoEmLojaMin = (t_saida - t_chegada) / 60000;
+                    totalTempoEmLoja += tempoEmLojaMin;
+                    lastDeparture = t_saida; // Atualiza o último ponto de saída
+                }
 
-                return `
-                    <div class="historico-card">
-                        <div class="flex justify-between items-start">
-                           <div>
-                                <h3 class="text-lg font-bold">${new Date(exp.data_hora).toLocaleDateString('pt-BR')} - ${exp.veiculo_placa}</h3>
-                                <p class="text-sm text-gray-500">Motorista: ${exp.motorista_nome}</p>
-                                ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">📦 ${exp.numeros_carga.join(', ')}</p>` : ''}
+                // Determina a cor da badge de tempo em loja (descarga)
+                let tempoLojaClass = '';
+                if (tempoEmLojaMin > 60) tempoLojaClass = 'bg-red-100 text-red-800'; // Vermelho se > 1h
+                else if (tempoEmLojaMin > 30) tempoLojaClass = 'bg-yellow-100 text-yellow-800'; // Amarelo se > 30min
+                else if (tempoEmLojaMin > 0) tempoLojaClass = 'bg-green-100 text-green-800'; // Verde
+                
+                // Garante que rolltrainers e pallets sejam exibidos como 0 se nulos
+                const palletsDisplay = item.pallets || 0;
+                const rollsDisplay = item.rolltrainers || 0;
+
+                roteiroHtml += `
+                    <div class="p-3 border-b border-dashed border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <strong class="text-sm text-gray-800">${index + 1}. ${loja?.codigo || 'N/A'} - ${loja?.nome || 'N/A'}</strong>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs font-semibold ${tempoLojaClass} px-2 py-1 rounded">
+                                    ${tempoEmLojaMin > 0 ? `Descarga: ${minutesToHHMM(tempoEmLojaMin)}` : 'Descarga: N/A'}
+                                </span>
+                                <span class="text-xs text-gray-500">${palletsDisplay}P / ${rollsDisplay}R</span>
                             </div>
-                            <div class="flex flex-col items-end gap-2">
-    <span class="status-badge status-entregue">Entregue</span>
-    <div class="flex gap-2">
-        <button class="btn btn-success btn-small" onclick="showTrajectoryMap('${exp.id}', '${exp.veiculo_placa}')">Ver Trajeto</button>
-        <button class="btn btn-danger btn-small" onclick="deleteHistoricoExpedition('${exp.id}')">Excluir</button>
-    </div>
-</div>
                         </div>
-                        <div class="mt-2 grid grid-cols-2 gap-4 text-sm">
-                            <div><strong>Ocupação:</strong> <span class="font-bold">${exp.ocupacao}%</span></div>
-                            <div><strong>Pallets:</strong> <span class="font-bold">${exp.total_pallets}</span></div>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4 text-xs">
-                            <div class="time-display"><strong>T. Pátio:</strong> ${tempos.patio}</div>
-                            <div class="time-display"><strong>T. Carga:</strong> ${tempos.carregamento}</div>
-                        </div>
-                        ${roteiroHtml}
+                        ${tempoTransitoMin > 0 ? `
+                            <div class="text-xs text-gray-500 mt-1 pl-4">
+                                ↳ T. Desloc.: ${minutesToHHMM(tempoTransitoMin)}
+                            </div>
+                        ` : ''}
                     </div>
                 `;
-            }).join('');
+             });
         }
+
+        // 3. RENDERIZAÇÃO DO CARD COMPLETO
+        
+        // Define a cor da ocupação
+        const ocupacaoPerc = Math.round(exp.ocupacao || 0);
+        let ocupacaoColor = 'text-green-600';
+        if (ocupacaoPerc > 90) ocupacaoColor = 'text-orange-600';
+        if (ocupacaoPerc > 100) ocupacaoColor = 'text-red-600';
+
+        return `
+            <div class="historico-card" data-aos="fade-up">
+                <div class="flex justify-between items-start mb-4 border-b pb-3">
+                   <div>
+                        <h3 class="text-xl font-bold text-gray-800">${new Date(exp.data_hora).toLocaleDateString('pt-BR')} - ${exp.veiculo_placa}</h3>
+                        <p class="text-sm text-gray-600">Motorista: <span class="font-semibold">${exp.motorista_nome}</span></p>
+                        ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">📦 Cargas: ${exp.numeros_carga.join(', ')}</p>` : ''}
+                    </div>
+                    <div class="text-right">
+                        <span class="status-badge status-entregue">ENTREGUE</span>
+                        <div class="mt-2 flex gap-2">
+                            <button class="btn btn-primary btn-small" onclick="showDetalhesExpedicao('${exp.id}')">Detalhes</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteHistoricoExpedition('${exp.id}')">Excluir</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm font-semibold">
+                    <div class="p-3 bg-gray-50 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-blue-600">${exp.total_pallets}P / ${exp.total_rolltrainers || 0}R</div>
+                        <div class="text-xs text-gray-500">Carga Total</div>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg text-center">
+                        <div class="text-2xl font-bold ${ocupacaoColor}">${ocupacaoPerc}%</div>
+                        <div class="text-xs text-gray-500">Ocupação</div>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-green-600">${minutesToHHMM(totalTempoEmLoja)}</div>
+                        <div class="text-xs text-gray-500">T. Descarga Total</div>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-orange-600">${minutesToHHMM(totalTempoEmTransito)}</div>
+                        <div class="text-xs text-gray-500">T. Trânsito Total</div>
+                    </div>
+                </div>
+
+                <h4 class="font-bold text-gray-700 mb-2 border-t pt-3">Tempos de Pátio e Faturamento</h4>
+                <div class="grid grid-cols-3 gap-2 text-xs text-center mb-4">
+                    <div class="time-display" style="background:#e0e7ff; border-left-color:#3730a3;"><strong>T. Alocação:</strong> ${tempos.alocacao}</div>
+                    <div class="time-display" style="background:#cffafe; border-left-color:#0e7490;"><strong>T. Carga:</strong> ${tempos.carregamento}</div>
+                    <div class="time-display" style="background:#d1fae5; border-left-color:#065f46;"><strong>T. Faturamento:</strong> ${tempos.faturamento}</div>
+                </div>
+
+                <h4 class="font-bold text-gray-700 mb-2 border-t pt-3">Roteiro Detalhado (${exp.lojas_count} Paradas)</h4>
+                <div class="space-y-1 bg-white p-2 border rounded-lg">
+                    ${roteiroHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
         
         async function deleteHistoricoExpedition(expeditionId) {
             const confirmed = await showYesNoModal('Deseja excluir permanentemente esta expedição do histórico?');
@@ -3966,71 +4917,361 @@ function updateLastRefreshTime() {
             }
         }
 
-        function generateHistoricoIndicators(data) {
-            const summaryContainer = document.getElementById('indicadoresSummary');
-            if (data.length === 0) {
-                summaryContainer.innerHTML = '<div class="alert alert-info">Sem dados para exibir indicadores.</div>';
-                destroyChart('lojasRankingChart');
-                destroyChart('entregasChart');
-                return;
-            }
-            
-            const calcularMedia = (arr) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-            
-            let temposAlocar = [], temposChegada = [], temposCarregamento = [], temposTotalViagem = [], temposEmTransito = [], temposEmLoja = [];
-            let lojasData = {};
-            let entregasFort = 0, entregasComper = 0;
-
-            data.forEach(exp => {
-                if (exp.data_alocacao_veiculo) temposAlocar.push((new Date(exp.data_alocacao_veiculo) - new Date(exp.data_hora)) / 60000);
-                if (exp.data_chegada_veiculo) temposChegada.push((new Date(exp.data_chegada_veiculo) - new Date(exp.data_hora)) / 60000);
-                if (exp.data_chegada_veiculo && exp.data_saida_veiculo) temposCarregamento.push((new Date(exp.data_saida_veiculo) - new Date(exp.data_chegada_veiculo)) / 60000);
-                
-                let ultimaData = exp.data_saida_entrega ? new Date(exp.data_saida_entrega) : null;
-                let totalTransitoViagem = 0;
-                let totalLojaViagem = 0;
-                let ultimaDescarga = null;
-
-                exp.items.forEach(item => {
-                    const t_chegada = item.data_inicio_descarga ? new Date(item.data_inicio_descarga) : null;
-                    const t_saida = item.data_fim_descarga ? new Date(item.data_fim_descarga) : null;
-                    const tempoEmLoja = t_saida && t_chegada ? (t_saida - t_chegada) / 60000 : 0;
-                    const tempoTransito = ultimaData && t_chegada ? (t_chegada - ultimaData) / 60000 : 0;
-                    
-                    if (tempoEmLoja > 0) {
-                        totalLojaViagem += tempoEmLoja;
-                        const loja = lojas.find(l => l.id === item.loja_id);
-                        if(loja) {
-                            if (!lojasData[loja.id]) lojasData[loja.id] = { nome: `${loja.codigo} - ${loja.nome}`, tempos: [], entregas: 0 };
-                            lojasData[loja.id].tempos.push(tempoEmLoja);
-                            lojasData[loja.id].entregas++;
-                            if (loja.nome.toLowerCase().includes('fort')) entregasFort++;
-                            else if (loja.nome.toLowerCase().includes('comper')) entregasComper++;
-                        }
-                    }
-                    if (tempoTransito > 0) totalTransitoViagem += tempoTransito;
-                    if (t_saida) ultimaData = t_saida;
-                    if (t_saida && (!ultimaDescarga || t_saida > ultimaDescarga)) ultimaDescarga = t_saida;
-                });
-                if (totalLojaViagem > 0) temposEmLoja.push(totalLojaViagem);
-                if (totalTransitoViagem > 0) temposEmTransito.push(totalTransitoViagem);
-                if(ultimaDescarga) temposTotalViagem.push((ultimaDescarga - new Date(exp.data_hora)) / 60000);
-            });
-            
-            summaryContainer.innerHTML = `
-                <div class="time-stat-card"><div class="stat-number">${data.length}</div><div class="stat-label">Viagens</div></div>
-                <div class="time-stat-card"><div class="stat-number">${data.reduce((s,e)=> s + e.lojas_count, 0)}</div><div class="stat-label">Entregas</div></div>
-                <div class="time-stat-card"><div class="stat-number">${minutesToHHMM(calcularMedia(temposAlocar))}</div><div class="stat-label">T.M. Alocar</div></div>
-                <div class="time-stat-card"><div class="stat-number">${minutesToHHMM(calcularMedia(temposCarregamento))}</div><div class="stat-label">T.M. Carga</div></div>
-                <div class="time-stat-card"><div class="stat-number">${minutesToHHMM(calcularMedia(temposTotalViagem))}</div><div class="stat-label">T.M. Viagem</div></div>
-                <div class="time-stat-card"><div class="stat-number">${minutesToHHMM(calcularMedia(temposEmTransito))}</div><div class="stat-label">T.M. Trânsito</div></div>
-                <div class="time-stat-card"><div class="stat-number">${minutesToHHMM(calcularMedia(temposEmLoja))}</div><div class="stat-label">T.M. em Loja</div></div>
-            `;
-
-           renderLojasRankingChart(lojasData);
-renderEntregasChart(entregasFort, entregasComper);
-        }
+ // SUBSTITUIR A FUNÇÃO generateHistoricoIndicators COMPLETA
+function generateHistoricoIndicators(data) {
+    const timeSummaryContainer = document.getElementById('indicadoresTimeSummary');
+    const volumeStatsContainer = document.getElementById('indicadoresVolumeStats');
+    
+    if (data.length === 0) {
+        timeSummaryContainer.innerHTML = '<div class="alert alert-info md:col-span-5">Sem dados de expedições concluídas para o período selecionado.</div>';
+        volumeStatsContainer.innerHTML = '';
+        destroyChart('lojasRankingChart');
+        destroyChart('entregasChart');
+        destroyChart('totalEntregasLojaChart');
+        destroyChart('participacaoEntregasLojaChart');
+        destroyChart('palletsPorLojaChart'); 
+        return;
+    }
+    
+    const calcularMedia = (arr) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const totalViagens = data.length;
+    
+    // VARIÁVEIS DE AGRUPAMENTO
+    let temposAlocar = [];
+    let temposChegadaDoca = [];
+    let temposCarregamento = [];
+    let temposFaturamento = []; 
+    let temposEmTransito = []; 
+    let temposEmLoja = [];
+    
+    // Estrutura principal para Ranking e Participação. O array 'tempos' é crítico para o ranking.
+    let lojasData = {}; 
+    let entregasFort = 0, entregasComper = 0;
+    let totalEntregas = 0;
+    let totalPallets = 0;
+    let totalRolls = 0;
+    let ocupacoes = [];
+    let lojasAtendidas = new Set();
+    const entregasDiarias = {}; // Mantida para o gráfico de evolução, se necessário
+    const datasExpedicao = new Set();
+    const dataFimFiltro = document.getElementById('indicadoresFiltroDataFim').value || new Date().toISOString().split('T')[0];
+    
+    data.forEach(exp => {
+        const dataExp = new Date(exp.data_hora).toISOString().split('T')[0];
+        datasExpedicao.add(dataExp);
         
+        // 1. CÁLCULOS DE TEMPO INTERNO (Pátio)
+        if (exp.data_alocacao_veiculo) temposAlocar.push((new Date(exp.data_alocacao_veiculo) - new Date(exp.data_hora)) / 60000);
+        if (exp.data_chegada_veiculo && exp.data_alocacao_veiculo) temposChegadaDoca.push((new Date(exp.data_chegada_veiculo) - new Date(exp.data_alocacao_veiculo)) / 60000);
+        if (exp.data_chegada_veiculo && exp.data_saida_veiculo) temposCarregamento.push((new Date(exp.data_saida_veiculo) - new Date(exp.data_chegada_veiculo)) / 60000);
+        if (exp.data_inicio_faturamento && exp.data_fim_faturamento) temposFaturamento.push((new Date(exp.data_fim_faturamento) - new Date(exp.data_inicio_faturamento)) / 60000);
+        
+        // 2. CÁLCULOS DE VOLUME E TEMPO EXTERNO
+        let ultimaData = exp.data_saida_entrega ? new Date(exp.data_saida_entrega) : new Date(exp.data_saida_veiculo);
+        let totalTransitoViagem = 0;
+        let totalLojaViagem = 0;
+        
+        const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
+        let cargaPalletExp = 0;
+        let cargaRollExp = 0;
+
+        exp.items.sort((a, b) => (a.ordem_entrega || 999) - (b.ordem_entrega || 999)).forEach(item => {
+            // Conta totais GERAIS
+            totalPallets += item.pallets || 0;
+            totalRolls += item.rolltrainers || 0;
+            cargaPalletExp += item.pallets || 0;
+            cargaRollExp += item.rolltrainers || 0;
+            
+            // Para o cálculo de tempos de loja e trânsito
+            const t_chegada = item.data_inicio_descarga ? new Date(item.data_inicio_descarga) : null;
+            const t_saida = item.data_fim_descarga ? new Date(item.data_fim_descarga) : null;
+            const tempoEmLoja = t_saida && t_chegada ? (t_saida - t_chegada) / 60000 : 0;
+            const tempoTransito = ultimaData && t_chegada ? (t_chegada - ultimaData) / 60000 : 0;
+            
+            if (tempoEmLoja > 0) {
+                totalLojaViagem += tempoEmLoja;
+                const loja = lojas.find(l => l.id === item.loja_id);
+                if(loja) {
+                    lojasAtendidas.add(loja.id);
+                    // Inicializa a estrutura da loja
+                    if (!lojasData[loja.id]) {
+                        lojasData[loja.id] = { nome: `${loja.codigo} - ${loja.nome}`, totalEntregas: 0, totalTempo: 0, totalPallets: 0, tempos: [] }; // Adicionado 'tempos'
+                    }
+                    lojasData[loja.id].totalTempo += tempoEmLoja;
+                    lojasData[loja.id].totalPallets += item.pallets || 0;
+                    lojasData[loja.id].tempos.push(tempoEmLoja); // Adiciona o tempo para o cálculo do Ranking
+                    
+                    if (loja.nome.toLowerCase().includes('fort')) entregasFort++;
+                    else if (loja.nome.toLowerCase().includes('comper')) entregasComper++;
+                }
+            }
+            if (tempoTransito > 0) totalTransitoViagem += tempoTransito;
+            if (t_saida) ultimaData = t_saida;
+        });
+        
+        // CORREÇÃO CRÍTICA (Item 4): A contagem de Entregas/Saídas deve ser por EXPEDIÇÃO/ITEM finalizado
+        if (exp.status === 'entregue') {
+            exp.items.forEach(item => {
+                const loja = lojas.find(l => l.id === item.loja_id);
+                if (loja && item.status_descarga === 'descarregado') {
+                     // Conta 1 "saída" por item de expedição descarregado (reflete a lógica de 1 loja = 1 item)
+                    lojasData[loja.id].totalEntregas++; 
+                    totalEntregas++; 
+                }
+            });
+            // Mantida para o gráfico de Evolução (se fosse usado)
+            entregasDiarias[dataExp] = (entregasDiarias[dataExp] || 0) + exp.items.length;
+        }
+
+        if (totalLojaViagem > 0) temposEmLoja.push(totalLojaViagem);
+        if (totalTransitoViagem > 0) temposEmTransito.push(totalTransitoViagem);
+
+        if (veiculo && veiculo.capacidade_pallets > 0) {
+            const cargaTotal = cargaPalletExp + (cargaRollExp / 2);
+            ocupacoes.push((cargaTotal / veiculo.capacidade_pallets) * 100);
+        }
+    });
+    
+    // CÁLCULO DAS MÉDIAS FINAIS
+    const mediaAlocar = calcularMedia(temposAlocar);
+    const mediaChegadaDoca = calcularMedia(temposChegadaDoca);
+    const mediaCarregamento = calcularMedia(temposCarregamento);
+    const mediaFaturamento = calcularMedia(temposFaturamento);
+    const mediaEmTransito = calcularMedia(temposEmTransito);
+    const mediaEmLoja = calcularMedia(temposEmLoja);
+    const mediaOcupacao = calcularMedia(ocupacoes);
+    
+    // T.M. TOTAL INTERNO (E2E): Ociosidade + Chegada Doca + Carregamento + Faturamento
+    const mediaTempoInternoTotal = mediaAlocar + mediaChegadaDoca + mediaCarregamento + mediaFaturamento;
+
+    
+    // PROCESSAMENTO PARA GRÁFICOS
+    const lojasRankingData = Object.values(lojasData).map(loja => ({
+        ...loja,
+        // Garante que o tempo médio por loja (para o Ranking) seja calculado a partir de todos os 'tempos'
+        tempoMedio: calcularMedia(loja.tempos) 
+    })).filter(l => l.totalEntregas > 0); 
+    
+    // -----------------------------------------------------
+    // RENDERIZAÇÃO
+    // -----------------------------------------------------
+    
+    // ... (Blocos de Volume e Tempos permanecem os mesmos)
+    
+    // 1. Bloco de Volume e Eficiência (6 Indicadores)
+    volumeStatsContainer.innerHTML = `
+        <div class="stat-card" style="background: linear-gradient(135deg, #00D4AA, #00B4D8);">
+            <div class="stat-number">${totalViagens}</div>
+            <div class="stat-label">Viagens Concluídas</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #00B4D8, #0077B6);">
+            <div class="stat-number">${totalEntregas}</div>
+            <div class="stat-label">Entregas Realizadas</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #FFD700, #F77F00);">
+            <div class="stat-number">${totalPallets}</div>
+            <div class="stat-label">Total Pallets</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #9C27B0, #7209B7);">
+            <div class="stat-number">${totalRolls}</div>
+            <div class="stat-label">Total RollTrainers</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #DC143C, #D62828);">
+            <div class="stat-number">${mediaOcupacao.toFixed(1)}%</div>
+            <div class="stat-label">Ocupação Média</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #3B82F6, #1D4ED8);">
+            <div class="stat-number">${lojasAtendidas.size}</div>
+            <div class="stat-label">Lojas Atendidas</div>
+        </div>
+    `;
+
+    // 2. Bloco de Tempos por Grupo (5 Colunas)
+    timeSummaryContainer.innerHTML = `
+        <div class="bg-white p-4 rounded-xl shadow-lg border-t-4 border-blue-600 historico-time-card" data-aos="fade-up">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">⏱️Tempo Interno </h3>
+            <div class="time-stat-card" style="background: linear-gradient(135deg, #0077B6, #00B4D8); margin-bottom: 15px;">
+                <div class="stat-number text-3xl">${minutesToHHMM(mediaTempoInternoTotal)}</div>
+                <div class="stat-label">TEMPO TOTAL PÁTIO</div>
+            </div>
+            
+            <div class="text-sm space-y-2">
+                <div class="flex justify-between border-b pb-1"><span>Ociosidade (Lanç. → Aloc.)</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaAlocar)}</span></div>
+                <div class="flex justify-between border-b pb-1"><span>Chegada Doca (Aloc. → Cheg.)</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaChegadaDoca)}</span></div>
+                <div class="flex justify-between border-b pb-1"><span>Carregamento (Cheg. → Saída)</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaCarregamento)}</span></div>
+                <div class="flex justify-between pb-1"><span>T.M. Faturamento</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaFaturamento)}</span></div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-4 rounded-xl shadow-lg border-t-4 border-yellow-600 historico-time-card" data-aos="fade-up" data-aos-delay="100">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Carregamento (Doca)</h3>
+            <div class="time-stat-card" style="background: linear-gradient(135deg, #FFD700, #F77F00); height: 100%;">
+                <div class="stat-number text-5xl">${minutesToHHMM(mediaCarregamento)}</div>
+                <div class="stat-label text-xl">TEMPO EM DOCA</div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-4 rounded-xl shadow-lg border-t-4 border-purple-600 historico-time-card" data-aos="fade-up" data-aos-delay="200">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Faturamento</h3>
+            <div class="time-stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC); height: 100%;">
+                <div class="stat-number text-5xl">${minutesToHHMM(mediaFaturamento)}</div>
+                <div class="stat-label text-xl">TEMPO EM FATURAMENTO</div>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-lg border-t-4 border-orange-600 historico-time-card" data-aos="fade-up" data-aos-delay="300">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Trânsito</h3>
+            <div class="time-stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49); height: 100%;">
+                <div class="stat-number text-5xl">${minutesToHHMM(mediaEmTransito)}</div>
+                <div class="stat-label text-xl">TEMPO DE TRANSITO</div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-4 rounded-xl shadow-lg border-t-4 border-green-600 historico-time-card" data-aos="fade-up" data-aos-delay="400">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Loja</h3>
+            <div class="time-stat-card" style="background: linear-gradient(135deg, #00D4AA, #10B981); height: 100%;">
+                <div class="stat-number text-5xl">${minutesToHHMM(mediaEmLoja)}</div>
+                <div class="stat-label text-xl">TEMPO DE DESCARGA</div>
+            </div>
+        </div>
+    `;
+    
+    // 3. Renderização dos Gráficos
+    // CORREÇÃO DO RANKING (Item 2)
+    renderLojasRankingChart(lojasRankingData.filter(l => l.tempoMedio > 0).sort((a, b) => b.tempoMedio - a.tempoMedio).slice(0, 10));
+    renderEntregasChart(entregasFort, entregasComper);
+    
+    // NOVOS GRÁFICOS
+    renderTotalEntregasLojaChart(lojasRankingData);
+    renderParticipacaoEntregasLojaChart(lojasRankingData); // Novo gráfico de Pizza (Ajustado no código abaixo)
+    renderPalletsPorLojaChart(lojasRankingData); // Novo gráfico
+    
+    // REMOVIDO renderEvolucaoEntregasDiaChart (Item 5)
+
+}
+
+// =======================================================
+// NOVAS FUNÇÕES DE RENDERIZAÇÃO DE GRÁFICOS (PARA ADICIONAR)
+// =======================================================
+
+function renderTotalEntregasLojaChart(lojasData) {
+    const dataFiltrada = lojasData.filter(l => l.totalEntregas > 0).sort((a, b) => b.totalEntregas - a.totalEntregas).slice(0, 10);
+    if (dataFiltrada.length === 0) {
+        destroyChart('totalEntregasLojaChart');
+        return;
+    }
+    
+    const labels = dataFiltrada.map(l => l.nome);
+    const data = dataFiltrada.map(l => l.totalEntregas);
+    const colors = dataFiltrada.map(l => l.nome.toLowerCase().includes('fort') ? 'rgba(214, 40, 40, 0.7)' : 'rgba(0, 119, 182, 0.7)');
+
+    renderChart('totalEntregasLojaChart', 'bar', {
+        labels: labels,
+        datasets: [{ label: 'Total de Entregas', data: data, backgroundColor: colors }]
+    }, { 
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            datalabels: {
+                anchor: 'end',
+                align: 'end',
+                color: '#333',
+                formatter: (value) => value
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return `Saídas: ${context.raw}`;
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+// SUBSTITUIR A FUNÇÃO renderParticipacaoEntregasLojaChart COMPLETA
+function renderParticipacaoEntregasLojaChart(lojasData) {
+    const dataFiltrada = lojasData.filter(l => l.totalEntregas > 0).sort((a, b) => b.totalEntregas - a.totalEntregas);
+    if (dataFiltrada.length === 0) {
+        destroyChart('participacaoEntregasLojaChart');
+        return;
+    }
+
+    const totalGeral = dataFiltrada.reduce((sum, l) => sum + l.totalEntregas, 0);
+    
+    // REQUISITO: TOP 5 e REMOVER FATIA 'OUTRAS LOJAS'
+    const topN = 5;
+    const topLojas = dataFiltrada.slice(0, topN);
+    
+    let labels = topLojas.map(l => l.nome);
+    let data = topLojas.map(l => l.totalEntregas);
+    // Cores específicas para Fort/Comper
+    let colors = topLojas.map(l => l.nome.toLowerCase().includes('fort') ? 'rgba(239, 68, 68, 0.8)' : 'rgba(0, 180, 216, 0.8)');
+
+
+    renderChart('participacaoEntregasLojaChart', 'pie', {
+        labels: labels,
+        datasets: [{ 
+            label: 'Total de Entregas', 
+            data: data,
+            backgroundColor: colors
+        }]
+    }, {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            datalabels: {
+                color: 'white',
+                font: { weight: 'bold', size: 14 },
+                formatter: (value) => {
+                    if (totalGeral === 0) return '0%';
+                    let percentage = (value * 100 / totalGeral).toFixed(1) + '%';
+                    return percentage;
+                }
+            }
+        }
+    });
+}
+
+function renderPalletsPorLojaChart(lojasData) {
+    const dataFiltrada = lojasData.filter(l => l.totalPallets > 0).sort((a, b) => b.totalPallets - a.totalPallets).slice(0, 10);
+    if (dataFiltrada.length === 0) {
+        destroyChart('palletsPorLojaChart');
+        return;
+    }
+    
+    const labels = dataFiltrada.map(l => l.nome);
+    const data = dataFiltrada.map(l => l.totalPallets);
+    const colors = dataFiltrada.map(l => l.nome.toLowerCase().includes('fort') ? 'rgba(247, 127, 0, 0.7)' : 'rgba(255, 215, 0, 0.7)');
+
+    renderChart('palletsPorLojaChart', 'bar', {
+        labels: labels,
+        datasets: [{ label: 'Total de Pallets', data: data, backgroundColor: colors }]
+    }, { 
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            datalabels: {
+                anchor: 'end',
+                align: 'end',
+                color: '#333',
+                formatter: (value) => value
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return `Pallets: ${context.raw}`;
+                    }
+                }
+            }
+        }
+    });
+}
+        
+
        function renderLojasRankingChart(lojasData) {
             const ranking = Object.values(lojasData)
                 .map(loja => ({ ...loja, tempoMedio: (loja.tempos && loja.tempos.length > 0) ? loja.tempos.reduce((a, b) => a + b, 0) / loja.tempos.length : 0 }))
@@ -4180,9 +5421,32 @@ async function checkAuthForEdit() {
     }
 }
 
-      // Função para abrir modal de edição (SUBSTITUÍDA)
+// SUBSTITUIR A FUNÇÃO openEditModal COMPLETA
 async function openEditModal(expeditionId) {
-    if (!hasPermission('editar_expedicao')) {
+    const isMaster = masterUserPermission;
+    
+    // 1. Verificar Permissão Principal: Checagem robusta de múltiplas nomenclaturas
+    const requiredPermissions = [
+        'edit_expeditions',     // Plural inglês (Mais comum no seu BD para ações)
+        'edit_expedition',      // Singular inglês (Alternativa comum)
+        'editar_expedicao',     // Português (Como está no Gerenciar Permissões)
+        'view_editar_expedicao',// Prefixado (Fallback)
+        'acesso_editar_expedicao' // Prefixado (Fallback)
+    ];
+    
+    let canEdit = isMaster;
+
+    // Se o usuário não for MASTER, checa todas as variações da permissão de edição
+    if (!canEdit) {
+        for (const perm of requiredPermissions) {
+            if (hasPermission(perm)) {
+                canEdit = true;
+                break;
+            }
+        }
+    }
+
+    if (!canEdit) {
         showNotification('Você não tem permissão para editar expedições.', 'error');
         return;
     }
@@ -4208,11 +5472,20 @@ async function openEditModal(expeditionId) {
         return;
     }
 
-    if (expedition.status === 'saiu_para_entrega' || expedition.status === 'entregue') {
-        showNotification('Esta expedição não pode mais ser editada pois já saiu para entrega.', 'error');
+    // 2. Aplicar Restrição de Status (SÓ PARA USUÁRIOS NORMAIS) - Master Bypass OK
+    if (!isMaster && (expedition.status === 'saiu_para_entrega' || expedition.status === 'entregue')) {
+        showNotification('Esta expedição não pode mais ser editada, pois já saiu para entrega.', 'error');
+        return;
+    }
+    
+    // 3. Se não é Master, e o status é avançado, pedimos autenticação para garantir
+    if (!isMaster && (expedition.status === 'faturado' || expedition.status === 'faturamento_iniciado')) {
+        showNotification('Acesso a esta expedição requer autenticação adicional.', 'info');
+        showAuthEditModal(expeditionId);
         return;
     }
 
+    // 4. Fluxo de Edição Normal
     document.getElementById('editExpeditionId').value = expeditionId;
 
     populateEditSelects();
@@ -4233,6 +5506,7 @@ async function openEditModal(expeditionId) {
 
     document.getElementById('editExpeditionModal').style.display = 'flex';
 }
+
 // Função que abre o modal de edição sem verificação
 async function openEditModalDirectly(expeditionId) {
     // Primeiro, garante que temos os dados carregados
@@ -4326,31 +5600,39 @@ function populateEditSelects() {
             document.getElementById('editExpeditionModal').style.display = 'none';
         }
 
-        function addEditLojaLine(item = null) {
-            editLojaLineCounter++;
-            const container = document.getElementById('editLojasContainer');
-            const newLine = document.createElement('div');
-            newLine.className = 'grid grid-cols-1 md:grid-cols-4 gap-4 items-end';
-            newLine.dataset.editIndex = editLojaLineCounter;
-            
-            newLine.innerHTML = `
-                <div class="form-group md:col-span-2"><label>Loja:</label><select class="edit-loja-select w-full">${lojas.map(l => `<option value="${l.id}">${l.codigo} - ${l.nome}</option>`).join('')}</select></div>
-                <div class="form-group"><label>Pallets:</label><input type="number" class="edit-pallets-input w-full" min="0"></div>
-                <div><button type="button" class="btn btn-danger btn-small w-full" onclick="removeEditLojaLine(${editLojaLineCounter})">Remover</button></div>
-            `;
-            container.appendChild(newLine);
-            
-            if(item) {
-                newLine.querySelector('.edit-loja-select').value = item.loja_id;
-                newLine.querySelector('.edit-pallets-input').value = item.pallets;
-            }
-        }
+       // Função para adicionar uma nova linha de loja no modal de edição
+function addEditLojaLine(item = null) {
+    editLojaLineCounter++;
+    const container = document.getElementById('editLojasContainer');
+    const newLine = document.createElement('div');
+    // Ajustado para 5 colunas (Loja, Pallets, RollTrainers, Remover)
+    newLine.className = 'grid grid-cols-1 md:grid-cols-5 gap-4 items-end';
+    newLine.dataset.editIndex = editLojaLineCounter;
+    
+    // Inclui campo RollTrainers (com a classe 'edit-rolls-input')
+    newLine.innerHTML = `
+        <div class="form-group md:col-span-2"><label>Loja:</label><select class="edit-loja-select w-full">${lojas.map(l => `<option value="${l.id}">${l.codigo} - ${l.nome}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Pallets:</label><input type="number" class="edit-pallets-input w-full" min="0"></div>
+        <div class="form-group"><label>RollTrainers:</label><input type="number" class="edit-rolls-input w-full" min="0"></div>
+        <div><button type="button" class="btn btn-danger btn-small w-full" onclick="removeEditLojaLine(${editLojaLineCounter})">Remover</button></div>
+    `;
+    container.appendChild(newLine);
+    
+    if(item) {
+        newLine.querySelector('.edit-loja-select').value = item.loja_id;
+        newLine.querySelector('.edit-pallets-input').value = item.pallets;
+        // Preenche o campo RollTrainers com o valor existente
+        newLine.querySelector('.edit-rolls-input').value = item.rolltrainers || 0; 
+    }
+}
         
         function removeEditLojaLine(index) {
             document.querySelector(`[data-edit-index="${index}"]`)?.remove();
         }
 
-        async function saveEditedExpedition() {
+// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
+
+async function saveEditedExpedition() {
   const expeditionId = document.getElementById('editExpeditionId').value;
   const newVeiculo = document.getElementById('editVeiculo').value;
   const newMotorista = document.getElementById('editMotorista').value;
@@ -4362,7 +5644,7 @@ function populateEditSelects() {
   const newItemsData = Array.from(document.querySelectorAll('#editLojasContainer .grid')).map(row => ({
     loja_id: row.querySelector('.edit-loja-select').value,
     pallets: parseInt(row.querySelector('.edit-pallets-input').value) || 0,
-    rolltrainers: 0 // Assumindo que rolltrainers não são editáveis nesta tela
+    rolltrainers: parseInt(row.querySelector('.edit-rolls-input').value) || 0 // NOVO: Coleta RollTrainers
   }));
 
   try {
@@ -4438,6 +5720,7 @@ function populateEditSelects() {
       !newItemsData.some(newItem => newItem.loja_id === originalItem.loja_id)
     );
     for (const item of itemsToRemove) {
+      // 🚨 FIX CRÍTICO: Garante que a exclusão não envie filtro de filial (4º parâmetro = false)
       updatePromises.push(
         supabaseRequest(`expedition_items?id=eq.${item.id}`, 'DELETE', null, false)
       );
@@ -4446,14 +5729,28 @@ function populateEditSelects() {
     // Itens a serem adicionados ou atualizados
     for (const newItem of newItemsData) {
       const existingItem = originalItems.find(originalItem => originalItem.loja_id === newItem.loja_id);
+      
       if (existingItem) {
-        // Se já existe, atualiza
+        // Se já existe, verifica e atualiza
+        const payload = {};
+        let needsUpdate = false;
+
         if (existingItem.pallets !== newItem.pallets) {
-          updatePromises.push(
-            supabaseRequest(`expedition_items?id=eq.${existingItem.id}`, 'PATCH', {
-              pallets: newItem.pallets
-            }, false)
-          );
+          payload.pallets = newItem.pallets;
+          needsUpdate = true;
+        }
+
+        // NOVO: Verifica RollTrainers
+        if (existingItem.rolltrainers !== newItem.rolltrainers) {
+          payload.rolltrainers = newItem.rolltrainers;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+            // 🚨 FIX CRÍTICO: Garante que o PATCH não envie filtro de filial (4º parâmetro = false)
+            updatePromises.push(
+                supabaseRequest(`expedition_items?id=eq.${existingItem.id}`, 'PATCH', payload, false)
+            );
         }
       } else {
         // Se não existe, adiciona
@@ -4464,6 +5761,7 @@ function populateEditSelects() {
           rolltrainers: newItem.rolltrainers,
           status_descarga: 'pendente'
         };
+        // 🚨 FIX CRÍTICO: Garante que o POST não envie filtro de filial (4º parâmetro = false)
         updatePromises.push(
           supabaseRequest('expedition_items', 'POST', payload, false)
         );
@@ -4487,9 +5785,21 @@ function populateEditSelects() {
         
        // CÓDIGO CORRIGIDO
 
-// Função para excluir expedição (SUBSTITUÍDA)
+// SUBSTITUIR A FUNÇÃO deleteExpedition COMPLETA
 async function deleteExpedition(expeditionId) {
-    if (!hasPermission('excluir_expedicao')) {
+    const isMaster = masterUserPermission;
+
+    // 1. Verificar Permissão Principal
+    const requiredPermission = 'excluir_expedicao'; // Termo em português, mas mantemos o fallback
+    let canDelete = isMaster || hasPermission(requiredPermission);
+    
+    // 🚨 FIX CRÍTICO: Checa formas alternativas de permissão de ação.
+    if (!canDelete) {
+        // Ex: Se o BD tem o código de ação em inglês (delete_expeditions/delete_expedition)
+        canDelete = hasPermission('delete_expeditions') || hasPermission('delete_expedition');
+    }
+
+    if (!canDelete) {
         showNotification('Você não tem permissão para excluir expedições.', 'error');
         return;
     }
@@ -4500,8 +5810,9 @@ async function deleteExpedition(expeditionId) {
         return;
     }
 
-    if (expeditionToDel.status === 'saiu_para_entrega' || expeditionToDel.status === 'entregue') {
-        showNotification('Esta expedição não pode ser excluída pois já saiu para entrega.', 'error');
+    // 2. Aplicar Restrição de Status (SÓ PARA USUÁRIOS NORMAIS) - Master Bypass OK
+    if (!isMaster && (expeditionToDel.status === 'saiu_para_entrega' || expeditionToDel.status === 'entregue')) {
+        showNotification('Esta expedição não pode ser excluída, pois já saiu para entrega.', 'error');
         return;
     }
 
@@ -4510,6 +5821,7 @@ async function deleteExpedition(expeditionId) {
         try {
             const updatePromises = [];
 
+            // 3. Liberar Recursos Alocados
             if (expeditionToDel.doca_id) {
                 updatePromises.push(
                     supabaseRequest(`docas?id=eq.${expeditionToDel.doca_id}`, 'PATCH', { status: 'disponivel' })
@@ -4545,169 +5857,287 @@ async function deleteExpedition(expeditionId) {
         
         // --- FUNCIONALIDADES DA ABA CONFIGURAÇÕES ---
 
-        function loadConfiguracoes() {
-            if (currentUser) {
-                document.getElementById('passwordFormContainer').style.display = 'none';
-                document.getElementById('configuracoesContent').style.display = 'block';
-                showSubTab('configuracoes', 'filiais', document.querySelector('#configuracoes .sub-tab'));
-                updateSystemStatus();
-            } else {
-                document.getElementById('passwordFormContainer').style.display = 'block';
-                document.getElementById('configuracoesContent').style.display = 'none';
-                document.getElementById('passwordInput').value = '';
-                document.getElementById('userInput').value = '';
-            }
+  async function loadConfiguracoes() {
+    if (!currentUser) {
+        document.getElementById('passwordFormContainer').style.display = 'block';
+        document.getElementById('configuracoesContent').style.display = 'none';
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('userInput').value = '';
+        return;
+    }
+
+    if (gruposAcesso.length === 0) {
+        try {
+            gruposAcesso = await supabaseRequest('grupos_acesso?order=nome', 'GET', null, false);
+        } catch (error) {
+            console.error('Erro ao carregar grupos de acesso:', error);
+            showNotification('Erro ao carregar grupos de acesso.', 'error');
+        }
+    }
+    
+    document.getElementById('passwordFormContainer').style.display = 'none';
+    document.getElementById('configuracoesContent').style.display = 'block';
+    updateSystemStatus();
+    
+    const permittedConfiguracoesTabs = getPermittedSubTabs('configuracoes');
+    
+    if (permittedConfiguracoesTabs.length > 0) {
+        const initialSubTab = permittedConfiguracoesTabs.length === 1 ? permittedConfiguracoesTabs[0] : 'filiais';
+        const initialElement = document.querySelector(`#configuracoes .sub-tabs button[onclick*="'${initialSubTab}'"]`);
+        showSubTab('configuracoes', initialSubTab, initialElement);
+    }
+}
+
+        // SUBSTITUIR A VERSÃO EXISTENTE DE checkPassword
+async function checkPassword() {
+    const nome = document.getElementById('userInput').value.trim();
+    const senha = document.getElementById('passwordInput').value;
+
+    if (!nome || !senha) {
+        showAlert('passwordAlert', 'Nome e senha são obrigatórios.', 'error');
+        return;
+    }
+
+    try {
+        const endpoint = `acessos?select=id,nome,grupo_id&nome=eq.${nome}&senha=eq.${senha}`;
+        const result = await supabaseRequest(endpoint, 'GET', null, false);
+
+        if (!result || result.length === 0) {
+            showAlert('passwordAlert', 'Nome de usuário ou senha incorretos.', 'error');
+            document.getElementById('passwordInput').value = '';
+            return;
         }
 
-        async function checkPassword() {
-            const nome = document.getElementById('userInput').value.trim();
-            const senha = document.getElementById('passwordInput').value;
+        const user = result[0];
+        currentUser = {
+            id: user.id,
+            nome: user.nome,
+            grupoId: user.grupo_id
+        };
 
-            if (!nome || !senha) {
-                showAlert('passwordAlert', 'Nome e senha são obrigatórios.', 'error');
-                return;
-            }
+        // NOVO: Carregar as permissões do usuário
+        await loadUserPermissions(currentUser.id, currentUser.grupoId);
 
-            try {
-                const endpoint = `acessos?select=nome,tipo_acesso&nome=eq.${nome}&senha=eq.${senha}`;
-                const result = await supabaseRequest(endpoint, 'GET', null, false);
+        showNotification('Acesso concedido!', 'success');
+        document.getElementById('passwordFormContainer').style.display = 'none';
+        document.getElementById('configuracoesContent').style.display = 'block';
+        showSubTab('configuracoes', 'filiais', document.querySelector('#configuracoes .sub-tab'));
+        updateSystemStatus();
+        
+    } catch (err) {
+        showAlert('passwordAlert', 'Erro ao verificar credenciais. Verifique a conexão.', 'error');
+        console.error(err);
+    }
+}
 
-                if (!result || result.length === 0) {
-                    showAlert('passwordAlert', 'Nome de usuário ou senha incorretos.', 'error');
-                    document.getElementById('passwordInput').value = '';
-                    return;
-                }
-
-                const user = result[0];
-                currentUser = {
-                    nome: user.nome,
-                    tipo_acesso: user.tipo_acesso
-                };
-
-                showNotification('Acesso concedido!', 'success');
-                document.getElementById('passwordFormContainer').style.display = 'none';
-                document.getElementById('configuracoesContent').style.display = 'block';
-                showSubTab('configuracoes', 'filiais', document.querySelector('#configuracoes .sub-tab'));
-                updateSystemStatus();
-
-            } catch (err) {
-                showAlert('passwordAlert', 'Erro ao verificar credenciais. Verifique a conexão.', 'error');
-                console.error(err);
-            }
-        }
 
         function showAlert(containerId, message, type) {
             const container = document.getElementById(containerId);
             container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
         }
         
-        function showAddForm(type) {
+      // Substitua a função showAddForm no seu script.js (cerca da linha 2689)
+// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
+
+function showAddForm(type, itemToEdit = null) {
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
     fieldsContainer.innerHTML = ''; // Limpa campos anteriores
 
     let formHtml = '';
+    
+    // Adiciona lógica de edição
+    const isEditing = itemToEdit && typeof itemToEdit === 'object';
+    const editData = isEditing ? itemToEdit : {};
+    
+    // Atualiza o texto do botão salvar
+    const saveButton = document.querySelector('#addFormModal button[type="submit"]');
+    if (saveButton) {
+        saveButton.textContent = isEditing ? 'Salvar Edição' : 'Salvar';
+    }
+
+
     if (type === 'filial') {
-        title.textContent = `Adicionar Nova Filial`;
+        title.textContent = isEditing ? `Editar Filial: ${editData.nome}` : `Adicionar Nova Filial`;
         formHtml = `
-            <div class="form-group"><label>Nome da Filial (Ex: 464):</label><input type="text" id="add_nome" required></div>
-            <div class="form-group"><label>Descrição (Ex: MT):</label><input type="text" id="add_descricao" required></div>
-            <div class="form-group md:col-span-2"><label>Endereço do CD (Ponto de Partida):</label><input type="text" id="add_endereco_cd" placeholder="Rua, Número, Cidade" required></div>
-            <div class="form-group"><label>Latitude do CD:</label><input type="number" id="add_latitude_cd" step="0.000001" placeholder="-15.601400"></div>
-            <div class="form-group"><label>Longitude do CD:</label><input type="number" id="add_longitude_cd" step="0.000001" placeholder="-56.097900"></div>
+            ${isEditing ? `<input type="hidden" id="edit_filial_nome" value="${editData.nome}">` : ''}
+            <div class="form-group"><label>Nome da Filial (Ex: 464):</label><input type="text" id="add_nome" value="${editData.nome || ''}" required ${isEditing ? 'readonly' : ''}></div>
+            <div class="form-group"><label>Descrição (Ex: MT):</label><input type="text" id="add_descricao" value="${editData.descricao || ''}" required></div>
+            <div class="form-group md:col-span-2"><label>Endereço do CD (Ponto de Partida):</label><input type="text" id="add_endereco_cd" value="${editData.endereco_cd || ''}" placeholder="Rua, Número, Cidade" required></div>
+            <div class="form-group"><label>Latitude do CD:</label><input type="number" id="add_latitude_cd" step="0.000001" value="${editData.latitude_cd || ''}" placeholder="-15.601400"></div>
+            <div class="form-group"><label>Longitude do CD:</label><input type="number" id="add_longitude_cd" step="0.000001" value="${editData.longitude_cd || ''}" placeholder="-56.097900"></div>
+            <div class="form-group"><label>Status:</label><select id="add_ativo">
+                <option value="true" ${editData.ativo !== false ? 'selected' : ''}>Ativa</option>
+                <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativa</option>
+            </select></div>
             <div class="text-center mt-4 md:col-span-2">
                 <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocationFilial()">📍 Usar Localização Atual</button>
                 <button type="button" class="btn btn-primary" onclick="geocodeAddressFilial()">🌍 Buscar por Endereço</button>
             </div>
         `;
     } else if (type === 'loja') {
-        title.textContent = `Adicionar Nova Loja`;
+        title.textContent = isEditing ? `Editar Loja: ${editData.nome}` : `Adicionar Nova Loja`;
         formHtml = `
-            <div class="form-group"><label>Nome da Loja:</label><input type="text" id="add_nome" required></div>
-            <div class="form-group"><label>Código da Loja:</label><input type="text" id="add_codigo" required></div>
-            <div class="form-group"><label>Cidade:</label><input type="text" id="add_cidade" required></div>
-            <div class="form-group"><label>Código QR:</label><input type="text" id="add_codlojaqr" required></div>
-            <div class="form-group md:col-span-2"><label>Endereço Completo:</label><input type="text" id="add_endereco_completo" placeholder="Rua, Número, Bairro, CEP" required></div>
-            <div class="form-group"><label>Latitude:</label><input type="number" id="add_latitude" step="0.000001" placeholder="-15.601400"></div>
-            <div class="form-group"><label>Longitude:</label><input type="number" id="add_longitude" step="0.000001" placeholder="-56.097900"></div>
-            <div class="form-group"><label>Status:</label><select id="add_ativo"><option value="true">Ativa</option><option value="false">Inativa</option></select></div>
+            ${isEditing ? `<input type="hidden" id="edit_loja_id" value="${editData.id}">` : ''}
+            <div class="form-group"><label>Nome da Loja:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
+            <div class="form-group"><label>Código da Loja:</label><input type="text" id="add_codigo" value="${editData.codigo || ''}" required></div>
+            <div class="form-group"><label>Cidade:</label><input type="text" id="add_cidade" value="${editData.cidade || ''}" required></div>
+            <div class="form-group"><label>Código QR:</label><input type="text" id="add_codlojaqr" value="${editData.codlojaqr || ''}" required></div>
+            <div class="form-group md:col-span-2"><label>Endereço Completo:</label><input type="text" id="add_endereco_completo" value="${editData.endereco_completo || ''}" placeholder="Rua, Número, Bairro, CEP" required></div>
+            <div class="form-group"><label>Latitude:</label><input type="number" id="add_latitude" step="0.000001" value="${editData.latitude || ''}" placeholder="-15.601400"></div>
+            <div class="form-group"><label>Longitude:</label><input type="number" id="add_longitude" step="0.000001" value="${editData.longitude || ''}" placeholder="-56.097900"></div>
+            <div class="form-group"><label>Status:</label><select id="add_ativo">
+                <option value="true" ${editData.ativo !== false ? 'selected' : ''}>Ativa</option>
+                <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativa</option>
+            </select></div>
             <div class="text-center mt-4 md:col-span-2">
                 <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">📍 Usar Localização Atual</button>
                 <button type="button" class="btn btn-primary" onclick="geocodeAddress()">🌍 Buscar por Endereço</button>
             </div>
         `;
     } else if (type === 'doca') {
-        title.textContent = `Adicionar Nova Doca`;
+        title.textContent = isEditing ? `Editar Doca: ${editData.nome}` : `Adicionar Nova Doca`;
         formHtml = `
-            <div class="form-group"><label>Nome da Doca:</label><input type="text" id="add_nome" required></div>
-            <div class="form-group"><label>Capacidade (Pallets):</label><input type="number" id="add_capacidade_pallets" min="0" required></div>
-            <div class="form-group"><label>Código QR:</label><input type="text" id="add_coddoca" required></div>
+            ${isEditing ? `<input type="hidden" id="edit_doca_id" value="${editData.id}">` : ''}
+            <div class="form-group"><label>Nome da Doca:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
+            <div class="form-group"><label>Capacidade (Pallets):</label><input type="number" id="add_capacidade_pallets" min="0" value="${editData.capacidade_pallets || ''}" required></div>
+            <div class="form-group"><label>Código QR:</label><input type="text" id="add_coddoca" value="${editData.coddoca || ''}" required></div>
+             <div class="form-group"><label>Status:</label><select id="add_ativo">
+                <option value="true" ${editData.ativo !== false ? 'selected' : ''}>Ativa</option>
+                <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativa</option>
+            </select></div>
         `;
     } else if (type === 'lider') {
-        title.textContent = `Adicionar Novo Líder`;
+        title.textContent = isEditing ? `Editar Líder: ${editData.nome}` : `Adicionar Novo Líder`;
         formHtml = `
-            <div class="form-group"><label>Nome do Líder:</label><input type="text" id="add_nome" required></div>
-            <div class="form-group"><label>Matrícula:</label><input type="text" id="add_codigo_funcionario" required></div>
+            ${isEditing ? `<input type="hidden" id="edit_lider_id" value="${editData.id}">` : ''}
+            <div class="form-group"><label>Nome do Líder:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
+            <div class="form-group"><label>Matrícula:</label><input type="text" id="add_codigo_funcionario" value="${editData.codigo_funcionario || ''}" required></div>
+            <div class="form-group"><label>Status:</label><select id="add_ativo">
+                <option value="true" ${editData.ativo !== false ? 'selected' : ''}>Ativa</option>
+                <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativa</option>
+            </select></div>
         `;
     } else if (type === 'veiculo') {
-        title.textContent = `Adicionar Novo Veículo`;
+        title.textContent = isEditing ? `Editar Veículo: ${editData.placa}` : `Adicionar Novo Veículo`;
         formHtml = `
-            <div class="form-group"><label>Placa:</label><input type="text" id="add_placa" required></div>
-            <div class="form-group"><label>Modelo:</label><input type="text" id="add_modelo" required></div>
-            <div class="form-group"><label>Capacidade (Pallets):</label><input type="number" id="add_capacidade_pallets" min="1" required></div>
-            <div class="form-group"><label>Tipo:</label><select id="add_tipo" required><option value="JJS">JJS</option><option value="PERLOG">PERLOG</option></select></div>
-            <div class="form-group"><label>Status:</label><select id="add_status" required><option value="disponivel">Disponível</option><option value="em_uso">Em Uso</option><option value="manutencao">Manutenção</option></select></div>
+            ${isEditing ? `<input type="hidden" id="edit_veiculo_id" value="${editData.id}">` : ''}
+            <div class="form-group"><label>Placa:</label><input type="text" id="add_placa" value="${editData.placa || ''}" required></div>
+            <div class="form-group"><label>Modelo:</label><input type="text" id="add_modelo" value="${editData.modelo || ''}" required></div>
+            <div class="form-group"><label>Capacidade (Pallets):</label><input type="number" id="add_capacidade_pallets" min="1" value="${editData.capacidade_pallets || ''}" required></div>
+            <div class="form-group"><label>Tipo:</label><select id="add_tipo" required>
+                <option value="JJS" ${editData.tipo === 'JJS' ? 'selected' : ''}>JJS</option>
+                <option value="PERLOG" ${editData.tipo === 'PERLOG' ? 'selected' : ''}>PERLOG</option>
+            </select></div>
+            <div class="form-group"><label>Status:</label><select id="add_status" required>
+                <option value="disponivel" ${editData.status === 'disponivel' ? 'selected' : ''}>Disponível</option>
+                <option value="em_uso" ${editData.status === 'em_uso' ? 'selected' : ''}>Em Uso</option>
+                <option value="manutencao" ${editData.status === 'manutencao' ? 'selected' : ''}>Manutenção</option>
+            </select></div>
         `;
     } else if (type === 'motorista') {
-        title.textContent = `Adicionar Novo Motorista`;
+        title.textContent = isEditing ? `Editar Motorista: ${editData.nome}` : `Adicionar Novo Motorista`;
         formHtml = `
-            <div class="form-group"><label>Nome:</label><input type="text" id="add_nome" required></div>
-            <div class="form-group"><label>Produtivo (Matrícula):</label><input type="text" id="add_produtivo" required></div>
-            <div class="form-group"><label>Status:</label><select id="add_status" required><option value="disponivel">Disponível</option><option value="em_viagem">Em Viagem</option><option value="folga">Folga</option></select></div>
+            ${isEditing ? `<input type="hidden" id="edit_motorista_id" value="${editData.id}">` : ''}
+            <div class="form-group"><label>Nome:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
+            <div class="form-group"><label>Produtivo (Matrícula):</label><input type="text" id="add_produtivo" value="${editData.PRODUTIVO || ''}" required></div>
+            <div class="form-group"><label>Status:</label><select id="add_status" required>
+                <option value="disponivel" ${editData.status === 'disponivel' ? 'selected' : ''}>Disponível</option>
+                <option value="em_viagem" ${editData.status === 'em_viagem' ? 'selected' : ''}>Em Viagem</option>
+                <option value="folga" ${editData.status === 'folga' ? 'selected' : ''}>Folga</option>
+            </select></div>
         `;
-    } else if (type === 'acesso') {
-        title.textContent = `Adicionar Novo Acesso`;
+    } else if (type === 'grupo') { // LÓGICA DO GRUPO (CRIAÇÃO E EDIÇÃO)
+        title.textContent = isEditing ? `Editar Grupo: ${editData.nome}` : `Adicionar Novo Grupo`;
         formHtml = `
-            <div class="form-group"><label>Nome de Usuário:</label><input type="text" id="add_nome" required></div>
-            <div class="form-group"><label>Senha:</label><input type="password" id="add_senha" required></div>
-            <div class="form-group"><label>Tipo de Acesso:</label><select id="add_tipo_acesso" required><option value="ALL">ALL (Master)</option><option value="${selectedFilial.nome}">${selectedFilial.nome}</option></select></div>
+            ${isEditing ? `<input type="hidden" id="edit_grupo_id" value="${editData.id}">` : ''}
+            <div class="form-group"><label>Nome do Grupo:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
+        `;
+    } else if (type === 'acesso') { // LÓGICA DE USUÁRIO
+        title.textContent = isEditing ? `Editar Usuário: ${editData.nome}` : `Adicionar Novo Usuário`;
+        // Usar gruposAcesso global para preencher o select
+        const gruposHtml = gruposAcesso.map(g => `<option value="${g.id}" ${editData.grupo_id === g.id ? 'selected' : ''}>${g.nome}</option>`).join('');
+        
+        // Se estiver editando, o itemToEdit.nome será o valor de 'acesso' a ser editado
+        const nomeAcesso = editData.nome || '';
+        
+        formHtml = `
+            ${isEditing ? `<input type="hidden" id="edit_acesso_id" value="${editData.id || ''}">` : ''}
+            <div class="form-group"><label>Nome de Usuário:</label><input type="text" id="add_nome" value="${nomeAcesso}" required></div>
+            <div class="form-group"><label>${isEditing ? 'Nova Senha:' : 'Senha:'}</label><input type="password" id="add_senha" ${!isEditing ? 'required' : ''} placeholder="${isEditing ? 'Deixe em branco para manter a atual' : ''}"></div>
+            <div class="form-group"><label>Grupo de Acesso:</label><select id="add_grupo_id" required>
+                <option value="">Selecione um Grupo</option>
+                ${gruposHtml}
+            </select></div>
         `;
     } else if (type === 'pontoInteresse') {
-        title.textContent = 'Adicionar Ponto de Interesse';
+        title.textContent = isEditing ? `Editar Ponto: ${editData.nome}` : 'Adicionar Ponto de Interesse';
+         // Lógica do select de lojas para preencher campos (apenas para a criação)
+        const lojasOptions = lojas.map(loja => `<option value="${loja.id}">${loja.codigo} - ${loja.nome}</option>`).join('');
+
         formHtml = `
-            <div class="form-group md:col-span-2">
+            ${isEditing ? `<input type="hidden" id="edit_ponto_id" value="${editData.id}">` : ''}
+            <div class="form-group md:col-span-2" ${isEditing ? 'style="display:none;"' : ''}>
                 <label>Selecionar Loja (opcional):</label>
                 <select id="add_loja_id" class="w-full">
                     <option value="">-- Ou insira um ponto manualmente --</option>
-                    ${lojas.map(loja => `<option value="${loja.id}">${loja.codigo} - ${loja.nome}</option>`).join('')}
+                    ${lojasOptions}
                 </select>
             </div>
-            <div class="form-group"><label>Nome do Ponto:</label><input type="text" id="add_nome" placeholder="Ex: CD Principal, Loja 123, etc." required></div>
+            <div class="form-group"><label>Nome do Ponto:</label><input type="text" id="add_nome" value="${editData.nome || ''}" placeholder="Ex: CD Principal, Loja 123, etc." required></div>
             <div class="form-group"><label>Tipo:</label><select id="add_tipo" required>
-                <option value="CD">Centro de Distribuição</option>
-                <option value="LOJA">Loja</option>
-                <option value="POSTO">Posto de Combustível</option>
-                <option value="CASA">Casa/Residência</option>
-                <option value="OUTRO">Outro</option>
+                <option value="CD" ${editData.tipo === 'CD' ? 'selected' : ''}>Centro de Distribuição</option>
+                <option value="LOJA" ${editData.tipo === 'LOJA' ? 'selected' : ''}>Loja</option>
+                <option value="POSTO" ${editData.tipo === 'POSTO' ? 'selected' : ''}>Posto de Combustível</option>
+                <option value="CASA" ${editData.tipo === 'CASA' ? 'selected' : ''}>Casa/Residência</option>
+                <option value="OUTRO" ${editData.tipo === 'OUTRO' ? 'selected' : ''}>Outro</option>
             </select></div>
-            <div class="form-group"><label>Latitude:</label><input type="number" id="add_latitude" step="0.000001" placeholder="-15.601400" required></div>
-            <div class="form-group"><label>Longitude:</label><input type="number" id="add_longitude" step="0.000001" value="" placeholder="-56.097900" required></div>
-            <div class="form-group"><label>Raio de Detecção (metros):</label><input type="number" id="add_raio_deteccao" min="50" max="2000" value="200" required></div>
+            <div class="form-group"><label>Latitude:</label><input type="number" id="add_latitude" step="0.000001" value="${editData.latitude || ''}" placeholder="-15.601400" required></div>
+            <div class="form-group"><label>Longitude:</label><input type="number" id="add_longitude" step="0.000001" value="${editData.longitude || ''}" placeholder="-56.097900" required></div>
+            <div class="form-group"><label>Raio de Detecção (metros):</label><input type="number" id="add_raio_deteccao" min="50" max="2000" value="${editData.raio_deteccao || 200}" required></div>
             <div class="form-group"><label>Cor no Mapa:</label><select id="add_cor">
-                <option value="#0077B6">Azul</option>
-                <option value="#EF4444">Vermelho</option>
-                <option value="#10B981">Verde</option>
-                <option value="#F59E0B">Laranja</option>
-                <option value="#8B5CF6">Roxo</option>
-                <option value="#EC4899">Rosa</option>
+                <option value="#0077B6" ${editData.cor === '#0077B6' ? 'selected' : ''}>Azul</option>
+                <option value="#EF4444" ${editData.cor === '#EF4444' ? 'selected' : ''}>Vermelho</option>
+                <option value="#10B981" ${editData.cor === '#10B981' ? 'selected' : ''}>Verde</option>
+                <option value="#F59E0B" ${editData.cor === '#F59E0B' ? 'selected' : ''}>Laranja</option>
+                <option value="#8B5CF6" ${editData.cor === '#8B5CF6' ? 'selected' : ''}>Roxo</option>
+                <option value="#EC4899" ${editData.cor === '#EC4899' ? 'selected' : ''}>Rosa</option>
             </select></div>
-            <div class="form-group" style="display:none;"><label>Status:</label><select id="add_ativo"><option value="true">Ativo</option><option value="false">Inativo</option></select></div>
+            <div class="form-group"><label>Status:</label><select id="add_ativo">
+                <option value="true" ${editData.ativo !== false ? 'selected' : ''}>Ativo</option>
+                <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativo</option>
+            </select></div>
+            <div class="text-center mt-4 md:col-span-2">
+                <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">📍 Usar Localização Atual</button>
+            </div>
         `;
     }
+    
     fieldsContainer.innerHTML = formHtml;
     modal.style.display = 'flex';
+    
+    // NOVO: Adicionar listener para o select de loja no Ponto de Interesse (apenas no modo de adição)
+    if (type === 'pontoInteresse' && !isEditing) {
+        const lojaSelect = document.getElementById('add_loja_id');
+        if (lojaSelect) {
+            lojaSelect.addEventListener('change', (e) => {
+                const selectedLojaId = e.target.value;
+                if (selectedLojaId) {
+                    const selectedLoja = lojas.find(l => l.id === selectedLojaId);
+                    if (selectedLoja) {
+                        document.getElementById('add_nome').value = selectedLoja.nome;
+                        document.getElementById('add_latitude').value = selectedLoja.latitude;
+                        document.getElementById('add_longitude').value = selectedLoja.longitude;
+                        document.getElementById('add_tipo').value = 'LOJA';
+                        document.getElementById('add_cor').value = selectedLoja.nome.toLowerCase().includes('fort') ? '#EF4444' : '#10B981';
+                    }
+                }
+            });
+        }
+    }
 }
+
 
         function hideAddForm() {
             document.getElementById('addFormModal').style.display = 'none';
@@ -4715,17 +6145,18 @@ async function deleteExpedition(expeditionId) {
         }
 
         async function handleSave() {
-            const title = document.getElementById('addFormTitle').textContent;
-            let success = false;
-            try {
-                if (title.includes('Filial')) success = await saveFilial();
-                else if (title.includes('Loja')) success = await saveLoja();
-                else if (title.includes('Doca')) success = await saveDoca();
-                else if (title.includes('Líder')) success = await saveLider();
-                else if (title.includes('Veículo')) success = await saveVeiculo();
-                else if (title.includes('Motorista')) success = await saveMotorista();
-                else if (title.includes('Acesso')) success = await saveAcesso();
-else if (title.includes('Ponto de Interesse')) success = await savePontoInteresse();
+    const title = document.getElementById('addFormTitle').textContent;
+    let success = false;
+    try {
+        if (title.includes('Filial')) success = await saveFilial();
+        else if (title.includes('Loja')) success = await saveLoja();
+        else if (title.includes('Doca')) success = await saveDoca();
+        else if (title.includes('Líder')) success = await saveLider();
+        else if (title.includes('Veículo')) success = await saveVeiculo();
+        else if (title.includes('Motorista')) success = await saveMotorista();
+        else if (title.includes('Grupo')) success = await saveGroup(); // NOVO
+        else if (title.includes('Acesso') || title.includes('Usuário')) success = await saveAcesso(); // Ajuste no texto
+        else if (title.includes('Ponto de Interesse')) success = await savePontoInteresse();
                 
                 if (success) {
                      showNotification('Cadastro realizado com sucesso!', 'success');
@@ -4817,7 +6248,9 @@ else if (title.includes('Ponto de Interesse')) success = await savePontoInteress
     renderDocasConfig();
     return true;
 }
-        async function saveLider() {
+  
+
+async function saveLider() {
     const isEdit = !!document.getElementById('edit_lider_id');
     const liderId = isEdit ? document.getElementById('edit_lider_id').value : null;
     
@@ -4827,7 +6260,11 @@ else if (title.includes('Ponto de Interesse')) success = await savePontoInteress
         ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true 
     };
     
+    // 🚨 AJUSTE CRÍTICO: Se estiver editando, não envie o código do funcionário 
+    // para evitar o erro de violação de chave única (409).
     if (isEdit) {
+        delete data.codigo_funcionario; 
+        
         await supabaseRequest(`lideres?id=eq.${liderId}`, 'PATCH', data);
         showNotification('Líder atualizado com sucesso!', 'success');
     } else {
@@ -4882,13 +6319,16 @@ else if (title.includes('Ponto de Interesse')) success = await savePontoInteress
     renderMotoristasConfig();
     return true;
 }
-       async function saveAcesso() {
-    const isEdit = !!document.getElementById('edit_acesso_nome');
-    const nomeOriginal = isEdit ? document.getElementById('edit_acesso_nome').value : null;
+      // SUBSTITUIR A VERSÃO EXISTENTE DE saveAcesso
+async function saveAcesso() {
+    const isEdit = !!document.getElementById('edit_acesso_id');
+    const userId = isEdit ? document.getElementById('edit_acesso_id').value : null;
     
     const data = { 
         nome: document.getElementById('add_nome').value, 
-        tipo_acesso: document.getElementById('add_tipo_acesso').value 
+        grupo_id: document.getElementById('add_grupo_id').value || null,
+        // Mantém tipo_acesso por compatibilidade, mas o campo de input foi removido
+        tipo_acesso: 'CUSTOM' 
     };
     
     const senha = document.getElementById('add_senha').value;
@@ -4897,11 +6337,11 @@ else if (title.includes('Ponto de Interesse')) success = await savePontoInteress
     }
     
     if (isEdit) {
-        await supabaseRequest(`acessos?nome=eq.${nomeOriginal}`, 'PATCH', data, false);
-        showNotification('Acesso atualizado com sucesso!', 'success');
+        await supabaseRequest(`acessos?id=eq.${userId}`, 'PATCH', data, false);
+        showNotification('Usuário atualizado com sucesso!', 'success');
     } else {
         await supabaseRequest('acessos', 'POST', data, false);
-        showNotification('Acesso cadastrado com sucesso!', 'success');
+        showNotification('Usuário cadastrado com sucesso!', 'success');
     }
     renderAcessosConfig();
     return true;
@@ -5258,7 +6698,7 @@ async function showTrajectoryMap(expeditionId, vehiclePlaca) {
 
 
 
-// Remove a função antiga para recriá-la com as novas funcionalidades
+// SUBSTITUIR A FUNÇÃO initTrajectoryMap COMPLETA
 async function initTrajectoryMap(expeditionId, vehiclePlaca) {
     try {
         if (mapInstance) {
@@ -5266,7 +6706,7 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
         }
 
         const expeditionItems = await supabaseRequest(
-            `expedition_items?expedition_id=eq.${expeditionId}&order=data_inicio_descarga.asc`,
+            `expedition_items?expedition_id=eq.${expeditionId}&order=ordem_entrega.asc,data_inicio_descarga.asc`,
             'GET', null, false
         );
         
@@ -5275,31 +6715,48 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
             mapInstance = L.map('map').setView(cdCoords, 11);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
+            setTimeout(() => { mapInstance.invalidateSize(); }, 200); 
             return;
         }
 
-        // Definir os waypoints para a rota completa (CD -> Lojas em ordem)
+        // 1. CONSTRUIR WAYPOINTS (CD + LOJAS)
         const waypoints = [
-            L.latLng(selectedFilial.latitude_cd, selectedFilial.longitude_cd),
-            ...expeditionItems.map(item => {
-                const loja = lojas.find(l => l.id === item.loja_id);
-                return L.latLng(loja.latitude, loja.longitude);
-            })
+            L.latLng(selectedFilial.latitude_cd, selectedFilial.longitude_cd)
         ];
-
-        mapInstance = L.map('map');
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
         
+        expeditionItems.forEach(item => {
+            const loja = lojas.find(l => l.id === item.loja_id);
+            if (loja && loja.latitude && loja.longitude) {
+                waypoints.push(L.latLng(loja.latitude, loja.longitude));
+            }
+        });
+
+        // Se não houver pontos suficientes para traçar rota
+        if (waypoints.length < 2) {
+             showNotification('Não há coordenadas de loja válidas para traçar a rota.', 'info');
+             const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
+             mapInstance = L.map('map').setView(cdCoords, 11);
+             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
+             setTimeout(() => { mapInstance.invalidateSize(); }, 200); 
+             return;
+        }
+
+        // 2. CRIAR MAPA
+        mapInstance = L.map('map');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(mapInstance);
+        
+        // 3. CRIAR ROTEAMENTO COM TRATAMENTO DE ERRO ROBUSTO
         const routingControl = L.Routing.control({
             waypoints: waypoints,
             createMarker: function(i, waypoint, n) {
-                // Personalizar o marcador para o CD (origem) e para cada loja (passagem)
-                let iconHtml = '';
+                 let iconHtml = '';
                 if (i === 0) {
                     iconHtml = '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🏭 CD</div>';
                 } else {
-                    const loja = lojas.find(l => l.id === expeditionItems[i-1].loja_id);
-                    iconHtml = `<div style="background: #EF4444; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">#${i} - ${loja.codigo}</div>`;
+                    const loja = lojas.find(l => l.id === expeditionItems[i-1].loja_id); 
+                    iconHtml = `<div style="background: #EF4444; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">#${i} - ${loja?.codigo || 'N/A'}</div>`;
                 }
                 
                 const markerIcon = L.divIcon({
@@ -5310,22 +6767,39 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
                 });
                 return L.marker(waypoint.latLng, {
                     icon: markerIcon
-                }).bindPopup(`<b>${waypoint.name}</b>`);
+                }).bindPopup(`<b>${waypoint.name || `Ponto ${i+1}`}</b>`);
             },
             routeWhileDragging: false,
             autoRoute: true,
-            lineOptions: { styles: [{ color: '#0077B6', weight: 6 }] }
+            lineOptions: { 
+                styles: [{ color: '#0077B6', weight: 6, opacity: 0.8 }] 
+            },
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1',
+                timeout: 30000 // 30 segundos de timeout
+            }),
+            showAlternatives: false,
+            fitSelectedRoutes: true,
+            show: false // Esconde o painel de instruções
         }).addTo(mapInstance);
-
+        
+        // 4. TRATAMENTO DE SUCESSO
         routingControl.on('routesfound', function(e) {
             const route = e.routes[0];
             const distance = route.summary.totalDistance / 1000;
             const duration = route.summary.totalTime / 60;
             
             // Ajustar o zoom do mapa para a rota completa
-            mapInstance.fitBounds(route.coordinates, { padding: [20, 20] });
-            
-            // Criar e adicionar o painel de estatísticas
+            try {
+                const bounds = route.bounds || L.latLngBounds(waypoints);
+                mapInstance.fitBounds(bounds, { padding: [30, 30] });
+            } catch (err) {
+                console.warn('Erro ao ajustar bounds, usando waypoints:', err);
+                const fallbackBounds = L.latLngBounds(waypoints);
+                mapInstance.fitBounds(fallbackBounds, { padding: [30, 30] });
+            }
+
+            // Cria o painel de estatísticas
             const statsControl = L.control({ position: 'topright' });
             statsControl.onAdd = function() {
                 const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
@@ -5336,20 +6810,80 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
                 div.innerHTML = `
                     <p><b>Estatísticas da Rota</b></p>
                     <p><strong>Veículo:</strong> ${vehiclePlaca}</p>
-                    <p><strong>Distância Total:</strong> ${distance.toFixed(1)} km</p>
-                    <p><strong>Duração Estimada:</strong> ${minutesToHHMM(duration)}</p>
+                    <p><strong>Distância:</strong> ${distance.toFixed(1)} km</p>
+                    <p><strong>Tempo Estimado:</strong> ${minutesToHHMM(duration)}</p>
+                    <p><strong>Paradas:</strong> ${waypoints.length - 1}</p>
                 `;
                 return div;
             };
             statsControl.addTo(mapInstance);
+            
+            showNotification('Rota calculada com sucesso!', 'success', 2000);
+        });
+        
+        // 5. TRATAMENTO DE ERRO CRÍTICO
+        routingControl.on('routingerror', function(e) {
+             console.error("Erro no Routing Machine:", e.error);
+             
+             // Remove o controle com erro
+             try {
+                 mapInstance.removeControl(routingControl);
+             } catch (err) {
+                 console.warn('Erro ao remover controle:', err);
+             }
+             
+             // Ajusta zoom para os waypoints mesmo sem rota
+             const boundsWaypoints = L.latLngBounds(waypoints);
+             if (boundsWaypoints.isValid()) {
+                 mapInstance.fitBounds(boundsWaypoints, { padding: [30, 30] });
+             }
+             
+             // Adiciona linha reta entre os pontos como fallback
+             const fallbackPolyline = L.polyline(waypoints, {
+                 color: '#F59E0B',
+                 weight: 4,
+                 opacity: 0.6,
+                 dashArray: '10, 10'
+             }).addTo(mapInstance);
+             
+             // Painel de aviso
+             const warningControl = L.control({ position: 'topright' });
+             warningControl.onAdd = function() {
+                 const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
+                 div.style.background = '#FEF3C7';
+                 div.style.border = '2px solid #F59E0B';
+                 div.style.padding = '10px';
+                 div.style.fontSize = '12px';
+                 div.style.maxWidth = '250px';
+                 
+                 div.innerHTML = `
+                     <p><b>⚠️ Rota Simplificada</b></p>
+                     <p style="margin: 5px 0;">O serviço OSRM falhou. Linha reta exibida.</p>
+                     <p><strong>Veículo:</strong> ${vehiclePlaca}</p>
+                     <p><strong>Paradas:</strong> ${waypoints.length - 1}</p>
+                 `;
+                 return div;
+             };
+             warningControl.addTo(mapInstance);
+             
+             showNotification('Rota simplificada: Serviço OSRM instável. Linha reta exibida.', 'error', 5000);
         });
 
+        // 6. ESCONDER PAINEL DE INSTRUÇÕES
         const routingAlt = document.querySelector('.leaflet-routing-alt');
         if (routingAlt) routingAlt.style.display = 'none';
 
+        // 7. GARANTIA DE EXIBIÇÃO
+        setTimeout(() => { 
+            if (mapInstance) {
+                mapInstance.invalidateSize(); 
+            }
+        }, 500); 
+        
     } catch (error) {
-        console.error('Erro ao carregar trajeto:', error);
-        showNotification('Erro ao carregar dados do trajeto: ' + error.message, 'error');
+        console.error('Erro fatal ao carregar trajeto:', error);
+        closeMapModal();
+        showNotification('Erro fatal ao carregar dados do trajeto.', 'error');
     }
 }
 // A função calculateTripStats também precisa ser ajustada para usar os dados do GPS
@@ -5725,51 +7259,7 @@ async function deletePontoInteresse(pontoId) {
     }
 }
 
-// === DADOS SIMULADOS PARA DEMONSTRAÇÃO ===
-function generateMockGPSTrajectory(expeditionId) {
-    // Gerar trajeto simulado com pontos GPS
-    const baseTime = new Date();
-    const points = [];
-    
-    // Trajeto simulado saindo do CD e visitando algumas lojas
-    const route = [
-        { lat: -15.6014, lng: -56.0979, desc: "CD - Saída" },
-        { lat: -15.5950, lng: -56.0920, desc: "Trânsito" },
-        { lat: -15.5880, lng: -56.0860, desc: "Próximo à Loja Fort" },
-        { lat: -15.5850, lng: -56.0850, desc: "Loja Fort - Descarga" },
-        { lat: -15.5820, lng: -56.0800, desc: "Saindo da Loja Fort" },
-        { lat: -15.5900, lng: -56.0700, desc: "Trânsito" },
-        { lat: -15.6100, lng: -56.0650, desc: "Próximo à Loja Comper" },
-        { lat: -15.6150, lng: -56.0680, desc: "Loja Comper - Descarga" },
-        { lat: -15.6180, lng: -56.0720, desc: "Retorno" },
-        { lat: -15.6080, lng: -56.0850, desc: "Trânsito" },
-        { lat: -15.6014, lng: -56.0979, desc: "CD - Chegada" }
-    ];
-    
-    route.forEach((point, index) => {
-        const timeOffset = index * 15 * 60 * 1000; // 15 minutos entre pontos
-        const timestamp = new Date(baseTime.getTime() + timeOffset);
-        
-        // Velocidade simulada
-        let velocidade = 0;
-        if (point.desc.includes('Trânsito')) velocidade = Math.random() * 30 + 40; // 40-70 km/h
-        else if (point.desc.includes('Próximo')) velocidade = Math.random() * 20 + 20; // 20-40 km/h
-        else velocidade = Math.random() * 10; // 0-10 km/h (parado/descarga)
-        
-        points.push({
-            expedition_id: expeditionId,
-            latitude: point.lat + (Math.random() - 0.5) * 0.002, // Pequena variação
-            longitude: point.lng + (Math.random() - 0.5) * 0.002,
-            data_gps: timestamp.toISOString(),
-            velocidade: Math.round(velocidade),
-            precisao: Math.random() * 20 + 5, // 5-25 metros
-            descricao: point.desc
-        });
-    });
-    
-    return points;
-}
-// === FUNÇÕES PARA GERENCIAMENTO DE LOJAS COM ENDEREÇOS ===
+
 
 async function showLojasConfig() {
     await renderLojasConfig();
@@ -5920,8 +7410,10 @@ async function deleteLider(liderId) {
     }
 }
 
+// SUBSTITUIR A VERSÃO EXISTENTE DE editAcesso
 async function editAcesso(nomeUsuario) {
-    const acessosData = await supabaseRequest(`acessos?nome=eq.${nomeUsuario}`, 'GET', null, false);
+    // Busca o ID e o grupo_id para edição
+    const acessosData = await supabaseRequest(`acessos?select=id,nome,grupo_id&nome=eq.${nomeUsuario}`, 'GET', null, false);
     if (!acessosData || acessosData.length === 0) {
         showNotification('Acesso não encontrado', 'error');
         return;
@@ -5933,11 +7425,16 @@ async function editAcesso(nomeUsuario) {
     const fieldsContainer = document.getElementById('addFormFields');
     
     title.textContent = 'Editar Acesso';
+    const gruposHtml = gruposAcesso.map(g => `<option value="${g.id}" ${acesso.grupo_id === g.id ? 'selected' : ''}>${g.nome}</option>`).join('');
+    
     fieldsContainer.innerHTML = `
-        <input type="hidden" id="edit_acesso_nome" value="${acesso.nome}">
-        <div class="form-group"><label>Nome de Usuário:</label><input type="text" id="add_nome" value="${acesso.nome}" required readonly></div>
+        <input type="hidden" id="edit_acesso_id" value="${acesso.id}">
+        <div class="form-group"><label>Nome de Usuário:</label><input type="text" id="add_nome" value="${acesso.nome}" required></div>
         <div class="form-group"><label>Nova Senha:</label><input type="password" id="add_senha" placeholder="Deixe em branco para manter a atual"></div>
-        <div class="form-group"><label>Tipo de Acesso:</label><select id="add_tipo_acesso" required><option value="ALL" ${acesso.tipo_acesso === 'ALL' ? 'selected' : ''}>ALL (Master)</option><option value="${selectedFilial.nome}" ${acesso.tipo_acesso === selectedFilial.nome ? 'selected' : ''}>${selectedFilial.nome}</option></select></div>
+        <div class="form-group"><label>Grupo de Acesso:</label><select id="add_grupo_id" required>
+            <option value="">Selecione um Grupo</option>
+            ${gruposHtml}
+        </select></div>
     `;
     
     modal.style.display = 'flex';
@@ -6209,25 +7706,7 @@ function calculateRouteToLoja(lojaId) {
     }, 300);
 }
 
-// Cerca da linha 2269
-function showSimulatedRoute(loja) {
-    if (mapInstance) {
-        mapInstance.remove();
-    }
-    
-    // Ponto de partida dinâmico da filial
-    const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979]; 
-    const lojaCoords = [parseFloat(loja.latitude), parseFloat(loja.longitude)];
-    
-    const bounds = L.latLngBounds([cdCoords, lojaCoords]);
-    mapInstance = L.map('map').fitBounds(bounds, { padding: [50, 50] });
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(mapInstance);
-    
-    // Resto da implementação da função...
-}
+
 // Novas funções para geolocalização da filial
 async function geocodeAddressFilial() {
     const endereco = document.getElementById('add_endereco_cd').value.trim();
@@ -6273,29 +7752,11 @@ function getCurrentLocationFilial() {
         showNotification('Geolocalização não suportada pelo navegador.', 'error');
     }
 }
-// --- NOVO: FUNÇÃO PARA CALCULAR ROTA SIMULADA ---
-async function calculateSimulatedRoute(startLat, startLng, endLat, endLng) {
-    const R = 6371e3;
-    const φ1 = parseFloat(startLat) * Math.PI / 180;
-    const φ2 = parseFloat(endLat) * Math.PI / 180;
-    const Δφ = (parseFloat(endLat) - parseFloat(startLat)) * Math.PI / 180;
-    const Δλ = (parseFloat(endLng) - parseFloat(startLng)) * Math.PI / 180;
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c;
 
-    const averageSpeedMetersPerSecond = 40 * 1000 / 3600;
-    const duration = distance / averageSpeedMetersPerSecond;
 
-    return {
-        distance: distance,
-        duration: duration
-    };
-}
-// --- NOVO: FUNÇÃO PARA CALCULAR ROTA REAL VIA API OSRM ---
+// SUBSTITUIR A VERSÃO EXISTENTE DE getRouteFromAPI
 async function getRouteFromAPI(waypoints) {
     if (!waypoints || waypoints.length < 2) {
-        console.error('Pelo menos dois waypoints são necessários para calcular a rota.');
         return null;
     }
 
@@ -6304,9 +7765,17 @@ async function getRouteFromAPI(waypoints) {
 
     try {
         const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Erro na API de roteamento: ${response.statusText}`);
+        
+        if (response.status === 429) {
+            // Limite de requisições. Lançar erro para que o allSettled capture.
+            throw new Error('Limite de requisições OSRM (429)'); 
         }
+        
+        if (!response.ok) {
+            // Outros erros HTTP (404, 500, etc.)
+            throw new Error(`Erro na API de roteamento: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (data.routes && data.routes.length > 0) {
@@ -6317,18 +7786,63 @@ async function getRouteFromAPI(waypoints) {
                 coordinates: route.geometry.coordinates.map(c => [c[1], c[0]])
             };
         }
+        // Rota não encontrada
         return null;
     } catch (error) {
-        console.error('Falha ao obter rota da API:', error);
-        return null;
+        // 🚨 FIX CRÍTICO: Tratamento de erro de rede (Failed to fetch/Timeout) 🚨
+        console.error('Falha crítica de rede/conexão OSRM:', error);
+        // Lança o erro para que o Promise.allSettled capture como 'rejected' e o fluxo continue.
+        throw new Error('Falha de conexão OSRM: A rota não pôde ser calculada.'); 
     }
 }
-// NOVO: Funções para o Modal de Ordem de Carregamento
 
-/**
- * Abre o modal para ordenar as lojas de uma nova expedição.
- * @param {string} expeditionId - O ID da expedição recém-criada.
- */
+
+// NOVO CÓDIGO: Função para Snap-to-Road (Map Matching)
+async function getMapMatchedRoute(coordinates) {
+    if (coordinates.length < 2) return null;
+    
+    // Converte a lista de objetos LatLng em strings "lng,lat;lng,lat"
+    const coordsString = coordinates.map(p => `${p.lng},${p.lat}`).join(';');
+    // Usa o endpoint Map Matching do OSRM para ajustar a rota às vias
+    const url = `https://router.project-osrm.org/match/v1/driving/${coordsString}?geometries=geojson&steps=false&tidy=true`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`OSRM Match Failed: ${response.status}`);
+        
+        const data = await response.json();
+        if (data.matchings && data.matchings.length > 0) {
+            // Retorna as coordenadas ajustadas à rua
+            return data.matchings[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        }
+        return null;
+    } catch (error) {
+        console.error('Falha no Map Matching OSRM:', error);
+        throw new Error('Falha no Map Matching: Servidor OSRM instável.');
+    }
+}
+// NOVO: Função auxiliar para o Drag and Drop
+function getDragAfterElement(container, y) {
+    // Retorna todos os elementos arrastáveis que NÃO estão sendo arrastados
+    const draggableElements = [...container.querySelectorAll('li[draggable="true"]:not(.dragging)')];
+
+    // Encontra o elemento mais próximo do ponto Y do cursor
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        // Calcula a distância do meio do elemento até o cursor Y
+        const offset = y - box.top - box.height / 2;
+        
+        // Se a distância for negativa e mais próxima do zero (acima do meio do elemento)
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: -Infinity }).element;
+}
+
+// ... O resto do seu script.js continua aqui
+
 async function openOrdemCarregamentoModal(expeditionId) {
     const modal = document.getElementById('ordemCarregamentoModal');
     const list = document.getElementById('ordemLojasList');
@@ -6388,22 +7902,6 @@ async function openOrdemCarregamentoModal(expeditionId) {
     }
 }
 
-/**
- * Função auxiliar para encontrar o elemento sobre o qual o item está sendo arrastado.
- */
-function getDragAfterElement(container, y) {
-    const draggableElements = [...container.querySelectorAll('li[draggable="true"]:not(.dragging)')];
-
-    return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-            return { offset: offset, element: child };
-        } else {
-            return closest;
-        }
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-}
 
 
 function closeOrdemCarregamentoModal() {
@@ -6411,7 +7909,7 @@ function closeOrdemCarregamentoModal() {
     document.getElementById('ordemLojasList').innerHTML = '';
 }
 
-// SUBSTITUA A FUNÇÃO ANTIGA POR ESTA
+// SUBSTITUA A FUNÇÃO saveOrdemCarregamento COMPLETA
 async function saveOrdemCarregamento() {
     const expeditionId = document.getElementById('ordemExpeditionId').value;
     const orderedItems = document.querySelectorAll('#ordemLojasList li');
@@ -6434,7 +7932,8 @@ async function saveOrdemCarregamento() {
         const updatePromises = updates.map(update => {
             const endpoint = `expedition_items?id=eq.${update.id}`; // Especifica o ID do item
             const payload = { ordem_entrega: update.ordem_entrega }; // Envia apenas o dado a ser atualizado
-            return supabaseRequest(endpoint, 'PATCH', payload, false);
+            // 🚨 FIX CRÍTICO: Passa 'false' para não tentar injetar 'filial' no payload do item
+            return supabaseRequest(endpoint, 'PATCH', payload, false); 
         });
 
         // Executa todas as atualizações
@@ -6451,6 +7950,7 @@ async function saveOrdemCarregamento() {
         // A mensagem de erro agora virá do supabaseRequest, que já é detalhada
         // Apenas para garantir, logamos o erro completo no console.
         console.error("Erro completo ao salvar ordem:", error);
+        showNotification(`Erro ao salvar ordem de carregamento: ${error.message}`, 'error');
     }
 }
 // --- NOVAS FUNÇÕES DE RENDERIZAÇÃO PARA CONFIGURAÇÕES ---
@@ -6558,38 +8058,72 @@ function renderPontosInteresseConfig() {
     `).join('');
 }
 
+// SUBSTITUIR A VERSÃO EXISTENTE DE renderAcessosConfig (Cerca da linha 3290)
 async function renderAcessosConfig() {
     const tbody = document.getElementById('acessosConfigBody');
     if (!tbody) return;
 
-    // Apenas usuários master podem gerenciar acessos
     if (!masterUserPermission) {
-        tbody.innerHTML = '<tr><td colspan="3" class="alert alert-error">Acesso negado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" class="alert alert-error">Acesso negado. Apenas usuários MASTER podem gerenciar acessos e permissões.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = `<tr><td colspan="3" class="loading"><div class="spinner"></div>Carregando acessos...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="loading"><div class="spinner"></div>Carregando usuários e grupos...</td></tr>`;
 
     try {
-        // CORREÇÃO: Adicionando 'false' no último parâmetro para desativar o filtro de filial.
-        const acessosData = await supabaseRequest('acessos?select=nome,grupo_id!inner(nome)', 'GET', null, false);
+        // 1. Carregar Grupos de Acesso
+        const gruposData = await supabaseRequest('grupos_acesso?order=nome', 'GET', null, false);
+        let gruposHtml = '<tr><td colspan="3" class="font-bold text-center bg-gray-200">GRUPOS DE ACESSO</td></tr>';
         
-        tbody.innerHTML = acessosData.map(acesso => `
-            <tr>
-                <td class="font-medium">${acesso.nome}</td>
-                <td><span class="status-badge ${acesso.grupo_id.nome === 'MASTER' ? 'status-disponivel' : 'status-em_uso'}">${acesso.grupo_id.nome}</span></td>
-                <td>
-                    <div class="flex gap-1">
-                        <button class="btn btn-warning btn-small" onclick="editAcesso('${acesso.nome}')">Editar</button>
-                        <button class="btn btn-danger btn-small" onclick="deleteAcesso('${acesso.nome}')">Excluir</button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+        gruposData.forEach(grupo => {
+            // Usamos JSON.stringify e o replace para passar o objeto como string para o onclick
+            const grupoJson = JSON.stringify(grupo).replace(/"/g, "'"); 
+            gruposHtml += `
+                <tr class="hover:bg-gray-50">
+                    <td class="font-medium">${grupo.nome}</td>
+                    <td><span class="status-badge status-disponivel">GRUPO</span></td>
+                    <td>
+                        <div class="flex gap-1">
+                            <button class="btn btn-primary btn-small" onclick="managePermissionsModal('${grupo.id}', '${grupo.nome}', 'grupo')">Permissões</button>
+                            <button class="btn btn-warning btn-small" onclick="showAddForm('grupo', ${grupoJson})">Editar</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteGroup('${grupo.id}')">Excluir</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        // 2. Carregar Usuários Individuais
+        const acessosData = await supabaseRequest('acessos?select=id,nome,grupo_id(nome)&order=nome', 'GET', null, false);
+        let acessosHtml = '<tr><td colspan="3" class="font-bold text-center bg-gray-200">USUÁRIOS INDIVIDUAIS</td></tr>';
+
+        acessosData.forEach(acesso => {
+            const grupoNome = acesso.grupo_id && typeof acesso.grupo_id === 'object' && acesso.grupo_id.nome 
+                             ? acesso.grupo_id.nome 
+                             : 'SEM GRUPO';
+
+            acessosHtml += `
+                <tr class="hover:bg-gray-50">
+                    <td class="font-medium">${acesso.nome}</td>
+                    <td><span class="status-badge status-em_uso">${grupoNome}</span></td>
+                    <td>
+                        <div class="flex gap-1">
+                            <button class="btn btn-primary btn-small" onclick="managePermissionsModal('${acesso.id}', '${acesso.nome}', 'usuario')">Permissões</button>
+                            <button class="btn btn-warning btn-small" onclick="editAcesso('${acesso.nome}')">Editar</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteAcesso('${acesso.nome}')">Excluir</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = gruposHtml + acessosHtml;
+        
     } catch (error) {
         tbody.innerHTML = `<tr><td colspan="3" class="alert alert-error">Erro ao carregar acessos: ${error.message}</td></tr>`;
     }
 }
+
 // Função para mostrar detalhes da expedição
 async function showDetalhesExpedicao(expeditionId) {
     const modal = document.getElementById('detalhesExpedicaoModal');
@@ -6730,7 +8264,13 @@ function imprimirDetalhes() {
 }
 // --- FUNCIONALIDADES DA ABA OPERAÇÃO IDENTIFICAÇÃO ---
 async function loadOperacao() {
-    showSubTab('operacao', 'lancamento', document.querySelector('#operacao .sub-tab'));
+    const permittedOperacaoTabs = getPermittedSubTabs('operacao');
+    if (permittedOperacaoTabs.length > 0) {
+        // Abre a única sub-aba permitida ou a padrão 'lancamento'
+        const initialSubTab = permittedOperacaoTabs.length === 1 ? permittedOperacaoTabs[0] : 'lancamento';
+        const initialElement = document.querySelector(`#operacao .sub-tabs button[onclick*="'${initialSubTab}'"]`);
+        showSubTab('operacao', initialSubTab, initialElement);
+    }
 }
 
 async function loadIdentificacaoExpedicoes() {
@@ -6775,13 +8315,12 @@ renderIdentificacaoExpedicoes(expeditionsWithItems);
     }
 }
 
+// SUBSTITUIR A FUNÇÃO renderIdentificacaoExpedicoes COMPLETA
 function renderIdentificacaoExpedicoes(expeditions) {
     const container = document.getElementById('expedicoesParaIdentificacao');
 
     container.innerHTML = expeditions.map(exp => {
         const totalItens = exp.total_pallets + exp.total_rolltrainers;
-        const numeroCarga = exp.numeros_carga && exp.numeros_carga.length > 0 ? exp.numeros_carga[0] : 'N/A';
-        
         const lojasInfo = exp.items.map(item => {
             const loja = lojas.find(l => l.id === item.loja_id);
             return loja ? `${loja.codigo} - ${loja.nome}` : 'N/A';
@@ -6820,7 +8359,7 @@ function renderIdentificacaoExpedicoes(expeditions) {
                 </div>
 
                 <div class="text-center">
-                    <button class="btn btn-primary" onclick="imprimirIdentificacao('${exp.id}', '${numeroCarga}', '${exp.lider_nome}', ${exp.total_pallets}, ${exp.total_rolltrainers})">
+                    <button class="btn btn-primary" onclick="openImprimirIdentificacaoModal('${exp.id}')">
                         🖨️ Imprimir Identificação (${totalItens} etiquetas)
                     </button>
                 </div>
@@ -6828,18 +8367,6 @@ function renderIdentificacaoExpedicoes(expeditions) {
         `;
     }).join('');
 }
-
-// Substitua a função imprimirIdentificacao existente por esta versão corrigida:
-
-// Substitua a função imprimirIdentificacao existente por esta versão corrigida:
-
-// Substitua a função imprimirIdentificacao existente por esta versão corrigida:
-
-// Substitua a função imprimirIdentificacao existente por esta versão corrigida:
-
-// Substitua a função imprimirIdentificacao existente por esta versão corrigida:
-
-// Substitua a função imprimirIdentificacao existente por esta versão corrigida:
 
 async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, pallets, rolltrainers) {
     try {
@@ -7085,11 +8612,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('initialLoginForm').addEventListener('submit', handleInitialLogin);
 });
 
-// NOVA FUNÇÃO para lidar com o login inicial (SUBSTITUÍDA)
 async function handleInitialLogin(event) {
     event.preventDefault();
+    // ✅ AJUSTE APLICADO: Use .trim() na senha para remover espaços em branco
     const nome = document.getElementById('initialUser').value.trim();
-    const senha = document.getElementById('initialPassword').value;
+    const senha = document.getElementById('initialPassword').value.trim(); 
     const alertContainer = document.getElementById('initialLoginAlert');
 
     if (!nome || !senha) {
@@ -7099,9 +8626,29 @@ async function handleInitialLogin(event) {
     alertContainer.innerHTML = '<div class="loading">Autenticando...</div>';
 
     try {
-        const endpoint = `acessos?select=nome,grupo_id&nome=eq.${nome}&senha=eq.${senha}`;
-        const result = await supabaseRequest(endpoint, 'GET', null, false);
+        // GARANTIA: Reseta o estado global antes da autenticação
+        selectedFilial = null;
 
+        // ✅ CORREÇÃO CRÍTICA: SEPARAÇÃO DO ENDPOINT E DOS FILTROS.
+        // A URL final que o proxy da Vercel receberá será: /api/proxy?endpoint=acessos&select=...
+        const nomeEndpointBase = 'acessos';
+        const filtros = `select=id,nome,grupo_id&nome=eq.${nome}&senha=eq.${senha}`;
+        
+        const authUrl = `${SUPABASE_PROXY_URL}?endpoint=${nomeEndpointBase}&${filtros}`;
+        
+        const authResponse = await fetch(authUrl, {
+            method: 'GET',
+            headers: headers 
+        });
+
+        if (!authResponse.ok) {
+            const errorText = await authResponse.text();
+            throw new Error(`Erro ${authResponse.status} na autenticação: ${errorText}`);
+        }
+        
+        const result = await authResponse.json();
+
+        // VALIDAÇÃO CRÍTICA: Se a resposta for vazia, significa falha na autenticação
         if (!result || result.length === 0 || !result[0]) {
             alertContainer.innerHTML = '<div class="alert alert-error">Usuário ou senha incorretos.</div>';
             return;
@@ -7109,46 +8656,45 @@ async function handleInitialLogin(event) {
 
         const user = result[0];
         currentUser = {
+            id: user.id,
             nome: user.nome,
             grupoId: user.grupo_id
         };
 
-        // Determinar se é um usuário Master e carregar permissões
-        // Proteção: verifica se o grupoId existe antes de fazer a requisição
-        if (user.grupo_id) {
-            const grupo = await supabaseRequest(`grupos_acesso?id=eq.${user.grupo_id}`);
-            if (grupo && grupo.length > 0 && grupo[0].nome === 'MASTER') {
-                masterUserPermission = true;
-            } else {
-                const permissoes = await supabaseRequest(`permissoes_grupo?grupo_id=eq.${user.grupo_id}`);
-                userPermissions = permissoes.map(p => p.permissao);
-            }
-        } else {
-            // Se o usuário não tem um grupo, não tem permissões
-            masterUserPermission = false;
-            userPermissions = [];
+        // 1. Carregar as permissões do usuário (Grupo + Individual)
+        await loadUserPermissions(currentUser.id, currentUser.grupoId);
+        
+        // 2. Se o usuário é Master, ele ganha acesso a todas as filiais
+        if (masterUserPermission) {
+            const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
+            todasFiliais.forEach(f => userPermissions.push(`acesso_filial_${f.nome}`));
         }
 
-        // NOVO: Redireciona para a tela de seleção de filial.
-        // A validação de permissão para a filial agora ocorre na função selectFilial().
-        document.getElementById('initialAuthContainer').style.display = 'none';
-        document.getElementById('filialSelectionContainer').style.display = 'block';
-        loadFiliais(); 
-        
+        // 3. Carrega as filiais ativas e determina o acesso/redirecionamento
+        await loadFiliais(); 
+
         showNotification(`Bem-vindo, ${currentUser.nome}!`, 'success');
 
     } catch (err) {
-        alertContainer.innerHTML = '<div class="alert alert-error">Erro ao verificar credenciais.</div>';
+        let msg = 'Erro ao verificar credenciais. Verifique a conexão.';
+        if (err.message.includes('401')) {
+             msg = `Erro crítico (401). Verifique se a sua chave 'SUPABASE_ANON_KEY' está incorreta.`;
+        }
+        alertContainer.innerHTML = `<div class="alert alert-error">${msg}</div>`;
         console.error(err);
     }
 }
-// NOVA FUNÇÃO
+
+// SUBSTITUIR A VERSÃO EXISTENTE DE showMainSystem
 async function showMainSystem() {
     // Oculta todas as telas de seleção
     document.getElementById('initialAuthContainer').style.display = 'none';
     document.getElementById('filialSelectionContainer').style.display = 'none';
     // Exibe a tela principal
     document.getElementById('mainSystem').style.display = 'flex';
+    
+    // 🚨 NOVO: Garante que a visibilidade do link 'Trocar Filial' seja checada no momento da exibição
+    toggleFilialLinkVisibility();
 }
 
 // Função para permitir ao usuário trocar de filial
@@ -7157,4 +8703,857 @@ function trocarFilial() {
     document.getElementById('mainSystem').style.display = 'none';
     document.getElementById('filialSelectionContainer').style.display = 'block';
     loadFiliais();
+}
+
+
+// NOVO: Funções para CRUD de Grupos de Acesso
+function showAddGroupForm(grupo = null) {
+    const modal = document.getElementById('addFormModal');
+    const title = document.getElementById('addFormTitle');
+    const fieldsContainer = document.getElementById('addFormFields');
+    fieldsContainer.innerHTML = '';
+    
+    title.textContent = grupo ? `Editar Grupo: ${grupo.nome}` : `Adicionar Novo Grupo`;
+    
+    // O campo 'grupo' é para salvar via handleSave.
+    fieldsContainer.innerHTML = `
+        ${grupo ? `<input type="hidden" id="edit_grupo_id" value="${grupo.id}">` : ''}
+        <div class="form-group"><label>Nome do Grupo:</label><input type="text" id="add_nome" value="${grupo ? grupo.nome : ''}" required></div>
+    `;
+    
+    modal.style.display = 'flex';
+}
+
+// NOVO: Função de salvar Grupo
+async function saveGroup() {
+    const isEdit = !!document.getElementById('edit_grupo_id');
+    const grupoId = isEdit ? document.getElementById('edit_grupo_id').value : null;
+    const nome = document.getElementById('add_nome').value;
+
+    const data = { nome };
+    
+    if (isEdit) {
+        await supabaseRequest(`grupos_acesso?id=eq.${grupoId}`, 'PATCH', data, false);
+        showNotification('Grupo atualizado com sucesso!', 'success');
+    } else {
+        await supabaseRequest('grupos_acesso', 'POST', data, false);
+        showNotification('Grupo cadastrado com sucesso!', 'success');
+    }
+    // Recarrega o array global de grupos e a tabela de configurações
+    gruposAcesso = await supabaseRequest('grupos_acesso?order=nome', 'GET', null, false);
+    renderAcessosConfig();
+    return true;
+}
+
+// NOVAS FUNÇÕES: CRUD DE GRUPOS E GESTÃO DE PERMISSÕES
+async function editGroup(grupoId) {
+    try {
+        const grupo = await supabaseRequest(`grupos_acesso?id=eq.${grupoId}`, 'GET', null, false);
+        if (grupo && grupo.length > 0) {
+            showAddGroupForm(grupo[0]);
+        }
+    } catch (error) { showNotification('Erro ao carregar grupo.', 'error'); }
+}
+
+async function deleteGroup(grupoId) {
+    const confirmed = await showYesNoModal('Deseja excluir este grupo? Usuários ligados a ele ficarão sem grupo.');
+    if (confirmed) {
+        try {
+            await supabaseRequest(`grupos_acesso?id=eq.${grupoId}`, 'DELETE', null, false);
+            showNotification('Grupo excluído!', 'success');
+            renderAcessosConfig();
+        } catch (error) { showNotification(`Erro ao excluir grupo: ${error.message}`, 'error'); }
+    }
+}
+
+function closePermissionsModal() {
+    document.getElementById('permissionsModal').style.display = 'none';
+}
+
+
+
+// SUBSTITUIR A VERSÃO EXISTENTE DE managePermissionsModal
+async function managePermissionsModal(targetId, targetName, targetType) {
+    const modal = document.getElementById('permissionsModal');
+    const title = document.getElementById('permissionsModalTitle');
+    const subtitle = document.getElementById('permissionsModalSubtitle');
+    const list = document.getElementById('permissionsList');
+
+    document.getElementById('permissionsTargetId').value = targetId;
+    document.getElementById('permissionsTargetType').value = targetType;
+    title.textContent = `Gerenciar Permissões`;
+    subtitle.textContent = targetType === 'grupo' ? `Configurando o Grupo: ${targetName}` : `Visualizando Permissões (Apenas Grupo): ${targetName}`;
+    list.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando permissões...</div>`;
+    modal.style.display = 'flex';
+
+    try {
+        // 1. Buscar todas as permissões base do sistema e filiais
+        const allPermissionsBase = await supabaseRequest('permissoes_sistema?ativa=eq.true&order=categoria,nome', 'GET', null, false);
+        const allFiliais = await supabaseRequest('filiais?ativo=eq.true&order=nome', 'GET', null, false);
+        
+        // 🚨 FIX CRÍTICO: ADICIONAR PERMISSÕES DE SUB-ABA MANUALMENTE 🚨
+        let allPermissions = [...allPermissionsBase];
+        
+        // Mapeia todas as permissões de sub-aba do hardcoded map
+        for (const viewId in subTabPermissionMap) {
+            for (const subTabId in subTabPermissionMap[viewId]) {
+                const code = subTabPermissionMap[viewId][subTabId];
+                const name = subTabId.replace(/([A-Z])/g, ' $1').toLowerCase(); // Transforma 'faturamentoAtivo' em 'faturamento ativo'
+                const viewNome = viewId.charAt(0).toUpperCase() + viewId.slice(1);
+                
+                // Cria um objeto no formato esperado pela renderização
+                allPermissions.push({
+                    codigo: code,
+                    nome: `Visualizar ${name}`,
+                    descricao: `Acesso à sub-aba ${name} na aba ${viewNome}`,
+                    categoria: 'Sub-Aba' // Nova categoria para organização
+                });
+            }
+        }
+        
+        // Classifica novamente a lista completa por categoria e nome
+        allPermissions.sort((a, b) => {
+            if (a.categoria !== b.categoria) {
+                // Prioriza as categorias Filial e Sub-Aba no topo
+                const order = { 'Acessos de Filial': 1, 'Sub-Aba': 2, 'Aba': 3, 'Ação': 4 };
+                return (order[a.categoria] || 99) - (order[b.categoria] || 99);
+            }
+            return a.nome.localeCompare(b.nome);
+        });
+        
+        // Fim do bloco de construção da lista mestra
+        // ====================================================================
+
+        let currentPermissions = [];
+        let isReadOnly = targetType !== 'grupo'; 
+
+        if (targetType === 'grupo') {
+            const result = await supabaseRequest(`permissoes_grupo?grupo_id=eq.${targetId}&select=permissao`, 'GET', null, false);
+            currentPermissions = result ? result.map(p => p.permissao) : [];
+        } else {
+            const userAccess = await supabaseRequest(`acessos?id=eq.${targetId}&select=grupo_id`, 'GET', null, false);
+            const grupoId = userAccess[0]?.grupo_id;
+
+            if (grupoId) {
+                const result = await supabaseRequest(`permissoes_grupo?grupo_id=eq.${grupoId}&select=permissao`, 'GET', null, false);
+                currentPermissions = result ? result.map(p => p.permissao) : [];
+            }
+        }
+
+        let html = '';
+        let currentCategory = '';
+        
+        const saveButton = document.querySelector('#permissionsModal .btn-success');
+        if (saveButton) saveButton.style.display = isReadOnly ? 'none' : 'block';
+        
+        // ====================================================================
+        // A) RENDERIZAR PERMISSÕES DE ACESSO À FILIAL
+        // ====================================================================
+        html += `<h4 class="font-bold text-lg text-gray-700 mt-4 mb-2 border-b pb-1">Acessos de Filial</h4>`;
+        
+        allFiliais.forEach(filial => {
+            const permissionCode = `acesso_filial_${filial.nome}`;
+            const permissao = { codigo: permissionCode, nome: `Filial ${filial.nome} (${filial.descricao})`, descricao: `Permissão de login na Filial ${filial.nome}` };
+            const isChecked = currentPermissions.includes(permissao.codigo);
+            const statusDisplay = isChecked ? '<span class="text-green-600 font-bold">PERMITIDO</span>' : '<span class="text-red-600 font-bold">NEGADO</span>';
+
+            html += `
+                <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" data-permission-code="${permissao.codigo}" class="h-5 w-5 rounded border-gray-300 text-blue-600" ${isChecked ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''}>
+                        <span class="text-sm font-medium text-gray-700">${permissao.nome}</span>
+                        <span class="text-xs text-gray-500 ml-2" title="${permissao.descricao}">${permissao.descricao}</span>
+                    </label>
+                    <span class="text-xs text-gray-500">${isReadOnly ? statusDisplay : ''}</span>
+                </div>
+            `;
+        });
+        
+        // ====================================================================
+        // B) RENDERIZAR OUTRAS PERMISSÕES DO SISTEMA (ABAS, SUB-ABAS, AÇÕES)
+        // ====================================================================
+
+        allPermissions.forEach(p => {
+            if (p.categoria !== currentCategory) {
+                currentCategory = p.categoria;
+                // Evita repetir a categoria "Acessos de Filial"
+                if (currentCategory !== 'Acessos de Filial') {
+                    html += `<h4 class="font-bold text-lg text-gray-700 mt-4 mb-2 border-b pb-1">${p.categoria}</h4>`;
+                }
+            }
+            
+            const isChecked = currentPermissions.includes(p.codigo);
+            const statusDisplay = isChecked ? '<span class="text-green-600 font-bold">PERMITIDO</span>' : '<span class="text-red-600 font-bold">NEGADO</span>';
+
+            html += `
+                <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" data-permission-code="${p.codigo}" class="h-5 w-5 rounded border-gray-300 text-blue-600" ${isChecked ? 'checked' : ''} ${isReadOnly ? 'disabled' : ''}>
+                        <span class="text-sm font-medium text-gray-700">${p.nome}</span>
+                        <span class="text-xs text-gray-500 ml-2" title="${p.descricao}">${p.descricao}</span>
+                    </label>
+                    <span class="text-xs text-gray-500">${isReadOnly ? statusDisplay : ''}</span>
+                </div>
+            `;
+        });
+
+        list.innerHTML = html;
+    } catch (error) {
+        list.innerHTML = `<div class="alert alert-error">Erro ao carregar dados de permissão: ${error.message}</div>`;
+        console.error(error);
+    }
+}
+
+// SUBSTITUIR A VERSÃO EXISTENTE DE savePermissions
+async function savePermissions() {
+    const targetId = document.getElementById('permissionsTargetId').value;
+    const targetType = document.getElementById('permissionsTargetType').value;
+    const checkboxes = document.querySelectorAll('#permissionsList input[type="checkbox"]');
+    const alert = document.getElementById('permissionsAlert');
+    alert.innerHTML = '';
+    
+    // Apenas grupos podem ter permissões salvas. Usuários são apenas para visualização.
+    if (targetType !== 'grupo') {
+        showNotification('Permissões de usuário individual não são mais permitidas. Use apenas Grupos.', 'error');
+        closePermissionsModal();
+        return;
+    }
+    
+    try {
+        await saveGroupPermissions(targetId, checkboxes, alert);
+
+        showNotification('Permissões salvas com sucesso!', 'success');
+        closePermissionsModal();
+    } catch (error) {
+        alert.innerHTML = `<div class="alert alert-error">Erro ao salvar: ${error.message}</div>`;
+        console.error('Erro ao salvar permissões:', error);
+    }
+}
+
+
+
+async function saveGroupPermissions(grupoId, checkboxes, alert) {
+    const permissionsToSave = [];
+    const permissionsToRemove = [];
+    
+    checkboxes.forEach(cb => {
+        const code = cb.dataset.permissionCode;
+        if (cb.checked) {
+            permissionsToSave.push({ grupo_id: grupoId, permissao: code });
+        } else {
+            permissionsToRemove.push(code);
+        }
+    });
+
+    // 1. Deletar permissões que foram desmarcadas
+    if (permissionsToRemove.length > 0) {
+        await supabaseRequest(`permissoes_grupo?grupo_id=eq.${grupoId}&permissao=in.(${permissionsToRemove.join(',')})`, 'DELETE', null, false);
+    }
+
+    // 2. Inserir/Atualizar permissões selecionadas usando Upsert em lote
+    if (permissionsToSave.length > 0) {
+        // 🚨 AJUSTE CRÍTICO: Força o UPSERT no 5º parâmetro (true) para evitar erro 409/duplicata de grupo 🚨
+        await supabaseRequest('permissoes_grupo', 'POST', permissionsToSave, false, true);
+    }
+}
+// NOVO: Função para renderizar as filiais permitidas na tela de seleção
+function renderFiliaisSelection(allowedFiliais) {
+    const grid = document.getElementById('filiaisGrid');
+    grid.innerHTML = '';
+    
+    allowedFiliais.forEach(filial => {
+        const card = document.createElement('div');
+        card.className = 'filial-card';
+        card.onclick = () => selectFilial(filial);
+        card.innerHTML = `<h3>${filial.nome}</h3><p>${filial.descricao || 'Descrição não informada'}</p>`;
+        grid.appendChild(card);
+    });
+}
+
+
+// SUBSTITUIR A VERSÃO EXISTENTE DE filterNavigationMenu
+function filterNavigationMenu() {
+    const navItems = document.querySelectorAll('.nav-item');
+    let firstPermittedViewId = null;
+
+    navItems.forEach(item => {
+        const href = item.getAttribute('href');
+        
+        // 🚨 FIX CRÍTICO: Garante que o item de navegação possui um href válido.
+        if (!href || href.length <= 1) {
+             item.style.display = 'none'; // Esconde o item inválido para segurança
+             return;
+        }
+        
+        const viewId = href.substring(1);
+        const htmlPermission = item.dataset.permission; // Ex: 'acesso_faturamento'
+        
+        let isPermitted = true;
+
+        if (htmlPermission) {
+            // 1. Checa a permissão principal (incluindo o mapeamento 'view_')
+            let isPrincipalPermitted = hasPermission(htmlPermission);
+            
+            if (!isPrincipalPermitted) {
+                // Tenta checar a permissão mapeada do BD ('acesso_' -> 'view_')
+                const mappedPermission = htmlPermission.replace('acesso_', 'view_');
+                if (hasPermission(mappedPermission)) {
+                    isPrincipalPermitted = true;
+                }
+            }
+            
+            isPermitted = isPrincipalPermitted;
+
+            // 2. Se for uma aba com sub-abas, aplica o filtro de sub-abas (só se a principal já estiver OK)
+            if (isPermitted && subTabViewIds.has(viewId)) {
+                const permittedSubTabs = getPermittedSubTabs(viewId);
+                if (permittedSubTabs.length === 0) {
+                    // Requisito: Esconder aba principal se não houver sub-abas permitidas
+                    isPermitted = false;
+                }
+            }
+        } 
+        
+        if (!isPermitted) {
+            item.style.display = 'none';
+        } else {
+            item.style.display = 'flex'; 
+            if (!firstPermittedViewId) {
+                firstPermittedViewId = viewId;
+            }
+        }
+    });
+    return firstPermittedViewId;
+}
+
+// NOVA FUNÇÃO: Filtra sub-abas após a injeção do HTML
+function filterSubTabs() {
+    const subTabItems = document.querySelectorAll('.sub-tab');
+
+    subTabItems.forEach(item => {
+        const htmlPermission = item.dataset.permission; 
+        
+        if (!htmlPermission) {
+            // Se não houver data-permission, assume que deve aparecer (ex: botão de filtro, etc.)
+            item.style.display = 'flex'; 
+            return;
+        }
+
+        let isPermitted = false;
+        
+        // O valor do 'onclick' é o viewId (ex: 'faturamentoAtivo')
+        const viewIdMatch = item.getAttribute('onclick').match(/'([^']*)','([^']*)'/);
+        const subTabContentId = viewIdMatch ? viewIdMatch[2] : null; 
+
+        // 1. Checa a permissão conforme está no HTML (Ex: 'acesso_faturamento_ativo')
+        if (hasPermission(htmlPermission)) {
+            isPermitted = true;
+        } else {
+            // 2. Mapeia o nome da permissão para o padrão 'view_' do BD e checa novamente
+            const mappedPermission = htmlPermission.replace('acesso_', 'view_');
+            if (hasPermission(mappedPermission)) {
+                isPermitted = true;
+            }
+        }
+
+        if (!isPermitted) {
+            item.style.display = 'none';
+            
+            // Garante que o conteúdo da sub-aba também seja escondido se for a aba ativa
+            if (subTabContentId) {
+                const subTabContent = document.getElementById(subTabContentId);
+                if (subTabContent) {
+                    subTabContent.style.display = 'none';
+                    subTabContent.classList.remove('active'); // Garante que não fique ativo
+                }
+            }
+        } else {
+            item.style.display = 'flex';
+        }
+    });
+}
+
+async function loadFaturamentoData(subTabName = 'faturamentoAtivo') {
+    const container = document.getElementById('faturamentoList');
+    if (!container) return;
+
+    if (subTabName === 'faturamentoAtivo') {
+         container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expedições...</div>`;
+
+        try {
+            // AJUSTE CRÍTICO: Incluir 'em_carregamento' e 'carregado' (e o novo status)
+            const expeditions = await supabaseRequest("expeditions?status=in.(em_carregamento,carregado,aguardando_faturamento,faturamento_iniciado,faturado,em_carregamento_faturando)&order=data_hora.asc");
+            const items = await supabaseRequest('expedition_items');
+
+
+            const expeditionsWithItems = expeditions.map(exp => {
+                const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
+                const motorista = exp.motorista_id ? motoristas.find(m => m.id === exp.motorista_id) : null;
+                const expItems = items.filter(item => item.expedition_id === exp.id);
+                
+                return {
+                    ...exp, 
+                    veiculo_placa: veiculo?.placa || 'N/A',
+                    motorista_nome: motorista?.nome || 'N/A',
+                    lojas_count: expItems.length,
+                    lojas_info: expItems.map(item => lojas.find(l => l.id === item.loja_id)?.nome || 'N/A').join(', '),
+                    total_pallets: expItems.reduce((sum, item) => sum + (item.pallets || 0), 0),
+                    total_rolltrainers: expItems.reduce((sum, item) => sum + (item.rolltrainers || 0), 0)
+                };
+            });
+            
+            updateFaturamentoStats(expeditionsWithItems);
+            renderFaturamentoList(expeditionsWithItems);
+            
+        } catch (error) {
+            container.innerHTML = `<div class="alert alert-error">Erro ao carregar lista de faturamento: ${error.message}</div>`;
+        }
+    }
+}
+
+
+// SUBSTITUIR A FUNÇÃO applyMotoristaStatusFilter COMPLETA
+function applyMotoristaStatusFilter() {
+    const filterValue = document.getElementById('motoristaStatusFilter').value;
+    const allMotoristas = window.motoristasDataCache || [];
+    
+    let filteredList = allMotoristas;
+
+    if (filterValue) {
+        // Trata múltiplos status separados por vírgula (Ex: retornando_cd,retornando_com_imobilizado)
+        const statuses = filterValue.split(',').map(s => s.trim());
+        
+        if (statuses.length > 0 && statuses[0]) {
+            // Filtra motoristas cujos status estão na lista de filtros
+            filteredList = allMotoristas.filter(m => statuses.includes(m.displayStatus));
+        }
+    }
+    
+    const listContainer = document.getElementById('motoristaListFiltered');
+    if(listContainer) {
+        listContainer.innerHTML = renderMotoristasListHtml(filteredList);
+    }
+    
+    // Garante que os timers sejam reiniciados apenas para os motoristas visíveis
+    filteredList.forEach(m => {
+        if (m.activeExp && m.displayStatus === 'saiu_para_entrega') {
+             startMotoristaTimer(m);
+        }
+    });
+}
+
+// NOVO CÓDIGO: Função auxiliar para iniciar o timer do motorista (extraída para limpeza)
+function startMotoristaTimer(m) {
+    const timerId = `motorista_${m.id}`;
+    if(activeTimers[timerId]) clearInterval(activeTimers[timerId]);
+    
+    activeTimers[timerId] = setInterval(() => {
+        let tempoEmLoja = 0, tempoDeslocamento = 0;
+        let lastEventTime = new Date(m.activeExp.data_saida_entrega);
+
+        m.activeExp.items.sort((a,b) => new Date(a.data_inicio_descarga) - new Date(b.data_inicio_descarga)).forEach(item => {
+            if(item.data_inicio_descarga) {
+               const inicio = new Date(item.data_inicio_descarga);
+               tempoDeslocamento += (inicio - lastEventTime);
+               if(item.data_fim_descarga) {
+                   const fim = new Date(item.data_fim_descarga);
+                   tempoEmLoja += (fim - inicio);
+                   lastEventTime = fim;
+               } else {
+                   tempoEmLoja += (new Date() - inicio);
+                   lastEventTime = new Date();
+               }
+            }
+        });
+        
+        const elLoja = document.getElementById(`loja_timer_${m.id}`);
+        const elDesloc = document.getElementById(`desloc_timer_${m.id}`);
+
+        if(elLoja) elLoja.textContent = `Loja: ${minutesToHHMM(tempoEmLoja / 60000)}`;
+        if(elDesloc) elDesloc.textContent = `Desloc.: ${minutesToHHMM(tempoDeslocamento / 60000)}`;
+
+    }, 1000);
+}
+
+
+
+// NOVO: Função para abrir o modal de seleção de impressão
+async function openImprimirIdentificacaoModal(expeditionId) {
+    const modal = document.getElementById('printIdentificationModal');
+    const lojaList = document.getElementById('printLojaList');
+    
+    document.getElementById('currentPrintExpeditionId').value = expeditionId;
+    document.getElementById('printExpeditionIdDisplay').textContent = expeditionId;
+    
+    // Resetar o estado do modal
+    document.getElementById('lojaSelectionContainer').style.display = 'none';
+    const secondaryBtn = document.querySelector('#printIdentificationModal .btn-secondary');
+    if (secondaryBtn) secondaryBtn.style.display = 'block';
+    lojaList.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando lojas...</div>`;
+    modal.style.display = 'flex';
+    
+    try {
+        // Busca os itens da expedição e os dados das lojas associadas
+        const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}&select=id,loja_id,pallets,rolltrainers,lojas(codigo,nome)`);
+        
+        if (!items || items.length === 0) {
+            lojaList.innerHTML = '<div class="alert alert-info">Nenhum item encontrado para esta expedição.</div>';
+            return;
+        }
+
+        let lojasHtml = '';
+        items.forEach(item => {
+            const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
+            lojasHtml += `
+                <div class="flex justify-between items-center bg-white p-3 rounded-md shadow-sm">
+                    <div class="text-left">
+                        <strong class="text-gray-800">${item.lojas.codigo} - ${item.lojas.nome}</strong>
+                        <div class="text-sm text-gray-500">${item.pallets}P + ${item.rolltrainers}R (${totalItensLoja} etiquetas)</div>
+                    </div>
+                    <button class="btn btn-success btn-small" onclick="handlePrintChoice('${item.loja_id}')">
+                        🖨️ Imprimir Loja
+                    </button>
+                </div>
+            `;
+        });
+
+        lojaList.innerHTML = lojasHtml;
+        
+    } catch (error) {
+        lojaList.innerHTML = `<div class="alert alert-error">Erro ao carregar lojas: ${error.message}</div>`;
+    }
+}
+
+function closePrintIdentificationModal() {
+    document.getElementById('printIdentificationModal').style.display = 'none';
+}
+
+async function handlePrintChoice(lojaId) {
+    const expeditionId = document.getElementById('currentPrintExpeditionId').value;
+    
+    // 1. Busca informações adicionais necessárias para a impressão
+    const expeditionData = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=lider_id,numeros_carga`);
+    const lider = expeditionData[0].lider_id ? lideres.find(l => l.id === expeditionData[0].lider_id) : { nome: 'N/A' };
+    const numeroCarga = expeditionData[0].numeros_carga && expeditionData[0].numeros_carga.length > 0 ? expeditionData[0].numeros_carga[0] : 'N/A';
+
+    closePrintIdentificationModal();
+    
+    // 2. Chama a função de impressão modificada (passando o ID da loja como filtro)
+    imprimirIdentificacao(expeditionId, numeroCarga, lider.nome, lojaId);
+}
+// SUBSTITUIR A FUNÇÃO imprimirIdentificacao existente por esta versão corrigida:
+async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaId = null) {
+    try {
+        // 1. Busca os itens da expedição e as informações das lojas
+        let endpoint = `expedition_items?expedition_id=eq.${expeditionId}`;
+        
+        // Aplica o filtro de loja, se fornecido
+        if (lojaId) {
+            endpoint += `&loja_id=eq.${lojaId}`;
+        }
+        
+        const items = await supabaseRequest(endpoint);
+        
+        if (!items || items.length === 0) {
+            showNotification(lojaId ? 'Nenhum item encontrado para esta loja.' : 'Nenhum item encontrado para esta expedição.', 'error');
+            return;
+        }
+        
+        const hoje = new Date();
+        const dataFormatada = hoje.toLocaleDateString('pt-BR');
+        
+        // Remove qualquer div de impressão anterior
+        const existingPrintDiv = document.getElementById('printIdentificationDiv');
+        if (existingPrintDiv) {
+            existingPrintDiv.remove();
+        }
+
+        // Cria o container de impressão
+        const printDiv = document.createElement('div');
+        printDiv.id = 'printIdentificationDiv';
+        
+        let etiquetasHtml = `
+            <style>
+                @media print {
+                    * {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        box-sizing: border-box !important;
+                        -webkit-print-color-adjust: exact !important;
+                        color-adjust: exact !important;
+                    }
+                    
+                    @page {
+                        size: A4 landscape;
+                        margin: 0;
+                    }
+                    
+                    body * {
+                        visibility: hidden !important;
+                    }
+                    
+                    #printIdentificationDiv,
+                    #printIdentificationDiv * {
+                        visibility: visible !important;
+                    }
+                    
+                    #printIdentificationDiv {
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        overflow: visible !important;
+                        z-index: 9999 !important;
+                    }
+                    
+                    .etiqueta-page {
+                        width: 297mm !important;
+                        height: 210mm !important;
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: white !important;
+                        position: relative !important;
+                        box-sizing: border-box !important;
+                        page-break-after: always !important;
+                        page-break-inside: avoid !important;
+                    }
+                    
+                    .etiqueta-page:last-child {
+                        page-break-after: auto !important;
+                    }
+                    
+                    .etiqueta-container {
+                        text-align: center !important;
+                        font-family: Arial, sans-serif !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        justify-content: center !important;
+                        align-items: center !important;
+                        padding: 5mm !important; 
+                        box-sizing: border-box !important;
+                    }
+                    
+                    .etiqueta-quadro {
+                        border: 3px solid #999 !important;
+                        padding: 20mm 15mm !important; 
+                        background: white !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        border-radius: 20px !important;
+                        box-shadow: inset 0 0 0 2px #ccc !important;
+                        box-sizing: border-box !important;
+                    }
+                    
+                    .etiqueta-numero {
+                        font-size: 100px !important;
+                        font-weight: 900 !important;
+                        color: #000 !important;
+                        margin: 0 !important;
+                        line-height: 0.9 !important;
+                        letter-spacing: 3px !important;
+                        text-transform: uppercase !important;
+                    }
+                    
+                    .etiqueta-info {
+                        font-size: 76px !important; 
+                        font-weight: 700 !important;
+                        color: #333 !important;
+                        margin: 0 !important;
+                        line-height: 1.1 !important;
+                        letter-spacing: 3px !important;
+                        text-transform: uppercase !important;
+                    }
+                    
+                    .etiqueta-data {
+                        font-size: 60px !important;
+                        font-weight: 700 !important;
+                        color: #000 !important;
+                        margin: 0 !important;
+                        line-height: 1 !important;
+                        letter-spacing: 3px !important;
+                    }
+                    
+                    .etiqueta-contador {
+                        font-size: 110px !important;
+                        font-weight: 900 !important;
+                        color: #000 !important;
+                        border: 3px solid #999 !important;
+                        padding: 25px 50px !important;
+                        margin: 0 !important;
+                        line-height: 1 !important;
+                        display: inline-block !important;
+                        border-radius: 15px !important;
+                        background: #f0f0f0 !important;
+                        letter-spacing: 4px !important;
+                        box-shadow: inset 0 0 0 2px #ccc !important;
+                        margin-bottom: 25px !important;
+                    }
+                    
+                    .etiqueta-lojas {
+                        font-size: 42px !important;
+                        font-weight: 700 !important;
+                        color: #000 !important;
+                        margin: 0 !important;
+                        line-height: 1.2 !important;
+                        text-align: center !important;
+                        max-width: 100% !important;
+                        word-wrap: break-word !important;
+                        text-transform: uppercase !important;
+                        letter-spacing: 2px !important;
+                    }
+
+                    hr.etiqueta-divider {
+                        border: none !important;
+                        border-top: 2px solid #999 !important;
+                        width: 90% !important;
+                        margin: 25px auto !important;
+                        opacity: 1 !important;
+                    }
+                }
+                
+                @media screen {
+                    #printIdentificationDiv {
+                        display: none;
+                    }
+                }
+            </style>
+        `;
+        
+        const filial = selectedFilial;
+        
+        // Para cada item/loja da expedição, gerar suas etiquetas separadamente
+        for (const item of items) {
+            const loja = lojas.find(l => l.id === item.loja_id);
+            if (!loja) continue;
+            
+            const lojaInfo = `${loja.codigo} - ${loja.nome}`;
+            // A quantidade total de etiquetas é a soma de Pallets e RollTrainers
+            const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
+            
+            // Criar etiquetas para esta loja específica
+            for (let i = 1; i <= totalItensLoja; i++) {
+                etiquetasHtml += `
+                    <div class="etiqueta-page">
+                        <div class="etiqueta-container">
+                            <div class="etiqueta-quadro">
+                                <div class="etiqueta-numero">${lojaInfo}</div>
+                                <hr class="etiqueta-divider">
+                                <div class="etiqueta-data">${loja.endereco_completo || 'Endereço não informado'}</div>
+                                <hr class="etiqueta-divider">
+                                <div class="etiqueta-contador">${String(i).padStart(2, '0')}/${String(totalItensLoja).padStart(2, '0')}</div>
+                                <hr class="etiqueta-divider">
+                                <div class="etiqueta-lojas">LÍDER: ${liderNome}</div>
+                                <hr class="etiqueta-divider">
+                                <div class="etiqueta-info">CD ${filial.nome} - ${filial.descricao}</div>
+                                <div class="text-xs text-gray-500 mt-4">Carga: ${numeroCarga} | Expedição: ${expeditionId} | Data: ${dataFormatada}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        printDiv.innerHTML = etiquetasHtml;
+        document.body.appendChild(printDiv);
+        
+        showNotification(lojaId ? `Preparando impressão para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressão de todas as etiquetas.', 'info');
+        
+        // Imprime
+        setTimeout(() => {
+            window.print();
+            // Remove o div após a impressão
+            setTimeout(() => {
+                if (document.getElementById('printIdentificationDiv')) {
+                    document.getElementById('printIdentificationDiv').remove();
+                }
+            }, 2000);
+        }, 500);
+        
+    } catch (error) {
+        console.error('Erro ao buscar dados para impressão:', error);
+        showNotification('Erro ao carregar dados para impressão: ' + error.message, 'error');
+    }
+}
+
+// NOVA FUNÇÃO: Checa e controla a visibilidade do link "Trocar Filial"
+function toggleFilialLinkVisibility() {
+    const link = document.getElementById('trocarFilialLink');
+    if (!link) return;
+
+    // 1. Identifica todas as filiais permitidas para o usuário
+    const allowedFiliais = filiais.filter(f => hasPermission(`acesso_filial_${f.nome}`));
+
+    // 2. Torna o link visível se o usuário puder acessar mais de uma filial (SUA REGRA)
+    if (allowedFiliais.length > 1) {
+        link.style.display = 'flex'; // Torna visível (usando 'flex' para manter o layout do nav-item)
+    } else {
+        link.style.display = 'none'; // Esconde o link
+    }
+}
+
+// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
+
+// ... (Adicionar no final do arquivo)
+
+// ========================================
+// NOVAS FUNÇÕES DE CONTROLE (LOGOUT / REFRESH)
+// ========================================
+
+/**
+ * Força a atualização de todos os dados da view ativa e recarrega selects.
+ */
+async function forceRefresh() {
+    showNotification('Atualizando dados e selects...', 'info');
+    
+    // 1. Recarrega dados estáticos (Lojas, Veículos, etc.)
+    await loadSelectData();
+
+    // 2. Garante que a view atual seja recarregada
+    const activeNavItem = document.querySelector('.nav-item.active');
+    const activeViewId = activeNavItem ? activeNavItem.getAttribute('href').substring(1) : 'home';
+    
+    // Chamamos showView novamente para recarregar os dados da aba ativa
+    // Passamos o elemento ativo para que o showView não mude o foco
+    showView(activeViewId, activeNavItem); 
+    
+    showNotification('Dados atualizados com sucesso!', 'success');
+}
+
+
+/**
+ * Desloga o usuário e volta para a tela de autenticação inicial.
+ */
+function logOut() {
+    // 1. Limpa o estado global
+    selectedFilial = null;
+    currentUser = null;
+    userPermissions = [];
+    masterUserPermission = false;
+    
+    // 2. Limpa timers
+    if (rastreioTimer) clearInterval(rastreioTimer);
+    if (homeMapTimer) clearInterval(homeMapTimer);
+    Object.values(activeTimers).forEach(clearInterval);
+    activeTimers = {};
+    
+    // 3. Oculta telas do sistema
+    document.getElementById('mainSystem').style.display = 'none';
+    document.getElementById('filialSelectionContainer').style.display = 'none';
+
+    // 4. Exibe a tela de login inicial
+    document.getElementById('initialAuthContainer').style.display = 'flex';
+    document.getElementById('initialLoginForm').reset();
+    document.getElementById('initialLoginAlert').innerHTML = '';
+
+    showNotification('Sessão encerrada.', 'info');
 }
