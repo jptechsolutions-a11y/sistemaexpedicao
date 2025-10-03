@@ -2618,7 +2618,9 @@ async function loadFaturamento() {
     }
 }
 
-       function renderFaturamentoList(expeditionsList) {
+      // Substitua a função renderFaturamentoList existente por esta
+
+function renderFaturamentoList(expeditionsList) {
     const container = document.getElementById('faturamentoList');
 
     if (expeditionsList.length === 0) {
@@ -2627,39 +2629,39 @@ async function loadFaturamento() {
     }
 
     container.innerHTML = expeditionsList.map(exp => {
-        // Usa a data de saída do veículo (fim do carregamento) se existir, senão usa a data de criação
         const carregadoEm = exp.data_saida_veiculo ? new Date(exp.data_saida_veiculo) : new Date(exp.data_hora);
         const tempoEspera = Math.round((new Date() - carregadoEm) / 60000);
         
         let actionButtons = '', statusInfo = '';
         
-        // 1. STATUS DE CARREGAMENTO (permissão para faturar antecipadamente)
-        if (exp.status === 'em_carregamento') {
-            statusInfo = `<div class="text-gray-600 font-semibold mb-2">🚚 Carregando (Permite Faturamento Antecipado)</div>`;
-            actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento (Antecipado)</button>`;
-        } else if (exp.status === 'carregado' || exp.status === 'aguardando_faturamento') {
-            // 2. STATUS DE PRONTO PARA FATURAR
-            statusInfo = `<div class="text-blue-600 font-semibold mb-2">📄 Pronto para iniciar faturamento</div>`;
+        // Lógica de Status Aprimorada
+        // ESTADO FINAL: Ambos concluídos
+        if (exp.status === 'faturado' && exp.data_saida_veiculo) {
+            statusInfo = `<div class="text-green-600 font-semibold mb-2">✅ Carregado e Faturado</div>`;
+            actionButtons = `<button class="btn btn-warning" onclick="marcarSaiuEntrega('${exp.id}')">Marcar Saída</button>`;
+        }
+        // CASO 1: Faturado, mas aguardando fim do carregamento
+        else if (exp.status === 'faturado' && !exp.data_saida_veiculo) {
+            statusInfo = `<div class="text-blue-600 font-semibold mb-2">✅ Faturado (Aguardando Fim do Carregamento)</div>`;
+            actionButtons = `<button class="btn btn-secondary" disabled title="Finalize o carregamento na tela de Motoristas para liberar a saída">Aguardando Carregamento</button>`;
+        }
+        // CASO 2: Carregado, mas aguardando faturamento
+        else if (exp.status === 'carregado' || exp.status === 'aguardando_faturamento') {
+            statusInfo = `<div class="text-blue-600 font-semibold mb-2">🚚 Carregado (Aguardando Faturamento)</div>`;
             actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento</button>`;
-        } else if (exp.status === 'faturamento_iniciado' || exp.status === 'em_carregamento_faturando') { 
-            // 3. STATUS DE FATURANDO (Inclui o status combinado)
+        }
+        // CASO 3: Faturamento em andamento (com ou sem carregamento simultâneo)
+        else if (exp.status === 'faturamento_iniciado' || exp.status === 'em_carregamento_faturando') {
             const iniciadoEm = exp.data_inicio_faturamento ? new Date(exp.data_inicio_faturamento) : null;
             const tempoFaturamento = iniciadoEm ? Math.round((new Date() - iniciadoEm) / 60000) : 0;
-            
-            const faturandoTexto = exp.status === 'em_carregamento_faturando' ? 'Carregando/Faturando' : 'Faturamento em andamento';
+            const faturandoTexto = exp.status === 'em_carregamento_faturando' ? 'Carregando e Faturando' : 'Faturamento em andamento';
             statusInfo = `<div class="text-yellow-600 font-semibold mb-2">📄 ${faturandoTexto} há ${minutesToHHMM(tempoFaturamento)}</div>`;
             actionButtons = `<button class="btn btn-primary" onclick="finalizarFaturamento('${exp.id}')">Finalizar Faturamento</button>`;
-        } else if (exp.status === 'faturado') {
-            // 4. STATUS FATURADO (Com bloqueio de saída)
-            statusInfo = `<div class="text-green-600 font-semibold mb-2">✅ Faturado</div>`;
-            
-            // AJUSTE CRÍTICO: 'Marcar Saída' liberado apenas se carregamento finalizado (`data_saida_veiculo` presente)
-            if (exp.data_saida_veiculo) {
-                actionButtons = `<button class="btn btn-warning" onclick="marcarSaiuEntrega('${exp.id}')">Marcar Saída</button>`;
-            } else {
-                // Botão desabilitado com dica, forçando a finalização do carregamento antes de liberar a saída.
-                actionButtons = `<button class="btn btn-secondary" disabled title="Aguardando Finalização do Carregamento (data_saida_veiculo)">Marcar Saída</button>`;
-            }
+        }
+        // CASO 4: Apenas carregando (faturamento ainda não iniciado)
+        else if (exp.status === 'em_carregamento') {
+            statusInfo = `<div class="text-gray-600 font-semibold mb-2">🚚 Carregando...</div>`;
+            actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento (Antecipado)</button>`;
         }
 
         return `
@@ -3774,8 +3776,47 @@ function renderMotoristaRankingChart(motoristasData) {
             }
         }
 
-        async function startLoading(expeditionId) { /* ... */ }
-        async function finishLoading(expeditionId) { /* ... */ }
+       
+       // Adicione esta nova função ao seu arquivo script.js
+
+async function finishLoading(expeditionId) {
+    try {
+        // 1. Pega o status atual da expedição antes de fazer qualquer alteração
+        const [currentExp] = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=status`);
+        if (!currentExp) {
+            throw new Error('Expedição não encontrada.');
+        }
+
+        const updateData = {
+            data_saida_veiculo: new Date().toISOString()
+        };
+
+        // 2. Lógica principal: Decide o novo status com base no estado atual
+        // Se o faturamento JÁ terminou (status 'faturado'), NÃO mude o status.
+        // Apenas registre a data de fim do carregamento. A interface irá combinar os dois estados para liberar a saída.
+        if (currentExp.status === 'faturado') {
+            // O status permanece 'faturado'. A UI combinará isso com a nova 'data_saida_veiculo'.
+        } else {
+            // Se o faturamento ainda não terminou, o novo status é 'carregado', indicando que agora aguarda o faturamento.
+            updateData.status = 'carregado';
+        }
+
+        await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', updateData);
+        showNotification('Carregamento finalizado com sucesso!', 'success');
+
+        // Recarrega a view ativa para refletir a mudança
+        if (document.getElementById('motoristas').classList.contains('active')) {
+             consultarExpedicoesPorPlaca();
+        } else if (document.getElementById('acompanhamento').classList.contains('active')) {
+            loadAcompanhamento();
+        } else if (document.getElementById('faturamento').classList.contains('active')) {
+            loadFaturamento();
+        }
+
+    } catch (error) {
+        showNotification('Erro ao finalizar carregamento: ' + error.message, 'error');
+    }
+}
 
         async function iniciarDescarga(itemId) {
             try {
