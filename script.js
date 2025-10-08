@@ -9831,6 +9831,8 @@ async function handleChatCommand(command) {
     await supabaseRequest('chat_messages', 'POST', messageData, false);
 }
 
+// Em script.js, SUBSTITUA esta função
+
 function subscribeToFilialMessages() {
     if (chatRealtimeSubscription) {
         chatRealtimeSubscription.unsubscribe();
@@ -9844,9 +9846,10 @@ function subscribeToFilialMessages() {
         interval: setInterval(async () => {
             if (!currentUser || !selectedFilial) return;
 
-            // *** CORREÇÃO DO TIMESTAMP APLICADA AQUI ***
-            const safeTimestamp = lastMessageTimestamp.split('.')[0]; // Remove milissegundos e timezone
-            const encodedTimestamp = encodeURIComponent(safeTimestamp);
+            // *** CORREÇÃO APLICADA AQUI ***
+            // Agora usamos o timestamp completo, apenas garantindo que ele seja
+            // codificado para a URL, o que resolve o problema de repetição.
+            const encodedTimestamp = encodeURIComponent(lastMessageTimestamp);
             
             const newMessages = await supabaseRequest(
                 `chat_messages?filial_nome=eq.${selectedFilial.nome}&created_at=gt.${encodedTimestamp}&select=*,acessos(nome)`, 
@@ -9854,13 +9857,17 @@ function subscribeToFilialMessages() {
             );
 
             if (newMessages && newMessages.length > 0) {
+                // Atualiza o timestamp para a data/hora da mensagem mais recente recebida
                 lastMessageTimestamp = newMessages[newMessages.length - 1].created_at;
+
                 const incomingMessages = newMessages.filter(msg => msg.user_id !== currentUser.id);
 
                 if (incomingMessages.length > 0) {
+                    // Renderiza as mensagens recebidas se o canal estiver aberto
                     if (currentChatChannelId && incomingMessages.some(m => m.channel_id === currentChatChannelId)) {
                         renderMessages(incomingMessages.filter(m => m.channel_id === currentChatChannelId), true);
                     }
+                    // Mostra notificação se o chat estiver fechado
                     if (!chatIsOpen) {
                         document.getElementById('chat-notification-dot').style.display = 'block';
                         const lastIncoming = incomingMessages[incomingMessages.length - 1];
@@ -9870,13 +9877,13 @@ function subscribeToFilialMessages() {
                     }
                 }
                 
-                // Renderiza as próprias mensagens sem notificar
+                // Renderiza as próprias mensagens (as que você envia) sem notificar
                 const myMessages = newMessages.filter(msg => msg.user_id === currentUser.id);
                 if (currentChatChannelId && myMessages.some(m => m.channel_id === currentChatChannelId)) {
                     renderMessages(myMessages.filter(m => m.channel_id === currentChatChannelId), true);
                 }
             }
-        }, 7000),
+        }, 7000), // A verificação continua a cada 7 segundos
         unsubscribe: function() { clearInterval(this.interval); }
     };
 }
