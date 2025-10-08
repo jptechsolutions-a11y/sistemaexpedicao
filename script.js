@@ -9598,3 +9598,312 @@ function logOut() {
 
     showNotification('Sessão encerrada.', 'info');
 }
+
+// Adicionar todo este bloco no final de script.js
+
+// ========================================
+// === LÓGICA DO CHAT DE COMUNICAÇÃO ======
+// ========================================
+
+// Variáveis globais do Chat
+let chatIsOpen = false;
+let allChatUsers = [];
+let allChatGroups = [];
+let currentChatChannelId = null;
+let chatRealtimeSubscription = null;
+
+// Inicialização dos elementos do Chat
+document.addEventListener('DOMContentLoaded', () => {
+    const fab = document.getElementById('chat-fab');
+    const closeBtn = document.getElementById('close-chat-btn');
+    const sendBtn = document.getElementById('chat-send-btn');
+    const messageInput = document.getElementById('chat-message-input');
+    const newDmBtn = document.getElementById('new-dm-btn');
+
+    if (fab) fab.addEventListener('click', toggleChatWindow);
+    if (closeBtn) closeBtn.addEventListener('click', toggleChatWindow);
+    if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+    if (messageInput) messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    if (newDmBtn) newDmBtn.addEventListener('click', openNewDmModal);
+});
+
+async function toggleChatWindow() {
+    const chatWindow = document.getElementById('chat-window');
+    chatIsOpen = !chatIsOpen;
+    chatWindow.classList.toggle('open', chatIsOpen);
+
+    if (chatIsOpen && !currentChatChannelId) {
+        // Se está abrindo pela primeira vez na sessão, carrega os dados
+        await initializeChat();
+    }
+    feather.replace(); // Redesenha os ícones
+}
+
+async function initializeChat() {
+    if (!currentUser) {
+        showNotification("Faça login para usar o chat.", "error");
+        return;
+    }
+
+    // Carrega o nome do usuário no perfil do chat
+    document.getElementById('chat-current-user-name').textContent = currentUser.nome;
+
+    try {
+        // Carrega usuários e grupos para menções
+        const [usersData, groupsData] = await Promise.all([
+            supabaseRequest('acessos?select=id,nome', 'GET', null, false),
+            supabaseRequest('grupos_acesso?select=id,nome', 'GET', null, false)
+        ]);
+        allChatUsers = usersData || [];
+        allChatGroups = groupsData || [];
+        
+        // Carrega os canais do usuário
+        await loadChatChannels();
+
+    } catch (error) {
+        console.error("Erro ao inicializar o chat:", error);
+        showNotification("Não foi possível carregar os dados do chat.", "error");
+    }
+}
+
+async function loadChatChannels() {
+    const channelsList = document.getElementById('chat-channels-list');
+    channelsList.innerHTML = '<div class="loading">Carregando...</div>';
+
+    try {
+        // Busca todos os canais (simplificado, em produção, buscaria apenas os do usuário)
+        const channels = await supabaseRequest('chat_channels?order=last_message_at.desc', 'GET', null, false);
+        
+        let html = '';
+        channels.forEach(channel => {
+            html += `
+                <div class="channel-item" data-channel-id="${channel.id}" onclick="selectChannel('${channel.id}', '${channel.name}')">
+                    <span>${channel.is_direct_message ? '👤' : '#'}</span>
+                    ${channel.name}
+                </div>
+            `;
+        });
+        channelsList.innerHTML = html;
+
+        // Auto-seleciona o canal #geral se existir
+        const generalChannel = channels.find(c => c.name === 'geral' && !c.is_direct_message);
+        if (generalChannel) {
+            selectChannel(generalChannel.id, generalChannel.name);
+        }
+
+    } catch (error) {
+        channelsList.innerHTML = '<div class="alert alert-error">Erro ao carregar canais.</div>';
+    }
+}
+
+async function selectChannel(channelId, channelName) {
+    currentChatChannelId = channelId;
+    document.getElementById('chat-channel-name').textContent = channelName;
+
+    // Remove a classe 'active' de todos os itens e adiciona ao selecionado
+    document.querySelectorAll('.channel-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.channelId === channelId);
+    });
+
+    await loadMessagesForChannel(channelId);
+    subscribeToChannelMessages(channelId);
+}
+
+async function loadMessagesForChannel(channelId) {
+    const messagesContainer = document.getElementById('chat-messages');
+    messagesContainer.innerHTML = '<div class="loading">Carregando mensagens...</div>';
+
+    try {
+        // Busca mensagens com nome do usuário
+        const messages = await supabaseRequest(`chat_messages?channel_id=eq.${channelId}&select=*,acessos(nome)&order=created_at.asc`, 'GET', null, false);
+        renderMessages(messages, false);
+
+    } catch (error) {
+        messagesContainer.innerHTML = '<div class="alert alert-error">Erro ao carregar mensagens.</div>';
+    }
+}
+
+function renderMessages(messages, append = false) {
+    const messagesContainer = document.getElementById('chat-messages');
+    if (!append) {
+        messagesContainer.innerHTML = '';
+    }
+
+    messages.forEach(msg => {
+        const isCurrentUser = msg.user_id === currentUser.id;
+        const senderName = msg.acessos ? msg.acessos.nome : 'Sistema';
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${isCurrentUser ? 'current-user' : ''} ${msg.message_type === 'system' ? 'system' : ''}`;
+        messageDiv.innerHTML = `
+            <div class="chat-message-content">
+                ${!isCurrentUser && msg.message_type !== 'system' ? `<div class="chat-message-header">${senderName}</div>` : ''}
+                <div class="chat-message-text">${formatMessageContent(msg.content)}</div>
+                <div class="chat-message-time">${new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+            </div>
+        `;
+        messagesContainer.appendChild(messageDiv);
+    });
+
+    // Rola para a mensagem mais recente
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function formatMessageContent(content) {
+    // Transforma menções em texto destacado
+    return content.replace(/@\[(.*?)\]\((.*?)\)/g, '<span class="mention">@$1</span>');
+}
+
+async function sendMessage() {
+    const input = document.getElementById('chat-message-input');
+    let content = input.value.trim();
+
+    if (!content || !currentChatChannelId) {
+        return;
+    }
+    
+    // Verifica se é um comando especial
+    if (content.startsWith('/')) {
+        await handleChatCommand(content);
+        input.value = '';
+        return;
+    }
+    
+    const messageData = {
+        channel_id: currentChatChannelId,
+        user_id: currentUser.id,
+        content: content
+    };
+
+    try {
+        await supabaseRequest('chat_messages', 'POST', messageData, false);
+        input.value = '';
+    } catch (error) {
+        showNotification("Erro ao enviar mensagem.", "error");
+    }
+}
+
+async function handleChatCommand(command) {
+    const messagesContainer = document.getElementById('chat-messages');
+    let systemMessage = '';
+
+    if (command === '/cargas') {
+        systemMessage = 'Gerando resumo de cargas...';
+        const expeditions = await supabaseRequest('expeditions?status=not.eq.entregue&order=data_hora.desc');
+        if (!expeditions || expeditions.length === 0) {
+            systemMessage = '**Resumo de Cargas:**\nNenhuma expedição ativa no momento.';
+        } else {
+            systemMessage = '**Resumo de Cargas Ativas:**\n\n';
+            expeditions.forEach(exp => {
+                const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
+                systemMessage += `- **Placa:** ${veiculo?.placa || 'N/A'} | **Status:** ${getStatusLabel(exp.status)}\n`;
+            });
+        }
+
+    } else if (command === '/frota') {
+        systemMessage = 'Gerando resumo da frota...';
+        const disponiveis = motoristas.filter(m => m.status === 'disponivel').length;
+        const emViagem = motoristas.filter(m => ['em_viagem', 'saiu_para_entrega'].includes(m.status)).length;
+        const retornando = motoristas.filter(m => ['retornando_cd', 'retornando_com_imobilizado'].includes(m.status)).length;
+        
+        systemMessage = `**Status da Frota (Motoristas):**\n- ✅ Disponíveis: ${disponiveis}\n- 🚚 Em Viagem: ${emViagem}\n- ↩️ Retornando: ${retornando}`;
+
+    } else {
+        systemMessage = `Comando desconhecido: "${command}"`;
+    }
+
+    // Envia a mensagem como sistema
+    const messageData = {
+        channel_id: currentChatChannelId,
+        user_id: currentUser.id, // Pode ser null se o RLS permitir
+        content: systemMessage,
+        message_type: 'system'
+    };
+    await supabaseRequest('chat_messages', 'POST', messageData, false);
+}
+
+
+function subscribeToChannelMessages(channelId) {
+    // Cancela a inscrição anterior para evitar múltiplas conexões
+    if (chatRealtimeSubscription) {
+        chatRealtimeSubscription.unsubscribe();
+    }
+
+    const subscriptionPayload = {
+        table: 'chat_messages',
+        filter: `channel_id=eq.${channelId}`
+    };
+
+    // Lógica simulada de "escuta". Em uma implementação real, você usaria a biblioteca do Supabase
+    // Ex: supabase.channel(...).on(...).subscribe()
+    console.log(`(Simulação) Inscrito para novas mensagens no canal ${channelId}.`);
+    
+    // Para fins de demonstração, vamos verificar por novas mensagens a cada 5 segundos
+    chatRealtimeSubscription = {
+        interval: setInterval(async () => {
+            const lastMessageTime = new Date(Date.now() - 6000).toISOString();
+            const newMessages = await supabaseRequest(`chat_messages?channel_id=eq.${channelId}&created_at=gt.${lastMessageTime}&select=*,acessos(nome)`, 'GET', null, false);
+            if(newMessages && newMessages.length > 0){
+                renderMessages(newMessages, true);
+            }
+        }, 5000),
+        unsubscribe: function() { clearInterval(this.interval); }
+    };
+}
+
+
+// Funções para Mensagens Diretas (DM)
+function openNewDmModal() {
+    const select = document.getElementById('dmUserSelect');
+    select.innerHTML = '<option value="">Selecione...</option>';
+    allChatUsers.forEach(user => {
+        // Não deixa o usuário iniciar uma conversa consigo mesmo
+        if (user.id !== currentUser.id) {
+            select.innerHTML += `<option value="${user.id}">${user.nome}</option>`;
+        }
+    });
+    document.getElementById('newDmModal').style.display = 'flex';
+}
+
+function closeNewDmModal() {
+    document.getElementById('newDmModal').style.display = 'none';
+}
+
+async function startDirectMessage() {
+    const selectedUserId = document.getElementById('dmUserSelect').value;
+    if (!selectedUserId) return;
+    
+    const selectedUser = allChatUsers.find(u => u.id == selectedUserId);
+    if (!selectedUser) return;
+    
+    // Lógica para criar ou encontrar um canal de DM
+    // Por simplicidade, vamos criar um novo canal sempre (em produção, você verificaria se já existe)
+    try {
+        const channelName = `DM: ${currentUser.nome} & ${selectedUser.nome}`;
+        const channelData = {
+            name: channelName,
+            is_direct_message: true
+        };
+        const newChannel = await supabaseRequest('chat_channels', 'POST', channelData, false);
+        const newChannelId = newChannel[0].id;
+        
+        // Adicionar ambos os usuários como membros
+        await supabaseRequest('channel_members', 'POST', [
+            { channel_id: newChannelId, user_id: currentUser.id },
+            { channel_id: newChannelId, user_id: selectedUserId }
+        ], false);
+
+        showNotification(`Conversa com ${selectedUser.nome} iniciada!`, 'success');
+        closeNewDmModal();
+        await loadChatChannels(); // Recarrega a lista de canais
+        selectChannel(newChannelId, selectedUser.nome); // Abre o novo canal
+
+    } catch(error) {
+        showNotification("Erro ao criar conversa.", "error");
+    }
+}
