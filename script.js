@@ -458,14 +458,10 @@ async function loadFiliais() {
 }
 
 
-// SUBSTITUIR A FUNÇÃO selectFilial COMPLETA
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
+// Em script.js, SUBSTITUA esta função
 
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
-
-// SUBSTITUIR A FUNÇÃO selectFilial COMPLETA (ADICIONANDO A CHAMADA NO FINAL)
 async function selectFilial(filial) {
-    // Verificar permissão para a filial
+    // Verificar permissão para la filial
     if (!hasPermission(`acesso_filial_${filial.nome}`)) {
         showNotification('Você não tem permissão para acessar esta filial.', 'error');
         return;
@@ -499,13 +495,8 @@ async function selectFilial(filial) {
         // Mostra a primeira aba permitida
         const firstNavItem = document.querySelector(`.nav-item[href="#${firstPermittedViewId}"]`);
         
-        // NOVO AJUSTE: Se a aba principal for carregada, mas todas as sub-abas forem filtradas,
-        // garantimos que o conteúdo da aba principal (que agora é o container de sub-abas)
-        // ainda mostre alguma mensagem se necessário.
-        
         showView(firstPermittedViewId, firstNavItem);
         
-        // Configura o refresh automático da Home (se for a primeira aba permitida)
         if (firstPermittedViewId === 'home') {
              setTimeout(() => {
                 const homeAutoRefreshCheckbox = document.getElementById('homeAutoRefresh');
@@ -520,10 +511,12 @@ async function selectFilial(filial) {
         // Se não houver nenhuma permissão de aba (erro de acesso final)
         document.getElementById('home').classList.add('active'); // Garante que a div está visível
         document.getElementById('home').innerHTML = '<div class="alert alert-error">Seu grupo de acesso não possui permissão para visualizar nenhuma aba. Contate o administrador.</div>';
-     document.getElementById('chat-fab').style.display = 'flex';
     }
     
     showNotification(`Bem-vindo à filial: ${selectedFilial.nome}!`, 'success');
+    
+    // CORREÇÃO: MOVIDO PARA O FINAL DA FUNÇÃO PARA EXECUTAR SEMPRE
+    document.getElementById('chat-fab').style.display = 'flex';
     
     // 🚨 CHAMADA FINAL PARA GARANTIR VISIBILIDADE 🚨
     toggleFilialLinkVisibility();
