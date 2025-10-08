@@ -9631,7 +9631,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.addEventListener('keyup', handleMentionInput);
     }
     if (newDmBtn) newDmBtn.addEventListener('click', openNewDmModal);
-    if (logoutChatBtn) logoutChatBtn.addEventListener('click', logOut); // Adiciona logout pelo chat
+    if (logoutChatBtn) logoutChatBtn.addEventListener('click', logOut);
 });
 
 async function toggleChatWindow() {
@@ -9667,6 +9667,9 @@ async function initializeChat() {
         await ensureGeneralChannelExists();
         
         await loadChatChannels();
+
+        // Inicia a escuta de novas mensagens em todos os canais
+        subscribeToAllMessages(); 
     } catch (error) {
         console.error("Erro ao inicializar o chat:", error);
         showNotification("Não foi possível carregar os dados do chat.", "error");
@@ -9686,7 +9689,6 @@ async function ensureGeneralChannelExists() {
         const newChannel = await supabaseRequest('chat_channels', 'POST', { name: 'geral', is_direct_message: false }, false);
         const newChannelId = newChannel[0].id;
 
-        // Adiciona todos os usuários como membros
         const allUsers = await supabaseRequest('acessos?select=id', 'GET', null, false);
         const membersToAdd = allUsers.map(user => ({ channel_id: newChannelId, user_id: user.id }));
 
@@ -9729,20 +9731,19 @@ async function selectChannel(channelId, channelName) {
     });
 
     await loadMessagesForChannel(channelId);
-    if (!chatRealtimeSubscription) {
-         subscribeToAllMessages(); // Inicia a escuta global se ainda não estiver ativa
-    }
 }
 
 async function loadMessagesForChannel(channelId) {
     const messagesContainer = document.getElementById('chat-messages');
-    messagesContainer.innerHTML = '<div class="loading">Carregando...</div>';
+    messagesContainer.innerHTML = '<div class="loading">Carregando mensagens...</div>';
     try {
         const messages = await supabaseRequest(`chat_messages?channel_id=eq.${channelId}&select=*,acessos(nome)&order=created_at.asc`, 'GET', null, false);
         renderMessages(messages, false);
-        // Atualiza o timestamp da última mensagem carregada
         if (messages.length > 0) {
-            lastMessageTimestamp = messages[messages.length - 1].created_at;
+            const latestTimestamp = messages[messages.length - 1].created_at;
+            if (new Date(latestTimestamp) > new Date(lastMessageTimestamp)) {
+                lastMessageTimestamp = latestTimestamp;
+            }
         }
     } catch (error) {
         messagesContainer.innerHTML = '<div class="alert alert-error">Erro ao carregar mensagens.</div>';
@@ -9771,7 +9772,6 @@ function renderMessages(messages, append = false) {
 }
 
 function formatMessageContent(content) {
-    // Escapa HTML para segurança e depois formata as menções
     const escapedContent = content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return escapedContent.replace(/@\[(.*?)\]\((.*?)\)/g, '<span class="mention">@$1</span>');
 }
@@ -9832,42 +9832,42 @@ async function handleChatCommand(command) {
     await supabaseRequest('chat_messages', 'POST', messageData, false);
 }
 
-// CORREÇÃO: Escuta global para notificações
+// CORREÇÃO: Escuta global de mensagens com encodeURIComponent
 function subscribeToAllMessages() {
-    if (chatRealtimeSubscription) return;
+    if (chatRealtimeSubscription) {
+        chatRealtimeSubscription.unsubscribe();
+        chatRealtimeSubscription = null;
+    }
 
     console.log("(Simulação) Escuta global de mensagens iniciada.");
     
     chatRealtimeSubscription = {
         interval: setInterval(async () => {
-            if (!currentUser) return; // Não faz nada se o usuário deslogou
+            if (!currentUser) return;
 
-            // Busca mensagens mais recentes que a última MENSAGEM VISTA
+            // *** CORREÇÃO APLICADA AQUI ***
+            const encodedTimestamp = encodeURIComponent(lastMessageTimestamp);
+            
             const newMessages = await supabaseRequest(
-                `chat_messages?created_at=gt.${lastMessageTimestamp}&select=*,acessos(nome)`, 
+                `chat_messages?created_at=gt.${encodedTimestamp}&select=*,acessos(nome)`, 
                 'GET', null, false
             );
 
             if (newMessages && newMessages.length > 0) {
-                // Atualiza o timestamp para a mensagem mais recente recebida
                 lastMessageTimestamp = newMessages[newMessages.length - 1].created_at;
 
                 const incomingMessages = newMessages.filter(msg => msg.user_id !== currentUser.id);
                 const myMessages = newMessages.filter(msg => msg.user_id === currentUser.id);
 
-                // Renderiza minhas mensagens no canal ativo
-                if (myMessages.length > 0 && myMessages[0].channel_id === currentChatChannelId) {
-                    renderMessages(myMessages, true);
+                if (currentChatChannelId && myMessages.some(m => m.channel_id === currentChatChannelId)) {
+                    renderMessages(myMessages.filter(m => m.channel_id === currentChatChannelId), true);
                 }
 
                 if (incomingMessages.length > 0) {
-                    // Renderiza mensagens recebidas se o canal estiver ativo
-                    const messagesForCurrentChannel = incomingMessages.filter(msg => msg.channel_id === currentChatChannelId);
-                    if (messagesForCurrentChannel.length > 0) {
-                        renderMessages(messagesForCurrentChannel, true);
+                    if (currentChatChannelId && incomingMessages.some(m => m.channel_id === currentChatChannelId)) {
+                        renderMessages(incomingMessages.filter(m => m.channel_id === currentChatChannelId), true);
                     }
 
-                    // Mostra notificação para qualquer mensagem recebida se o chat estiver fechado
                     if (!chatIsOpen) {
                         document.getElementById('chat-notification-dot').style.display = 'block';
                         const lastIncoming = incomingMessages[incomingMessages.length - 1];
@@ -9877,7 +9877,7 @@ function subscribeToAllMessages() {
                     }
                 }
             }
-        }, 5000), // Verifica a cada 5 segundos
+        }, 5000),
         unsubscribe: function() { clearInterval(this.interval); }
     };
 }
@@ -9888,12 +9888,11 @@ function handleMentionInput(e) {
     const suggestionsBox = document.getElementById('mention-suggestions');
     const text = input.value;
     const cursorPos = input.selectionStart;
-
-    const atMatch = text.substring(0, cursorPos).match(/@(\w+)$/);
+    const atMatch = text.substring(0, cursorPos).match(/@(\w*)$/);
 
     if (atMatch) {
         const query = atMatch[1].toLowerCase();
-        const filteredUsers = allChatUsers.filter(u => u.nome.toLowerCase().includes(query));
+        const filteredUsers = allChatUsers.filter(u => u.nome.toLowerCase().includes(query) && u.id !== currentUser.id);
         
         if (filteredUsers.length > 0) {
             suggestionsBox.innerHTML = filteredUsers.map(u => 
@@ -9931,8 +9930,7 @@ function selectMention(name, id) {
     suggestionsBox.style.display = 'none';
 }
 
-
-// Funções para Mensagens Diretas (DM) - Sem alterações
+// --- Funções para Mensagens Diretas (DM) ---
 function openNewDmModal() {
     const select = document.getElementById('dmUserSelect');
     select.innerHTML = '<option value="">Selecione...</option>';
@@ -9955,7 +9953,6 @@ async function startDirectMessage() {
     if (!selectedUser) return;
 
     try {
-        // Lógica para encontrar ou criar canal de DM
         const channelName = `DM: ${currentUser.nome} & ${selectedUser.nome}`;
         const newChannel = await supabaseRequest('chat_channels', 'POST', { name: channelName, is_direct_message: true }, false);
         const newChannelId = newChannel[0].id;
