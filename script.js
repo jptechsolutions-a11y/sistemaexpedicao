@@ -9585,6 +9585,7 @@ function logOut() {
     document.getElementById('mainSystem').style.display = 'none';
     document.getElementById('filialSelectionContainer').style.display = 'none';
 
+    document.getElementById('chat-fab').style.display = 'none';
     // 4. Exibe a tela de login inicial
     document.getElementById('initialAuthContainer').style.display = 'flex';
     document.getElementById('initialLoginForm').reset();
