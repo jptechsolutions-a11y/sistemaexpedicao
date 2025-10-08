@@ -1397,3 +1397,36 @@ canvas#motoristasRankingChart {
     }
     #chat-sidebar { width: 150px; }
 }
+/* Em style.css, adicione 'display: none;' em #chat-fab */
+#chat-fab {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: var(--primary-gradient);
+    color: white;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0, 119, 182, 0.4);
+    z-index: 998;
+    transition: all 0.3s ease;
+    /* ADICIONE ESTA LINHA */
+    display: none;
+}
+/* Em style.css, adicione este novo bloco */
+
+/* === Ponto de Notificação do Chat === */
+#chat-notification-dot {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 12px;
+    height: 12px;
+    background-color: #D62828; /* Vermelho forte */
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 5px rgba(214, 40, 40, 0.7);
+}
