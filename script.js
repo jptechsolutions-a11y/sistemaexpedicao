@@ -9970,3 +9970,51 @@ async function startDirectMessage() {
         showNotification("Erro ao criar conversa.", "error");
     }
 }
+// Em script.js, SUBSTITUA a função subscribeToChannelMessages inteira
+
+function subscribeToChannelMessages(channelId) {
+    if (chatRealtimeSubscription) {
+        chatRealtimeSubscription.unsubscribe();
+    }
+
+    console.log(`(Simulação) Inscrito para novas mensagens no canal ${channelId}.`);
+    
+    chatRealtimeSubscription = {
+        interval: setInterval(async () => {
+            // Busca mensagens dos últimos 6 segundos para simular tempo real
+            const lastMessageTime = new Date(Date.now() - 6000).toISOString();
+            
+            // *** CORREÇÃO APLICADA AQUI ***
+            // Codifica o timestamp para garantir que caracteres como '+' sejam enviados corretamente.
+            const encodedTimestamp = encodeURIComponent(lastMessageTime);
+
+            const newMessages = await supabaseRequest(
+                `chat_messages?channel_id=eq.${channelId}&created_at=gt.${encodedTimestamp}&select=*,acessos(nome)`, 
+                'GET', null, false
+            );
+
+            if (newMessages && newMessages.length > 0) {
+                const incomingMessages = newMessages.filter(msg => msg.user_id !== currentUser.id);
+
+                if (incomingMessages.length > 0) {
+                    renderMessages(incomingMessages, true);
+
+                    if (!chatIsOpen) {
+                        document.getElementById('chat-notification-dot').style.display = 'block';
+                        
+                        incomingMessages.forEach(msg => {
+                            const senderName = msg.acessos ? msg.acessos.nome : 'Usuário';
+                            const snippet = msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
+                            showNotification(`<strong>${senderName}:</strong> ${snippet}`, 'info');
+                        });
+                    }
+                }
+                 const myMessages = newMessages.filter(msg => msg.user_id === currentUser.id);
+                 if (myMessages.length > 0) {
+                    renderMessages(myMessages, true);
+                 }
+            }
+        }, 5000),
+        unsubscribe: function() { clearInterval(this.interval); }
+    };
+}
