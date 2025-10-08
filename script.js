@@ -520,6 +520,7 @@ async function selectFilial(filial) {
         // Se não houver nenhuma permissão de aba (erro de acesso final)
         document.getElementById('home').classList.add('active'); // Garante que a div está visível
         document.getElementById('home').innerHTML = '<div class="alert alert-error">Seu grupo de acesso não possui permissão para visualizar nenhuma aba. Contate o administrador.</div>';
+     document.getElementById('chat-fab').style.display = 'flex';
     }
     
     showNotification(`Bem-vindo à filial: ${selectedFilial.nome}!`, 'success');
@@ -9632,15 +9633,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (newDmBtn) newDmBtn.addEventListener('click', openNewDmModal);
 });
 
+// Em script.js, ATUALIZE a função toggleChatWindow
+
 async function toggleChatWindow() {
     const chatWindow = document.getElementById('chat-window');
     chatIsOpen = !chatIsOpen;
     chatWindow.classList.toggle('open', chatIsOpen);
 
-    if (chatIsOpen && !currentChatChannelId) {
-        // Se está abrindo pela primeira vez na sessão, carrega os dados
-        await initializeChat();
+    // ADICIONE ESTE BLOCO 'IF'
+    if (chatIsOpen) {
+        // Esconde o ponto de notificação ao abrir a janela
+        document.getElementById('chat-notification-dot').style.display = 'none';
+
+        if (!currentChatChannelId) {
+            // Se está abrindo pela primeira vez, carrega os dados
+            await initializeChat();
+        }
     }
+    
     feather.replace(); // Redesenha os ícones
 }
 
@@ -9828,28 +9838,49 @@ async function handleChatCommand(command) {
 }
 
 
+// Em script.js, SUBSTITUA a função subscribeToChannelMessages inteira
+
 function subscribeToChannelMessages(channelId) {
-    // Cancela a inscrição anterior para evitar múltiplas conexões
     if (chatRealtimeSubscription) {
         chatRealtimeSubscription.unsubscribe();
     }
 
-    const subscriptionPayload = {
-        table: 'chat_messages',
-        filter: `channel_id=eq.${channelId}`
-    };
-
-    // Lógica simulada de "escuta". Em uma implementação real, você usaria a biblioteca do Supabase
-    // Ex: supabase.channel(...).on(...).subscribe()
     console.log(`(Simulação) Inscrito para novas mensagens no canal ${channelId}.`);
     
-    // Para fins de demonstração, vamos verificar por novas mensagens a cada 5 segundos
     chatRealtimeSubscription = {
         interval: setInterval(async () => {
+            // Busca mensagens dos últimos 6 segundos para simular tempo real
             const lastMessageTime = new Date(Date.now() - 6000).toISOString();
-            const newMessages = await supabaseRequest(`chat_messages?channel_id=eq.${channelId}&created_at=gt.${lastMessageTime}&select=*,acessos(nome)`, 'GET', null, false);
-            if(newMessages && newMessages.length > 0){
-                renderMessages(newMessages, true);
+            const newMessages = await supabaseRequest(
+                `chat_messages?channel_id=eq.${channelId}&created_at=gt.${lastMessageTime}&select=*,acessos(nome)`, 
+                'GET', null, false
+            );
+
+            if (newMessages && newMessages.length > 0) {
+                // Filtra mensagens que não são do usuário atual
+                const incomingMessages = newMessages.filter(msg => msg.user_id !== currentUser.id);
+
+                if (incomingMessages.length > 0) {
+                    // Renderiza as novas mensagens na janela de chat (mesmo que oculta)
+                    renderMessages(incomingMessages, true);
+
+                    // Se a janela do chat estiver fechada, mostra a notificação
+                    if (!chatIsOpen) {
+                        document.getElementById('chat-notification-dot').style.display = 'block';
+                        
+                        incomingMessages.forEach(msg => {
+                            const senderName = msg.acessos ? msg.acessos.nome : 'Usuário';
+                            // Limita o conteúdo da notificação para não ficar muito grande
+                            const snippet = msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
+                            showNotification(`<strong>${senderName}:</strong> ${snippet}`, 'info');
+                        });
+                    }
+                }
+                 // Renderiza as mensagens do próprio usuário sem notificação
+                 const myMessages = newMessages.filter(msg => msg.user_id === currentUser.id);
+                 if (myMessages.length > 0) {
+                    renderMessages(myMessages, true);
+                 }
             }
         }, 5000),
         unsubscribe: function() { clearInterval(this.interval); }
