@@ -499,6 +499,50 @@
     </script>  
 <script src="script.js"></script>
     <div id="notificationContainer"></div>
-    
+    <div id="chat-fab" class="no-print">
+    <i data-feather="message-square"></i>
+</div>
+
+<div id="chat-window" class="no-print">
+    <div id="chat-sidebar">
+        <div class="chat-header">
+            <h3>Canais</h3>
+            <button id="new-dm-btn" title="Nova Mensagem Direta">+</button>
+        </div>
+        <div id="chat-channels-list">
+            </div>
+        <div class="chat-user-profile">
+            <span id="chat-current-user-name"></span>
+            <i data-feather="log-out" id="chat-logout"></i>
+        </div>
+    </div>
+    <div id="chat-main">
+        <div id="chat-main-header">
+            <h3 id="chat-channel-name">Selecione um Canal</h3>
+            <button id="close-chat-btn">&times;</button>
+        </div>
+        <div id="chat-messages">
+            </div>
+        <div id="chat-input-area">
+            <div id="mention-suggestions"></div>
+            <textarea id="chat-message-input" placeholder="Digite sua mensagem..."></textarea>
+            <button id="chat-send-btn"><i data-feather="send"></i></button>
+        </div>
+    </div>
+</div>
+
+<div id="newDmModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 400px;">
+        <h3 class="text-xl font-semibold mb-4">Iniciar Conversa</h3>
+        <div class="form-group">
+            <label for="dmUserSelect">Selecione um usuário:</label>
+            <select id="dmUserSelect" class="w-full"></select>
+        </div>
+        <div class="flex gap-4 mt-6">
+            <button class="btn btn-primary flex-1" onclick="startDirectMessage()">Conversar</button>
+            <button class="btn btn-danger flex-1" onclick="closeNewDmModal()">Cancelar</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
