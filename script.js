@@ -3972,10 +3972,34 @@ async function loadAcompanhamento() {
         }
 
         function setDefaultDateFilters() {
-            const hoje = new Date().toISOString().split('T')[0];
-            document.getElementById('filtroDataInicio').value = hoje;
-            document.getElementById('filtroDataFim').value = hoje;
-        }
+    // Cria um formatador específico para obter ano, mês e dia no fuso de Brasília
+    const formatter = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+
+    // Obtém as partes da data atual formatadas para Brasília
+    const parts = formatter.formatToParts(new Date());
+    let year, month, day;
+    parts.forEach(part => {
+        if (part.type === 'year') year = part.value;
+        if (part.type === 'month') month = part.value;
+        if (part.type === 'day') day = part.value;
+    });
+
+    // Monta a string no formato YYYY-MM-DD
+    const hojeBrasilia = `${year}-${month}-${day}`;
+
+    // --- Aplica aos filtros da aba Acompanhamento ---
+    const filtroInicio = document.getElementById('filtroDataInicio');
+    const filtroFim = document.getElementById('filtroDataFim');
+    if (filtroInicio) filtroInicio.value = hojeBrasilia;
+    if (filtroFim) filtroFim.value = hojeBrasilia;
+
+
+}
 
         function updateStats(data) {
             document.getElementById('totalExpedicoes').textContent = data.length;
