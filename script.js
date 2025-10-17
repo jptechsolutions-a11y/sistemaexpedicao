@@ -585,6 +585,15 @@ async function loadAllTabData() {
 
 <div id="identificacao" class="sub-tab-content">
     <h2 class="text-2xl font-bold text-gray-800 mb-4">Impressão de Identificação</h2>
+
+    <div class="filters-section mb-4">
+        <div class="form-group">
+            <label for="identificacaoLojaFilter">Filtrar por Loja:</label>
+            <select id="identificacaoLojaFilter" onchange="applyIdentificacaoFilter()">
+                <option value="">Todas as Lojas</option>
+                </select>
+        </div>
+    </div>
     <div class="bg-white p-6 rounded-lg shadow-md">
         <p class="text-sm text-gray-500 mb-4">Expedições aguardando impressão de etiquetas de identificação</p>
         <div id="expedicoesParaIdentificacao" class="loading">
