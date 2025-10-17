@@ -3866,7 +3866,7 @@ async function finishLoading(expeditionId) {
     }
 }
         
-       // SUBSTITUIR A FUNÇÃO loadAcompanhamento
+    // SUBSTITUA A FUNÇÃO loadAcompanhamento (aprox. linha 2891)
 async function loadAcompanhamento() {
     const permittedAcompanhamentoTabs = getPermittedSubTabs('acompanhamento');
     
@@ -3896,14 +3896,27 @@ async function loadAcompanhamento() {
                 total_pallets: expItems.reduce((s, i) => s + (i.pallets || 0), 0),
                 total_rolltrainers: expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0),
                 lojas_count: expItems.length,
+                
+                // AJUSTE 1: Mostrar apenas o CÓDIGO da loja, separado por vírgula
                 lojas_info: expItems.map(item => {
-    const loja = lojas.find(l => l.id === item.loja_id);
-    return loja ? `${loja.codigo} - ${loja.nome}` : 'N/A';
-}).join(', '),
+                    const loja = lojas.find(l => l.id === item.loja_id);
+                    return loja ? `${loja.codigo}` : 'N/A'; // Apenas o código
+                }).join(', '), // MUDANÇA AQUI: de '<br>' para ', '
+                
                 doca_nome: docas.find(d => d.id === exp.doca_id)?.nome || 'N/A',
                 lider_nome: lideres.find(l => l.id === exp.lider_id)?.nome || 'N/A',
                 veiculo_placa: veiculo?.placa,
-                motorista_nome: motoristas.find(m => m.id === exp.motorista_id)?.nome,
+                
+                // AJUSTE 2: Resumir o nome do motorista (Primeiro e Último nome)
+                motorista_nome: ((nomeCompleto) => {
+                    if (!nomeCompleto) return '-';
+                    const partes = nomeCompleto.trim().split(' ');
+                    if (partes.length > 1) {
+                        return `${partes[0]} ${partes[partes.length - 1]}`; // Primeiro e último nome
+                    }
+                    return nomeCompleto; // Retorna o nome se for único
+                })(motoristas.find(m => m.id === exp.motorista_id)?.nome),
+                
                 ocupacao: veiculo && veiculo.capacidade_pallets > 0 ? (totalCarga / veiculo.capacidade_pallets) * 100 : 0
             };
         });
@@ -3984,7 +3997,7 @@ async function loadAcompanhamento() {
             document.getElementById('tempoMedioTotal').textContent = minutesToHHMM(calcularMedia(temposTotal));
         }
         
-        // SUBSTITUIR A FUNÇÃO renderAcompanhamentoTable COMPLETA
+       // SUBSTITUA A FUNÇÃO renderAcompanhamentoTable (aprox. linha 2970)
 function renderAcompanhamentoTable(expeditions) {
     const tbody = document.getElementById('acompanhamentoBody');
     if (expeditions.length === 0) {
@@ -3996,7 +4009,6 @@ function renderAcompanhamentoTable(expeditions) {
         const ocupacaoPerc = Math.round(exp.ocupacao || 0);
         let barColor = 'progress-green';
         
-        // NOVO: Cores de alerta para a barra de progresso simples
         if (ocupacaoPerc > 90) barColor = 'progress-orange';
         if (ocupacaoPerc > 100) barColor = 'progress-red';
         
@@ -4006,7 +4018,6 @@ function renderAcompanhamentoTable(expeditions) {
             carreg: (exp.data_chegada_veiculo && exp.data_saida_veiculo) ? minutesToHHMM((new Date(exp.data_saida_veiculo) - new Date(exp.data_chegada_veiculo)) / 60000) : '-'
         };
         
-        // Verificar se pode editar/excluir
         const canEdit = exp.status !== 'saiu_para_entrega' && exp.status !== 'entregue';
         const editButton = canEdit ? 
             `<button class="btn btn-warning btn-small" onclick="openEditModal('${exp.id}')">Editar</button>` :
@@ -4017,11 +4028,11 @@ function renderAcompanhamentoTable(expeditions) {
             
         return `
             <tr class="hover:bg-gray-50 text-sm">
-                <td>${new Date(exp.data_hora).toLocaleString('pt-BR')}</td>
+                
+                <td>${new Date(exp.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '')}</td>
+                
                 <td class="whitespace-normal">
-                    ${exp.lojas_info}
-                    ${exp.numeros_carga_display ? `<br><span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">📦 ${exp.numeros_carga_display}</span>` : ''}
-                </td>
+                    ${exp.lojas_info} </td>
                 <td>${exp.total_pallets}</td>
                 <td>${exp.total_rolltrainers}</td>
                 <td>${exp.doca_nome}</td>
@@ -4031,8 +4042,7 @@ function renderAcompanhamentoTable(expeditions) {
                 <td style="min-width: 120px;">
                     <div class="progress-container"><div class="progress-bar ${barColor}" style="width: ${Math.min(100, ocupacaoPerc)}%;">${ocupacaoPerc}%</div></div>
                 </td>
-                <td>${exp.motorista_nome || '-'}</td>
-                <td class="text-xs">
+                <td>${exp.motorista_nome || '-'}</td> <td class="text-xs">
                     <div>Aloc: ${tempos.alocar}</div>
                     <div>Cheg: ${tempos.chegada}</div>
                     <div>Carr: ${tempos.carreg}</div>
