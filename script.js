@@ -22,7 +22,7 @@ let homeMapTimer = null;
 let userPermissions = [];
 let masterUserPermission = false;
 let gruposAcesso = [];
-
+let allIdentificacaoExpeditions = []; // Guarda a lista completa para o filtro
 
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
@@ -585,6 +585,15 @@ async function loadAllTabData() {
 
 <div id="identificacao" class="sub-tab-content">
     <h2 class="text-2xl font-bold text-gray-800 mb-4">Impressão de Identificação</h2>
+
+    <div class="filters-section mb-4">
+        <div class="form-group">
+            <label for="identificacaoLojaFilter">Filtrar por Loja:</label>
+            <select id="identificacaoLojaFilter" onchange="applyIdentificacaoFilter()">
+                <option value="">Todas as Lojas</option>
+                </select>
+        </div>
+    </div>
     <div class="bg-white p-6 rounded-lg shadow-md">
         <p class="text-sm text-gray-500 mb-4">Expedições aguardando impressão de etiquetas de identificação</p>
         <div id="expedicoesParaIdentificacao" class="loading">
@@ -890,11 +899,10 @@ async function loadAllTabData() {
             <div class="table-container bg-white rounded-lg shadow-md mt-6">
                 <table class="w-full"> 
                     <thead>
-                        <tr>
-                            <th>Data/Hora</th><th>Lojas/Cargas</th><th>Pallets</th><th>Rolls</th><th>Doca</th><th>Líder</th>
-                            <th>Status</th><th>Veículo</th><th>Ocupação</th><th>Motorista</th><th>Tempos</th><th>Ações</th>
-                        </tr>
-                    </thead>
+    <tr>
+        <th>Data/Hora</th><th>Lojas/Cargas</th><th>Pallets</th><th>Rolls</th><th>Doca</th> <th>Status</th><th>Veículo</th><th>Ocupação</th><th>Motorista</th><th>Tempos</th><th>Ações</th>
+    </tr>
+</thead>
                     <tbody id="acompanhamentoBody"></tbody>
                 </table>
             </div>
@@ -2618,7 +2626,9 @@ async function loadFaturamento() {
     }
 }
 
-       function renderFaturamentoList(expeditionsList) {
+      // Substitua a função renderFaturamentoList existente por esta
+
+function renderFaturamentoList(expeditionsList) {
     const container = document.getElementById('faturamentoList');
 
     if (expeditionsList.length === 0) {
@@ -2627,39 +2637,39 @@ async function loadFaturamento() {
     }
 
     container.innerHTML = expeditionsList.map(exp => {
-        // Usa a data de saída do veículo (fim do carregamento) se existir, senão usa a data de criação
         const carregadoEm = exp.data_saida_veiculo ? new Date(exp.data_saida_veiculo) : new Date(exp.data_hora);
         const tempoEspera = Math.round((new Date() - carregadoEm) / 60000);
         
         let actionButtons = '', statusInfo = '';
         
-        // 1. STATUS DE CARREGAMENTO (permissão para faturar antecipadamente)
-        if (exp.status === 'em_carregamento') {
-            statusInfo = `<div class="text-gray-600 font-semibold mb-2">🚚 Carregando (Permite Faturamento Antecipado)</div>`;
-            actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento (Antecipado)</button>`;
-        } else if (exp.status === 'carregado' || exp.status === 'aguardando_faturamento') {
-            // 2. STATUS DE PRONTO PARA FATURAR
-            statusInfo = `<div class="text-blue-600 font-semibold mb-2">📄 Pronto para iniciar faturamento</div>`;
+        // Lógica de Status Aprimorada
+        // ESTADO FINAL: Ambos concluídos
+        if (exp.status === 'faturado' && exp.data_saida_veiculo) {
+            statusInfo = `<div class="text-green-600 font-semibold mb-2">✅ Carregado e Faturado</div>`;
+            actionButtons = `<button class="btn btn-warning" onclick="marcarSaiuEntrega('${exp.id}')">Marcar Saída</button>`;
+        }
+        // CASO 1: Faturado, mas aguardando fim do carregamento
+        else if (exp.status === 'faturado' && !exp.data_saida_veiculo) {
+            statusInfo = `<div class="text-blue-600 font-semibold mb-2">✅ Faturado (Aguardando Fim do Carregamento)</div>`;
+            actionButtons = `<button class="btn btn-secondary" disabled title="Finalize o carregamento na tela de Motoristas para liberar a saída">Aguardando Carregamento</button>`;
+        }
+        // CASO 2: Carregado, mas aguardando faturamento
+        else if (exp.status === 'carregado' || exp.status === 'aguardando_faturamento') {
+            statusInfo = `<div class="text-blue-600 font-semibold mb-2">🚚 Carregado (Aguardando Faturamento)</div>`;
             actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento</button>`;
-        } else if (exp.status === 'faturamento_iniciado' || exp.status === 'em_carregamento_faturando') { 
-            // 3. STATUS DE FATURANDO (Inclui o status combinado)
+        }
+        // CASO 3: Faturamento em andamento (com ou sem carregamento simultâneo)
+        else if (exp.status === 'faturamento_iniciado' || exp.status === 'em_carregamento_faturando') {
             const iniciadoEm = exp.data_inicio_faturamento ? new Date(exp.data_inicio_faturamento) : null;
             const tempoFaturamento = iniciadoEm ? Math.round((new Date() - iniciadoEm) / 60000) : 0;
-            
-            const faturandoTexto = exp.status === 'em_carregamento_faturando' ? 'Carregando/Faturando' : 'Faturamento em andamento';
+            const faturandoTexto = exp.status === 'em_carregamento_faturando' ? 'Carregando e Faturando' : 'Faturamento em andamento';
             statusInfo = `<div class="text-yellow-600 font-semibold mb-2">📄 ${faturandoTexto} há ${minutesToHHMM(tempoFaturamento)}</div>`;
             actionButtons = `<button class="btn btn-primary" onclick="finalizarFaturamento('${exp.id}')">Finalizar Faturamento</button>`;
-        } else if (exp.status === 'faturado') {
-            // 4. STATUS FATURADO (Com bloqueio de saída)
-            statusInfo = `<div class="text-green-600 font-semibold mb-2">✅ Faturado</div>`;
-            
-            // AJUSTE CRÍTICO: 'Marcar Saída' liberado apenas se carregamento finalizado (`data_saida_veiculo` presente)
-            if (exp.data_saida_veiculo) {
-                actionButtons = `<button class="btn btn-warning" onclick="marcarSaiuEntrega('${exp.id}')">Marcar Saída</button>`;
-            } else {
-                // Botão desabilitado com dica, forçando a finalização do carregamento antes de liberar a saída.
-                actionButtons = `<button class="btn btn-secondary" disabled title="Aguardando Finalização do Carregamento (data_saida_veiculo)">Marcar Saída</button>`;
-            }
+        }
+        // CASO 4: Apenas carregando (faturamento ainda não iniciado)
+        else if (exp.status === 'em_carregamento') {
+            statusInfo = `<div class="text-gray-600 font-semibold mb-2">🚚 Carregando...</div>`;
+            actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento (Antecipado)</button>`;
         }
 
         return `
@@ -3774,8 +3784,47 @@ function renderMotoristaRankingChart(motoristasData) {
             }
         }
 
-        async function startLoading(expeditionId) { /* ... */ }
-        async function finishLoading(expeditionId) { /* ... */ }
+       
+       // Adicione esta nova função ao seu arquivo script.js
+
+async function finishLoading(expeditionId) {
+    try {
+        // 1. Pega o status atual da expedição antes de fazer qualquer alteração
+        const [currentExp] = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=status`);
+        if (!currentExp) {
+            throw new Error('Expedição não encontrada.');
+        }
+
+        const updateData = {
+            data_saida_veiculo: new Date().toISOString()
+        };
+
+        // 2. Lógica principal: Decide o novo status com base no estado atual
+        // Se o faturamento JÁ terminou (status 'faturado'), NÃO mude o status.
+        // Apenas registre a data de fim do carregamento. A interface irá combinar os dois estados para liberar a saída.
+        if (currentExp.status === 'faturado') {
+            // O status permanece 'faturado'. A UI combinará isso com a nova 'data_saida_veiculo'.
+        } else {
+            // Se o faturamento ainda não terminou, o novo status é 'carregado', indicando que agora aguarda o faturamento.
+            updateData.status = 'carregado';
+        }
+
+        await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', updateData);
+        showNotification('Carregamento finalizado com sucesso!', 'success');
+
+        // Recarrega a view ativa para refletir a mudança
+        if (document.getElementById('motoristas').classList.contains('active')) {
+             consultarExpedicoesPorPlaca();
+        } else if (document.getElementById('acompanhamento').classList.contains('active')) {
+            loadAcompanhamento();
+        } else if (document.getElementById('faturamento').classList.contains('active')) {
+            loadFaturamento();
+        }
+
+    } catch (error) {
+        showNotification('Erro ao finalizar carregamento: ' + error.message, 'error');
+    }
+}
 
         async function iniciarDescarga(itemId) {
             try {
@@ -3825,7 +3874,7 @@ function renderMotoristaRankingChart(motoristasData) {
     }
 }
         
-     // SUBSTITUA A FUNÇÃO loadAcompanhamento (aprox. linha 2891)
+    // SUBSTITUA A FUNÇÃO loadAcompanhamento (aprox. linha 2891)
 async function loadAcompanhamento() {
     const permittedAcompanhamentoTabs = getPermittedSubTabs('acompanhamento');
     
@@ -3856,11 +3905,11 @@ async function loadAcompanhamento() {
                 total_rolltrainers: expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0),
                 lojas_count: expItems.length,
                 
-                // AJUSTE 1: Mostrar apenas o CÓDIGO da loja e quebrar linha
+                // AJUSTE 1: Mostrar apenas o CÓDIGO da loja, separado por vírgula
                 lojas_info: expItems.map(item => {
                     const loja = lojas.find(l => l.id === item.loja_id);
                     return loja ? `${loja.codigo}` : 'N/A'; // Apenas o código
-                }).join('<br>'), // Quebra de linha
+                }).join(', '), // MUDANÇA AQUI: de '<br>' para ', '
                 
                 doca_nome: docas.find(d => d.id === exp.doca_id)?.nome || 'N/A',
                 lider_nome: lideres.find(l => l.id === exp.lider_id)?.nome || 'N/A',
@@ -3932,10 +3981,34 @@ async function loadAcompanhamento() {
         }
 
         function setDefaultDateFilters() {
-            const hoje = new Date().toISOString().split('T')[0];
-            document.getElementById('filtroDataInicio').value = hoje;
-            document.getElementById('filtroDataFim').value = hoje;
-        }
+    // Cria um formatador específico para obter ano, mês e dia no fuso de Brasília
+    const formatter = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+
+    // Obtém as partes da data atual formatadas para Brasília
+    const parts = formatter.formatToParts(new Date());
+    let year, month, day;
+    parts.forEach(part => {
+        if (part.type === 'year') year = part.value;
+        if (part.type === 'month') month = part.value;
+        if (part.type === 'day') day = part.value;
+    });
+
+    // Monta a string no formato YYYY-MM-DD
+    const hojeBrasilia = `${year}-${month}-${day}`;
+
+    // --- Aplica aos filtros da aba Acompanhamento ---
+    const filtroInicio = document.getElementById('filtroDataInicio');
+    const filtroFim = document.getElementById('filtroDataFim');
+    if (filtroInicio) filtroInicio.value = hojeBrasilia;
+    if (filtroFim) filtroFim.value = hojeBrasilia;
+
+
+}
 
         function updateStats(data) {
             document.getElementById('totalExpedicoes').textContent = data.length;
@@ -3956,7 +4029,7 @@ async function loadAcompanhamento() {
             document.getElementById('tempoMedioTotal').textContent = minutesToHHMM(calcularMedia(temposTotal));
         }
         
-     // SUBSTITUA A FUNÇÃO renderAcompanhamentoTable (aprox. linha 2970)
+       // SUBSTITUA A FUNÇÃO renderAcompanhamentoTable (aprox. linha 2970)
 function renderAcompanhamentoTable(expeditions) {
     const tbody = document.getElementById('acompanhamentoBody');
     if (expeditions.length === 0) {
@@ -3991,12 +4064,10 @@ function renderAcompanhamentoTable(expeditions) {
                 <td>${new Date(exp.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '')}</td>
                 
                 <td class="whitespace-normal">
-                    ${exp.lojas_info} ${(exp.numeros_carga && exp.numeros_carga.length > 0) ? `<br><span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded" title="${exp.numeros_carga.join(', ')}">📦 ${exp.numeros_carga.length} Carga(s)</span>` : ''}
-                </td>
+                    ${exp.lojas_info} </td>
                 <td>${exp.total_pallets}</td>
                 <td>${exp.total_rolltrainers}</td>
                 <td>${exp.doca_nome}</td>
-                <td>${exp.lider_nome}</td>
                 <td><span class="status-badge status-${exp.status}">${getStatusLabel(exp.status)}</span></td>
                 <td>${exp.veiculo_placa || '-'}</td>
                 <td style="min-width: 120px;">
@@ -8193,7 +8264,7 @@ async function showDetalhesExpedicao(expeditionId) {
                     <div class="planilha-value">${motorista?.nome || 'N/A'}</div>
                 </div>
                 <div class="planilha-row" style="margin-bottom: 6px;">
-                    <div class="planilha-cell" style="width: 120px;">LÍDER:</div>
+                    <div class="planilha-cell" style="width: 120px;">CONFERENTE:</div>
                     <div class="planilha-value">${lider?.nome || 'N/A'}</div>
                 </div>
             </div>
@@ -8284,21 +8355,27 @@ async function loadOperacao() {
     }
 }
 
+// SUBSTITUA a função loadIdentificacaoExpedicoes existente por esta:
 async function loadIdentificacaoExpedicoes() {
     const container = document.getElementById('expedicoesParaIdentificacao');
+    const filterSelect = document.getElementById('identificacaoLojaFilter');
     container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expedições...</div>`;
+    // Limpa opções antigas, exceto a primeira ("Todas as Lojas")
+    filterSelect.length = 1;
 
     try {
         // Busca expedições que ainda não saíram para entrega
         const expeditions = await supabaseRequest("expeditions?status=in.(aguardando_agrupamento,aguardando_veiculo,em_carregamento,carregado,aguardando_faturamento,faturamento_iniciado,faturado)&order=data_hora.desc");
-        const items = await supabaseRequest('expedition_items');
+        const items = await supabaseRequest('expedition_items'); // Pega todos os itens relevantes
 
         if (!expeditions || expeditions.length === 0) {
             container.innerHTML = '<div class="alert alert-success">Nenhuma expedição aguardando identificação!</div>';
+            allIdentificacaoExpeditions = []; // Limpa o cache
             return;
         }
 
-        const expeditionsWithItems = expeditions.map(exp => {
+        // Mapeia os dados e armazena na variável global
+        allIdentificacaoExpeditions = expeditions.map(exp => {
             const expItems = items.filter(item => item.expedition_id === exp.id);
             const lider = lideres.find(l => l.id === exp.lider_id);
             const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
@@ -8306,42 +8383,92 @@ async function loadIdentificacaoExpedicoes() {
 
             return {
                 ...exp,
-                items: expItems,
+                items: expItems, // Armazena os itens aqui para o filtro
                 lider_nome: lider?.nome || 'N/A',
                 veiculo_placa: veiculo?.placa || 'N/A',
                 motorista_nome: motorista?.nome || 'N/A',
                 total_pallets: expItems.reduce((sum, item) => sum + (item.pallets || 0), 0),
                 total_rolltrainers: expItems.reduce((sum, item) => sum + (item.rolltrainers || 0), 0)
             };
+        }).filter(exp => exp.items.length > 0); // Garante que só expedições com itens sejam listadas
+
+        // --- POPULAR FILTRO DE LOJA ---
+        const uniqueLojas = {};
+        allIdentificacaoExpeditions.forEach(exp => {
+            exp.items.forEach(item => {
+                const loja = lojas.find(l => l.id === item.loja_id);
+                if (loja && !uniqueLojas[loja.id]) {
+                    uniqueLojas[loja.id] = `${loja.codigo} - ${loja.nome}`;
+                }
+            });
         });
 
-        // Garante que as lojas estão carregadas antes de renderizar
-if (lojas.length === 0) {
-    await loadSelectData();
-}
-renderIdentificacaoExpedicoes(expeditionsWithItems);
+        // Ordena as lojas alfabeticamente pelo nome para o dropdown
+        const sortedLojas = Object.entries(uniqueLojas).sort(([, nameA], [, nameB]) => nameA.localeCompare(nameB));
+
+        sortedLojas.forEach(([id, name]) => {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = name;
+            filterSelect.appendChild(option);
+        });
+        // --- FIM POPULAR FILTRO ---
+
+        // Garante que as lojas estejam carregadas (caso ainda não estejam)
+        if (lojas.length === 0) {
+            await loadSelectData();
+        }
+
+        // Aplica o filtro (que inicialmente mostrará todos)
+        applyIdentificacaoFilter();
 
     } catch (error) {
         container.innerHTML = `<div class="alert alert-error">Erro ao carregar expedições: ${error.message}</div>`;
+        allIdentificacaoExpeditions = []; // Limpa cache em caso de erro
     }
 }
 
-// SUBSTITUIR A FUNÇÃO renderIdentificacaoExpedicoes COMPLETA
-function renderIdentificacaoExpedicoes(expeditions) {
+
+// **** NOVA FUNÇÃO ****
+function applyIdentificacaoFilter() {
+    const selectedLojaId = document.getElementById('identificacaoLojaFilter').value;
+    let filteredData = allIdentificacaoExpeditions; // Começa com a lista completa
+
+    if (selectedLojaId) {
+        // Filtra a lista: mantém apenas expedições que TENHAM a loja selecionada
+        filteredData = allIdentificacaoExpeditions.filter(exp =>
+            exp.items.some(item => item.loja_id === selectedLojaId)
+        );
+    }
+
+    // Chama a função de renderização com a lista filtrada
+    renderIdentificacaoExpedicoes(filteredData);
+}
+
+// SUBSTITUA a função renderIdentificacaoExpedicoes existente por esta:
+function renderIdentificacaoExpedicoes(expeditionsToRender) { // Recebe a lista (filtrada ou não)
     const container = document.getElementById('expedicoesParaIdentificacao');
 
-    container.innerHTML = expeditions.map(exp => {
+    // Verifica se a lista A SER RENDERIZADA está vazia
+    if (!expeditionsToRender || expeditionsToRender.length === 0) {
+         container.innerHTML = '<div class="alert alert-info">Nenhuma expedição encontrada para o filtro selecionado.</div>';
+         return;
+    }
+
+    container.innerHTML = expeditionsToRender.map(exp => {
         const totalItens = exp.total_pallets + exp.total_rolltrainers;
         const lojasInfo = exp.items.map(item => {
             const loja = lojas.find(l => l.id === item.loja_id);
-            return loja ? `${loja.codigo} - ${loja.nome}` : 'N/A';
+            // Mostra quantidade junto com a loja para clareza
+            return loja ? `${loja.codigo} (${item.pallets || 0}P/${item.rolltrainers || 0}R)` : 'N/A';
         }).join(', ');
 
         return `
             <div class="identificacao-card">
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        <h3 class="text-lg font-bold text-gray-800">Expedição ${exp.id}</h3>
+                       
+                        <h3 class="text-lg font-bold text-gray-800">Identificação de Expedição</h3>
                         <p class="text-sm text-gray-500">${new Date(exp.data_hora).toLocaleString('pt-BR')}</p>
                         <p class="text-sm text-gray-600 mt-2"><strong>Lojas:</strong> ${lojasInfo}</p>
                         ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">📦 ${exp.numeros_carga.join(', ')}</p>` : ''}
@@ -8350,7 +8477,7 @@ function renderIdentificacaoExpedicoes(expeditions) {
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
-                    <div><strong>Líder:</strong> ${exp.lider_nome}</div>
+                    <div><strong>Conferente:</strong> ${exp.lider_nome}</div>
                     <div><strong>Veículo:</strong> ${exp.veiculo_placa}</div>
                     <div><strong>Motorista:</strong> ${exp.motorista_nome}</div>
                     <div><strong>Total Itens:</strong> ${totalItens}</div>
@@ -8379,19 +8506,27 @@ function renderIdentificacaoExpedicoes(expeditions) {
     }).join('');
 }
 
-async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, pallets, rolltrainers) {
+// SUBSTITUIR A FUNÇÃO imprimirIdentificacao existente por esta versão corrigida:
+async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaId = null) {
     try {
-        // Busca os itens da expedição e as informações das lojas
-        const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`);
-        
+        // 1. Busca os itens da expedição e as informações das lojas
+        let endpoint = `expedition_items?expedition_id=eq.${expeditionId}`;
+
+        // Aplica o filtro de loja, se fornecido
+        if (lojaId) {
+            endpoint += `&loja_id=eq.${lojaId}`;
+        }
+
+        const items = await supabaseRequest(endpoint);
+
         if (!items || items.length === 0) {
-            showNotification('Nenhum item encontrado para esta expedição.', 'error');
+            showNotification(lojaId ? 'Nenhum item encontrado para esta loja.' : 'Nenhum item encontrado para esta expedição.', 'error');
             return;
         }
-        
+
         const hoje = new Date();
         const dataFormatada = hoje.toLocaleDateString('pt-BR');
-        
+
         // Remove qualquer div de impressão anterior
         const existingPrintDiv = document.getElementById('printIdentificationDiv');
         if (existingPrintDiv) {
@@ -8401,7 +8536,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
         // Cria o container de impressão
         const printDiv = document.createElement('div');
         printDiv.id = 'printIdentificationDiv';
-        
+
         let etiquetasHtml = `
             <style>
                 @media print {
@@ -8412,21 +8547,21 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         -webkit-print-color-adjust: exact !important;
                         color-adjust: exact !important;
                     }
-                    
+
                     @page {
                         size: A4 landscape;
                         margin: 0;
                     }
-                    
+
                     body * {
                         visibility: hidden !important;
                     }
-                    
+
                     #printIdentificationDiv,
                     #printIdentificationDiv * {
                         visibility: visible !important;
                     }
-                    
+
                     #printIdentificationDiv {
                         position: absolute !important;
                         left: 0 !important;
@@ -8436,7 +8571,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         overflow: visible !important;
                         z-index: 9999 !important;
                     }
-                    
+
                     .etiqueta-page {
                         width: 297mm !important;
                         height: 210mm !important;
@@ -8451,11 +8586,11 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         page-break-after: always !important;
                         page-break-inside: avoid !important;
                     }
-                    
+
                     .etiqueta-page:last-child {
                         page-break-after: auto !important;
                     }
-                    
+
                     .etiqueta-container {
                         text-align: center !important;
                         font-family: Arial, sans-serif !important;
@@ -8465,13 +8600,13 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         flex-direction: column !important;
                         justify-content: center !important;
                         align-items: center !important;
-                        padding: 5mm !important; 
+                        padding: 5mm !important;
                         box-sizing: border-box !important;
                     }
-                    
+
                     .etiqueta-quadro {
                         border: 3px solid #999 !important;
-                        padding: 20mm 15mm !important; 
+                        padding: 20mm 15mm !important;
                         background: white !important;
                         width: 100% !important;
                         height: 100% !important;
@@ -8483,7 +8618,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         box-shadow: inset 0 0 0 2px #ccc !important;
                         box-sizing: border-box !important;
                     }
-                    
+
                     .etiqueta-numero {
                         font-size: 100px !important;
                         font-weight: 900 !important;
@@ -8493,9 +8628,9 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         letter-spacing: 3px !important;
                         text-transform: uppercase !important;
                     }
-                    
+
                     .etiqueta-info {
-                        font-size: 76px !important; 
+                        font-size: 76px !important;
                         font-weight: 700 !important;
                         color: #333 !important;
                         margin: 0 !important;
@@ -8503,7 +8638,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         letter-spacing: 3px !important;
                         text-transform: uppercase !important;
                     }
-                    
+
                     .etiqueta-data {
                         font-size: 60px !important;
                         font-weight: 700 !important;
@@ -8512,7 +8647,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         line-height: 1 !important;
                         letter-spacing: 3px !important;
                     }
-                    
+
                     .etiqueta-contador {
                         font-size: 110px !important;
                         font-weight: 900 !important;
@@ -8528,7 +8663,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         box-shadow: inset 0 0 0 2px #ccc !important;
                         margin-bottom: 25px !important;
                     }
-                    
+
                     .etiqueta-lojas {
                         font-size: 42px !important;
                         font-weight: 700 !important;
@@ -8550,7 +8685,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         opacity: 1 !important;
                     }
                 }
-                
+
                 @media screen {
                     #printIdentificationDiv {
                         display: none;
@@ -8558,15 +8693,18 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                 }
             </style>
         `;
-        
-        // Para cada loja da expedição, gerar suas etiquetas separadamente
+
+        const filial = selectedFilial;
+
+        // Para cada item/loja da expedição, gerar suas etiquetas separadamente
         for (const item of items) {
             const loja = lojas.find(l => l.id === item.loja_id);
             if (!loja) continue;
-            
+
             const lojaInfo = `${loja.codigo} - ${loja.nome}`;
+            // A quantidade total de etiquetas é a soma de Pallets e RollTrainers
             const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
-            
+
             // Criar etiquetas para esta loja específica
             for (let i = 1; i <= totalItensLoja; i++) {
                 etiquetasHtml += `
@@ -8575,25 +8713,28 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                             <div class="etiqueta-quadro">
                                 <div class="etiqueta-numero">${lojaInfo}</div>
                                 <hr class="etiqueta-divider">
-                                <div class="etiqueta-data">${loja.endereco_completo}</div>
+                                <div class="etiqueta-data">${loja.endereco_completo || 'Endereço não informado'}</div>
                                 <hr class="etiqueta-divider">
                                 <div class="etiqueta-contador">${String(i).padStart(2, '0')}/${String(totalItensLoja).padStart(2, '0')}</div>
                                 <hr class="etiqueta-divider">
-                                <div class="etiqueta-lojas">${liderNome}</div>
+                                <div class="etiqueta-lojas">Conferente: ${liderNome}</div>
                                 <hr class="etiqueta-divider">
-                                <div class="etiqueta-info">CD ${selectedFilial.nome} - ${selectedFilial.descricao}</div>
-                            </div>
+                                <div class="etiqueta-info">CD ${filial.nome} - ${filial.descricao}</div>
+                                <div class="text-xs text-gray-500 mt-4">
+                                    ${numeroCarga !== 'N/A' ? `Carga: ${numeroCarga} | ` : ''}Data: ${dataFormatada}
+                                </div>
+                                </div>
                         </div>
                     </div>
                 `;
             }
         }
-        
+
         printDiv.innerHTML = etiquetasHtml;
         document.body.appendChild(printDiv);
-        
-        showNotification('Preparando impressão das etiquetas...', 'info');
-        
+
+        showNotification(lojaId ? `Preparando impressão para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressão de todas as etiquetas.', 'info');
+
         // Imprime
         setTimeout(() => {
             window.print();
@@ -8604,7 +8745,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                 }
             }, 2000);
         }, 500);
-        
+
     } catch (error) {
         console.error('Erro ao buscar dados para impressão:', error);
         showNotification('Erro ao carregar dados para impressão: ' + error.message, 'error');
@@ -9188,30 +9329,44 @@ function startMotoristaTimer(m) {
 
 
 
-// NOVO: Função para abrir o modal de seleção de impressão
 async function openImprimirIdentificacaoModal(expeditionId) {
     const modal = document.getElementById('printIdentificationModal');
     const lojaList = document.getElementById('printLojaList');
-    
+
     document.getElementById('currentPrintExpeditionId').value = expeditionId;
     document.getElementById('printExpeditionIdDisplay').textContent = expeditionId;
-    
-    // Resetar o estado do modal
+
+    // Resetar o estado do modal (ANTES de exibir)
     document.getElementById('lojaSelectionContainer').style.display = 'none';
     const secondaryBtn = document.querySelector('#printIdentificationModal .btn-secondary');
     if (secondaryBtn) secondaryBtn.style.display = 'block';
     lojaList.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando lojas...</div>`;
-    modal.style.display = 'flex';
-    
+    // modal.style.display = 'flex'; // <-- NÃO exibir o modal ainda
+
     try {
         // Busca os itens da expedição e os dados das lojas associadas
         const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}&select=id,loja_id,pallets,rolltrainers,lojas(codigo,nome)`);
-        
+
         if (!items || items.length === 0) {
-            lojaList.innerHTML = '<div class="alert alert-info">Nenhum item encontrado para esta expedição.</div>';
+            // Se não houver itens, apenas mostra notificação e não abre modal
+            showNotification('Nenhum item encontrado para esta expedição.', 'error');
+            closePrintIdentificationModal(); // Garante que o modal feche se estiver aberto por algum motivo
             return;
         }
 
+        // ***** NOVO: LÓGICA PARA IMPRESSÃO DIRETA *****
+        if (items.length === 1) {
+            // Apenas uma loja, imprime diretamente
+            showNotification('Apenas uma loja. Imprimindo diretamente...', 'info', 2000);
+            handlePrintChoice(items[0].loja_id); // Chama a função de impressão com o ID da única loja
+            return; // Sai da função para não mostrar o modal
+        }
+        // ***** FIM DA NOVA LÓGICA *****
+
+        // Se chegou aqui, há mais de uma loja, então mostra o modal
+        modal.style.display = 'flex'; // <-- Exibe o modal AGORA
+
+        // Popula a lista de lojas (código existente)
         let lojasHtml = '';
         items.forEach(item => {
             const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
@@ -9227,11 +9382,16 @@ async function openImprimirIdentificacaoModal(expeditionId) {
                 </div>
             `;
         });
-
         lojaList.innerHTML = lojasHtml;
-        
+
     } catch (error) {
+         // Se der erro ao buscar, mostra no local da lista e fecha o modal se precisar
         lojaList.innerHTML = `<div class="alert alert-error">Erro ao carregar lojas: ${error.message}</div>`;
+         // Se o modal já estiver visível por algum motivo, esconde
+         if (modal.style.display === 'flex') {
+             // Pode adicionar um botão para fechar ou fechar automaticamente
+             setTimeout(closePrintIdentificationModal, 3000);
+         }
     }
 }
 
@@ -9257,22 +9417,22 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
     try {
         // 1. Busca os itens da expedição e as informações das lojas
         let endpoint = `expedition_items?expedition_id=eq.${expeditionId}`;
-        
+
         // Aplica o filtro de loja, se fornecido
         if (lojaId) {
             endpoint += `&loja_id=eq.${lojaId}`;
         }
-        
+
         const items = await supabaseRequest(endpoint);
-        
+
         if (!items || items.length === 0) {
             showNotification(lojaId ? 'Nenhum item encontrado para esta loja.' : 'Nenhum item encontrado para esta expedição.', 'error');
             return;
         }
-        
+
         const hoje = new Date();
         const dataFormatada = hoje.toLocaleDateString('pt-BR');
-        
+
         // Remove qualquer div de impressão anterior
         const existingPrintDiv = document.getElementById('printIdentificationDiv');
         if (existingPrintDiv) {
@@ -9282,7 +9442,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
         // Cria o container de impressão
         const printDiv = document.createElement('div');
         printDiv.id = 'printIdentificationDiv';
-        
+
         let etiquetasHtml = `
             <style>
                 @media print {
@@ -9293,21 +9453,21 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         -webkit-print-color-adjust: exact !important;
                         color-adjust: exact !important;
                     }
-                    
+
                     @page {
                         size: A4 landscape;
                         margin: 0;
                     }
-                    
+
                     body * {
                         visibility: hidden !important;
                     }
-                    
+
                     #printIdentificationDiv,
                     #printIdentificationDiv * {
                         visibility: visible !important;
                     }
-                    
+
                     #printIdentificationDiv {
                         position: absolute !important;
                         left: 0 !important;
@@ -9317,7 +9477,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         overflow: visible !important;
                         z-index: 9999 !important;
                     }
-                    
+
                     .etiqueta-page {
                         width: 297mm !important;
                         height: 210mm !important;
@@ -9332,11 +9492,11 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         page-break-after: always !important;
                         page-break-inside: avoid !important;
                     }
-                    
+
                     .etiqueta-page:last-child {
                         page-break-after: auto !important;
                     }
-                    
+
                     .etiqueta-container {
                         text-align: center !important;
                         font-family: Arial, sans-serif !important;
@@ -9346,13 +9506,13 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         flex-direction: column !important;
                         justify-content: center !important;
                         align-items: center !important;
-                        padding: 5mm !important; 
+                        padding: 5mm !important;
                         box-sizing: border-box !important;
                     }
-                    
+
                     .etiqueta-quadro {
                         border: 3px solid #999 !important;
-                        padding: 20mm 15mm !important; 
+                        padding: 20mm 15mm !important;
                         background: white !important;
                         width: 100% !important;
                         height: 100% !important;
@@ -9364,7 +9524,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         box-shadow: inset 0 0 0 2px #ccc !important;
                         box-sizing: border-box !important;
                     }
-                    
+
                     .etiqueta-numero {
                         font-size: 100px !important;
                         font-weight: 900 !important;
@@ -9374,9 +9534,9 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         letter-spacing: 3px !important;
                         text-transform: uppercase !important;
                     }
-                    
+
                     .etiqueta-info {
-                        font-size: 76px !important; 
+                        font-size: 76px !important;
                         font-weight: 700 !important;
                         color: #333 !important;
                         margin: 0 !important;
@@ -9384,7 +9544,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         letter-spacing: 3px !important;
                         text-transform: uppercase !important;
                     }
-                    
+
                     .etiqueta-data {
                         font-size: 60px !important;
                         font-weight: 700 !important;
@@ -9393,7 +9553,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         line-height: 1 !important;
                         letter-spacing: 3px !important;
                     }
-                    
+
                     .etiqueta-contador {
                         font-size: 110px !important;
                         font-weight: 900 !important;
@@ -9409,7 +9569,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         box-shadow: inset 0 0 0 2px #ccc !important;
                         margin-bottom: 25px !important;
                     }
-                    
+
                     .etiqueta-lojas {
                         font-size: 42px !important;
                         font-weight: 700 !important;
@@ -9431,7 +9591,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         opacity: 1 !important;
                     }
                 }
-                
+
                 @media screen {
                     #printIdentificationDiv {
                         display: none;
@@ -9439,18 +9599,18 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                 }
             </style>
         `;
-        
+
         const filial = selectedFilial;
-        
+
         // Para cada item/loja da expedição, gerar suas etiquetas separadamente
         for (const item of items) {
             const loja = lojas.find(l => l.id === item.loja_id);
             if (!loja) continue;
-            
+
             const lojaInfo = `${loja.codigo} - ${loja.nome}`;
             // A quantidade total de etiquetas é a soma de Pallets e RollTrainers
             const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
-            
+
             // Criar etiquetas para esta loja específica
             for (let i = 1; i <= totalItensLoja; i++) {
                 etiquetasHtml += `
@@ -9463,22 +9623,24 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                                 <hr class="etiqueta-divider">
                                 <div class="etiqueta-contador">${String(i).padStart(2, '0')}/${String(totalItensLoja).padStart(2, '0')}</div>
                                 <hr class="etiqueta-divider">
-                                <div class="etiqueta-lojas">LÍDER: ${liderNome}</div>
+                                <div class="etiqueta-lojas">Conferente: ${liderNome}</div>
                                 <hr class="etiqueta-divider">
                                 <div class="etiqueta-info">CD ${filial.nome} - ${filial.descricao}</div>
-                                <div class="text-xs text-gray-500 mt-4">Carga: ${numeroCarga} | Expedição: ${expeditionId} | Data: ${dataFormatada}</div>
-                            </div>
+                                <div class="text-xs text-gray-500 mt-4">
+                                    ${numeroCarga !== 'N/A' ? `Carga: ${numeroCarga} | ` : ''}Data: ${dataFormatada}
+                                </div>
+                                </div>
                         </div>
                     </div>
                 `;
             }
         }
-        
+
         printDiv.innerHTML = etiquetasHtml;
         document.body.appendChild(printDiv);
-        
+
         showNotification(lojaId ? `Preparando impressão para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressão de todas as etiquetas.', 'info');
-        
+
         // Imprime
         setTimeout(() => {
             window.print();
@@ -9489,7 +9651,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                 }
             }, 2000);
         }, 500);
-        
+
     } catch (error) {
         console.error('Erro ao buscar dados para impressão:', error);
         showNotification('Erro ao carregar dados para impressão: ' + error.message, 'error');
