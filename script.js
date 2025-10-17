@@ -890,11 +890,10 @@ async function loadAllTabData() {
             <div class="table-container bg-white rounded-lg shadow-md mt-6">
                 <table class="w-full"> 
                     <thead>
-                        <tr>
-                            <th>Data/Hora</th><th>Lojas/Cargas</th><th>Pallets</th><th>Rolls</th><th>Doca</th><th>Líder</th>
-                            <th>Status</th><th>Veículo</th><th>Ocupação</th><th>Motorista</th><th>Tempos</th><th>Ações</th>
-                        </tr>
-                    </thead>
+    <tr>
+        <th>Data/Hora</th><th>Lojas/Cargas</th><th>Pallets</th><th>Rolls</th><th>Doca</th> <th>Status</th><th>Veículo</th><th>Ocupação</th><th>Motorista</th><th>Tempos</th><th>Ações</th>
+    </tr>
+</thead>
                     <tbody id="acompanhamentoBody"></tbody>
                 </table>
             </div>
@@ -4036,7 +4035,6 @@ function renderAcompanhamentoTable(expeditions) {
                 <td>${exp.total_pallets}</td>
                 <td>${exp.total_rolltrainers}</td>
                 <td>${exp.doca_nome}</td>
-                <td>${exp.lider_nome}</td>
                 <td><span class="status-badge status-${exp.status}">${getStatusLabel(exp.status)}</span></td>
                 <td>${exp.veiculo_placa || '-'}</td>
                 <td style="min-width: 120px;">
@@ -8233,7 +8231,7 @@ async function showDetalhesExpedicao(expeditionId) {
                     <div class="planilha-value">${motorista?.nome || 'N/A'}</div>
                 </div>
                 <div class="planilha-row" style="margin-bottom: 6px;">
-                    <div class="planilha-cell" style="width: 120px;">LÍDER:</div>
+                    <div class="planilha-cell" style="width: 120px;">CONFERENTE:</div>
                     <div class="planilha-value">${lider?.nome || 'N/A'}</div>
                 </div>
             </div>
