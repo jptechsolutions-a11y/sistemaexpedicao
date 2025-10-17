@@ -22,7 +22,7 @@ let homeMapTimer = null;
 let userPermissions = [];
 let masterUserPermission = false;
 let gruposAcesso = [];
-
+let allIdentificacaoExpeditions = []; // Guarda a lista completa para o filtro
 
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
@@ -8346,21 +8346,27 @@ async function loadOperacao() {
     }
 }
 
+// SUBSTITUA a função loadIdentificacaoExpedicoes existente por esta:
 async function loadIdentificacaoExpedicoes() {
     const container = document.getElementById('expedicoesParaIdentificacao');
+    const filterSelect = document.getElementById('identificacaoLojaFilter');
     container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expedições...</div>`;
+    // Limpa opções antigas, exceto a primeira ("Todas as Lojas")
+    filterSelect.length = 1;
 
     try {
         // Busca expedições que ainda não saíram para entrega
         const expeditions = await supabaseRequest("expeditions?status=in.(aguardando_agrupamento,aguardando_veiculo,em_carregamento,carregado,aguardando_faturamento,faturamento_iniciado,faturado)&order=data_hora.desc");
-        const items = await supabaseRequest('expedition_items');
+        const items = await supabaseRequest('expedition_items'); // Pega todos os itens relevantes
 
         if (!expeditions || expeditions.length === 0) {
             container.innerHTML = '<div class="alert alert-success">Nenhuma expedição aguardando identificação!</div>';
+            allIdentificacaoExpeditions = []; // Limpa o cache
             return;
         }
 
-        const expeditionsWithItems = expeditions.map(exp => {
+        // Mapeia os dados e armazena na variável global
+        allIdentificacaoExpeditions = expeditions.map(exp => {
             const expItems = items.filter(item => item.expedition_id === exp.id);
             const lider = lideres.find(l => l.id === exp.lider_id);
             const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
@@ -8368,42 +8374,92 @@ async function loadIdentificacaoExpedicoes() {
 
             return {
                 ...exp,
-                items: expItems,
+                items: expItems, // Armazena os itens aqui para o filtro
                 lider_nome: lider?.nome || 'N/A',
                 veiculo_placa: veiculo?.placa || 'N/A',
                 motorista_nome: motorista?.nome || 'N/A',
                 total_pallets: expItems.reduce((sum, item) => sum + (item.pallets || 0), 0),
                 total_rolltrainers: expItems.reduce((sum, item) => sum + (item.rolltrainers || 0), 0)
             };
+        }).filter(exp => exp.items.length > 0); // Garante que só expedições com itens sejam listadas
+
+        // --- POPULAR FILTRO DE LOJA ---
+        const uniqueLojas = {};
+        allIdentificacaoExpeditions.forEach(exp => {
+            exp.items.forEach(item => {
+                const loja = lojas.find(l => l.id === item.loja_id);
+                if (loja && !uniqueLojas[loja.id]) {
+                    uniqueLojas[loja.id] = `${loja.codigo} - ${loja.nome}`;
+                }
+            });
         });
 
-        // Garante que as lojas estão carregadas antes de renderizar
-if (lojas.length === 0) {
-    await loadSelectData();
-}
-renderIdentificacaoExpedicoes(expeditionsWithItems);
+        // Ordena as lojas alfabeticamente pelo nome para o dropdown
+        const sortedLojas = Object.entries(uniqueLojas).sort(([, nameA], [, nameB]) => nameA.localeCompare(nameB));
+
+        sortedLojas.forEach(([id, name]) => {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = name;
+            filterSelect.appendChild(option);
+        });
+        // --- FIM POPULAR FILTRO ---
+
+        // Garante que as lojas estejam carregadas (caso ainda não estejam)
+        if (lojas.length === 0) {
+            await loadSelectData();
+        }
+
+        // Aplica o filtro (que inicialmente mostrará todos)
+        applyIdentificacaoFilter();
 
     } catch (error) {
         container.innerHTML = `<div class="alert alert-error">Erro ao carregar expedições: ${error.message}</div>`;
+        allIdentificacaoExpeditions = []; // Limpa cache em caso de erro
     }
 }
 
-// SUBSTITUIR A FUNÇÃO renderIdentificacaoExpedicoes COMPLETA
-function renderIdentificacaoExpedicoes(expeditions) {
+
+// **** NOVA FUNÇÃO ****
+function applyIdentificacaoFilter() {
+    const selectedLojaId = document.getElementById('identificacaoLojaFilter').value;
+    let filteredData = allIdentificacaoExpeditions; // Começa com a lista completa
+
+    if (selectedLojaId) {
+        // Filtra a lista: mantém apenas expedições que TENHAM a loja selecionada
+        filteredData = allIdentificacaoExpeditions.filter(exp =>
+            exp.items.some(item => item.loja_id === selectedLojaId)
+        );
+    }
+
+    // Chama a função de renderização com a lista filtrada
+    renderIdentificacaoExpedicoes(filteredData);
+}
+
+// SUBSTITUA a função renderIdentificacaoExpedicoes existente por esta:
+function renderIdentificacaoExpedicoes(expeditionsToRender) { // Recebe a lista (filtrada ou não)
     const container = document.getElementById('expedicoesParaIdentificacao');
 
-    container.innerHTML = expeditions.map(exp => {
+    // Verifica se a lista A SER RENDERIZADA está vazia
+    if (!expeditionsToRender || expeditionsToRender.length === 0) {
+         container.innerHTML = '<div class="alert alert-info">Nenhuma expedição encontrada para o filtro selecionado.</div>';
+         return;
+    }
+
+    container.innerHTML = expeditionsToRender.map(exp => {
         const totalItens = exp.total_pallets + exp.total_rolltrainers;
         const lojasInfo = exp.items.map(item => {
             const loja = lojas.find(l => l.id === item.loja_id);
-            return loja ? `${loja.codigo} - ${loja.nome}` : 'N/A';
+            // Mostra quantidade junto com a loja para clareza
+            return loja ? `${loja.codigo} (${item.pallets || 0}P/${item.rolltrainers || 0}R)` : 'N/A';
         }).join(', ');
 
         return `
             <div class="identificacao-card">
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        <h3 class="text-lg font-bold text-gray-800">Expedição ${exp.id}</h3>
+                        {/* **** ID REMOVIDO DAQUI **** */}
+                        <h3 class="text-lg font-bold text-gray-800">Identificação de Expedição</h3>
                         <p class="text-sm text-gray-500">${new Date(exp.data_hora).toLocaleString('pt-BR')}</p>
                         <p class="text-sm text-gray-600 mt-2"><strong>Lojas:</strong> ${lojasInfo}</p>
                         ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">📦 ${exp.numeros_carga.join(', ')}</p>` : ''}
