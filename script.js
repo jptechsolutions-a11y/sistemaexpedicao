@@ -8441,19 +8441,27 @@ function renderIdentificacaoExpedicoes(expeditions) {
     }).join('');
 }
 
-async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, pallets, rolltrainers) {
+// SUBSTITUIR A FUNÇÃO imprimirIdentificacao existente por esta versão corrigida:
+async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaId = null) {
     try {
-        // Busca os itens da expedição e as informações das lojas
-        const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`);
-        
+        // 1. Busca os itens da expedição e as informações das lojas
+        let endpoint = `expedition_items?expedition_id=eq.${expeditionId}`;
+
+        // Aplica o filtro de loja, se fornecido
+        if (lojaId) {
+            endpoint += `&loja_id=eq.${lojaId}`;
+        }
+
+        const items = await supabaseRequest(endpoint);
+
         if (!items || items.length === 0) {
-            showNotification('Nenhum item encontrado para esta expedição.', 'error');
+            showNotification(lojaId ? 'Nenhum item encontrado para esta loja.' : 'Nenhum item encontrado para esta expedição.', 'error');
             return;
         }
-        
+
         const hoje = new Date();
         const dataFormatada = hoje.toLocaleDateString('pt-BR');
-        
+
         // Remove qualquer div de impressão anterior
         const existingPrintDiv = document.getElementById('printIdentificationDiv');
         if (existingPrintDiv) {
@@ -8463,7 +8471,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
         // Cria o container de impressão
         const printDiv = document.createElement('div');
         printDiv.id = 'printIdentificationDiv';
-        
+
         let etiquetasHtml = `
             <style>
                 @media print {
@@ -8474,21 +8482,21 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         -webkit-print-color-adjust: exact !important;
                         color-adjust: exact !important;
                     }
-                    
+
                     @page {
                         size: A4 landscape;
                         margin: 0;
                     }
-                    
+
                     body * {
                         visibility: hidden !important;
                     }
-                    
+
                     #printIdentificationDiv,
                     #printIdentificationDiv * {
                         visibility: visible !important;
                     }
-                    
+
                     #printIdentificationDiv {
                         position: absolute !important;
                         left: 0 !important;
@@ -8498,7 +8506,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         overflow: visible !important;
                         z-index: 9999 !important;
                     }
-                    
+
                     .etiqueta-page {
                         width: 297mm !important;
                         height: 210mm !important;
@@ -8513,11 +8521,11 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         page-break-after: always !important;
                         page-break-inside: avoid !important;
                     }
-                    
+
                     .etiqueta-page:last-child {
                         page-break-after: auto !important;
                     }
-                    
+
                     .etiqueta-container {
                         text-align: center !important;
                         font-family: Arial, sans-serif !important;
@@ -8527,13 +8535,13 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         flex-direction: column !important;
                         justify-content: center !important;
                         align-items: center !important;
-                        padding: 5mm !important; 
+                        padding: 5mm !important;
                         box-sizing: border-box !important;
                     }
-                    
+
                     .etiqueta-quadro {
                         border: 3px solid #999 !important;
-                        padding: 20mm 15mm !important; 
+                        padding: 20mm 15mm !important;
                         background: white !important;
                         width: 100% !important;
                         height: 100% !important;
@@ -8545,7 +8553,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         box-shadow: inset 0 0 0 2px #ccc !important;
                         box-sizing: border-box !important;
                     }
-                    
+
                     .etiqueta-numero {
                         font-size: 100px !important;
                         font-weight: 900 !important;
@@ -8555,9 +8563,9 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         letter-spacing: 3px !important;
                         text-transform: uppercase !important;
                     }
-                    
+
                     .etiqueta-info {
-                        font-size: 76px !important; 
+                        font-size: 76px !important;
                         font-weight: 700 !important;
                         color: #333 !important;
                         margin: 0 !important;
@@ -8565,7 +8573,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         letter-spacing: 3px !important;
                         text-transform: uppercase !important;
                     }
-                    
+
                     .etiqueta-data {
                         font-size: 60px !important;
                         font-weight: 700 !important;
@@ -8574,7 +8582,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         line-height: 1 !important;
                         letter-spacing: 3px !important;
                     }
-                    
+
                     .etiqueta-contador {
                         font-size: 110px !important;
                         font-weight: 900 !important;
@@ -8590,7 +8598,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         box-shadow: inset 0 0 0 2px #ccc !important;
                         margin-bottom: 25px !important;
                     }
-                    
+
                     .etiqueta-lojas {
                         font-size: 42px !important;
                         font-weight: 700 !important;
@@ -8612,7 +8620,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                         opacity: 1 !important;
                     }
                 }
-                
+
                 @media screen {
                     #printIdentificationDiv {
                         display: none;
@@ -8620,15 +8628,18 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                 }
             </style>
         `;
-        
-        // Para cada loja da expedição, gerar suas etiquetas separadamente
+
+        const filial = selectedFilial;
+
+        // Para cada item/loja da expedição, gerar suas etiquetas separadamente
         for (const item of items) {
             const loja = lojas.find(l => l.id === item.loja_id);
             if (!loja) continue;
-            
+
             const lojaInfo = `${loja.codigo} - ${loja.nome}`;
+            // A quantidade total de etiquetas é a soma de Pallets e RollTrainers
             const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
-            
+
             // Criar etiquetas para esta loja específica
             for (let i = 1; i <= totalItensLoja; i++) {
                 etiquetasHtml += `
@@ -8637,25 +8648,28 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                             <div class="etiqueta-quadro">
                                 <div class="etiqueta-numero">${lojaInfo}</div>
                                 <hr class="etiqueta-divider">
-                                <div class="etiqueta-data">${loja.endereco_completo}</div>
+                                <div class="etiqueta-data">${loja.endereco_completo || 'Endereço não informado'}</div>
                                 <hr class="etiqueta-divider">
                                 <div class="etiqueta-contador">${String(i).padStart(2, '0')}/${String(totalItensLoja).padStart(2, '0')}</div>
                                 <hr class="etiqueta-divider">
-                                <div class="etiqueta-lojas">${liderNome}</div>
+                                <div class="etiqueta-lojas">Conferente: ${liderNome}</div>
                                 <hr class="etiqueta-divider">
-                                <div class="etiqueta-info">CD ${selectedFilial.nome} - ${selectedFilial.descricao}</div>
-                            </div>
+                                <div class="etiqueta-info">CD ${filial.nome} - ${filial.descricao}</div>
+                                <div class="text-xs text-gray-500 mt-4">
+                                    ${numeroCarga !== 'N/A' ? `Carga: ${numeroCarga} | ` : ''}Data: ${dataFormatada}
+                                </div>
+                                </div>
                         </div>
                     </div>
                 `;
             }
         }
-        
+
         printDiv.innerHTML = etiquetasHtml;
         document.body.appendChild(printDiv);
-        
-        showNotification('Preparando impressão das etiquetas...', 'info');
-        
+
+        showNotification(lojaId ? `Preparando impressão para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressão de todas as etiquetas.', 'info');
+
         // Imprime
         setTimeout(() => {
             window.print();
@@ -8666,7 +8680,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, palle
                 }
             }, 2000);
         }, 500);
-        
+
     } catch (error) {
         console.error('Erro ao buscar dados para impressão:', error);
         showNotification('Erro ao carregar dados para impressão: ' + error.message, 'error');
@@ -9250,30 +9264,44 @@ function startMotoristaTimer(m) {
 
 
 
-// NOVO: Função para abrir o modal de seleção de impressão
 async function openImprimirIdentificacaoModal(expeditionId) {
     const modal = document.getElementById('printIdentificationModal');
     const lojaList = document.getElementById('printLojaList');
-    
+
     document.getElementById('currentPrintExpeditionId').value = expeditionId;
     document.getElementById('printExpeditionIdDisplay').textContent = expeditionId;
-    
-    // Resetar o estado do modal
+
+    // Resetar o estado do modal (ANTES de exibir)
     document.getElementById('lojaSelectionContainer').style.display = 'none';
     const secondaryBtn = document.querySelector('#printIdentificationModal .btn-secondary');
     if (secondaryBtn) secondaryBtn.style.display = 'block';
     lojaList.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando lojas...</div>`;
-    modal.style.display = 'flex';
-    
+    // modal.style.display = 'flex'; // <-- NÃO exibir o modal ainda
+
     try {
         // Busca os itens da expedição e os dados das lojas associadas
         const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}&select=id,loja_id,pallets,rolltrainers,lojas(codigo,nome)`);
-        
+
         if (!items || items.length === 0) {
-            lojaList.innerHTML = '<div class="alert alert-info">Nenhum item encontrado para esta expedição.</div>';
+            // Se não houver itens, apenas mostra notificação e não abre modal
+            showNotification('Nenhum item encontrado para esta expedição.', 'error');
+            closePrintIdentificationModal(); // Garante que o modal feche se estiver aberto por algum motivo
             return;
         }
 
+        // ***** NOVO: LÓGICA PARA IMPRESSÃO DIRETA *****
+        if (items.length === 1) {
+            // Apenas uma loja, imprime diretamente
+            showNotification('Apenas uma loja. Imprimindo diretamente...', 'info', 2000);
+            handlePrintChoice(items[0].loja_id); // Chama a função de impressão com o ID da única loja
+            return; // Sai da função para não mostrar o modal
+        }
+        // ***** FIM DA NOVA LÓGICA *****
+
+        // Se chegou aqui, há mais de uma loja, então mostra o modal
+        modal.style.display = 'flex'; // <-- Exibe o modal AGORA
+
+        // Popula a lista de lojas (código existente)
         let lojasHtml = '';
         items.forEach(item => {
             const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
@@ -9289,11 +9317,16 @@ async function openImprimirIdentificacaoModal(expeditionId) {
                 </div>
             `;
         });
-
         lojaList.innerHTML = lojasHtml;
-        
+
     } catch (error) {
+         // Se der erro ao buscar, mostra no local da lista e fecha o modal se precisar
         lojaList.innerHTML = `<div class="alert alert-error">Erro ao carregar lojas: ${error.message}</div>`;
+         // Se o modal já estiver visível por algum motivo, esconde
+         if (modal.style.display === 'flex') {
+             // Pode adicionar um botão para fechar ou fechar automaticamente
+             setTimeout(closePrintIdentificationModal, 3000);
+         }
     }
 }
 
@@ -9319,22 +9352,22 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
     try {
         // 1. Busca os itens da expedição e as informações das lojas
         let endpoint = `expedition_items?expedition_id=eq.${expeditionId}`;
-        
+
         // Aplica o filtro de loja, se fornecido
         if (lojaId) {
             endpoint += `&loja_id=eq.${lojaId}`;
         }
-        
+
         const items = await supabaseRequest(endpoint);
-        
+
         if (!items || items.length === 0) {
             showNotification(lojaId ? 'Nenhum item encontrado para esta loja.' : 'Nenhum item encontrado para esta expedição.', 'error');
             return;
         }
-        
+
         const hoje = new Date();
         const dataFormatada = hoje.toLocaleDateString('pt-BR');
-        
+
         // Remove qualquer div de impressão anterior
         const existingPrintDiv = document.getElementById('printIdentificationDiv');
         if (existingPrintDiv) {
@@ -9344,7 +9377,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
         // Cria o container de impressão
         const printDiv = document.createElement('div');
         printDiv.id = 'printIdentificationDiv';
-        
+
         let etiquetasHtml = `
             <style>
                 @media print {
@@ -9355,21 +9388,21 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         -webkit-print-color-adjust: exact !important;
                         color-adjust: exact !important;
                     }
-                    
+
                     @page {
                         size: A4 landscape;
                         margin: 0;
                     }
-                    
+
                     body * {
                         visibility: hidden !important;
                     }
-                    
+
                     #printIdentificationDiv,
                     #printIdentificationDiv * {
                         visibility: visible !important;
                     }
-                    
+
                     #printIdentificationDiv {
                         position: absolute !important;
                         left: 0 !important;
@@ -9379,7 +9412,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         overflow: visible !important;
                         z-index: 9999 !important;
                     }
-                    
+
                     .etiqueta-page {
                         width: 297mm !important;
                         height: 210mm !important;
@@ -9394,11 +9427,11 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         page-break-after: always !important;
                         page-break-inside: avoid !important;
                     }
-                    
+
                     .etiqueta-page:last-child {
                         page-break-after: auto !important;
                     }
-                    
+
                     .etiqueta-container {
                         text-align: center !important;
                         font-family: Arial, sans-serif !important;
@@ -9408,13 +9441,13 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         flex-direction: column !important;
                         justify-content: center !important;
                         align-items: center !important;
-                        padding: 5mm !important; 
+                        padding: 5mm !important;
                         box-sizing: border-box !important;
                     }
-                    
+
                     .etiqueta-quadro {
                         border: 3px solid #999 !important;
-                        padding: 20mm 15mm !important; 
+                        padding: 20mm 15mm !important;
                         background: white !important;
                         width: 100% !important;
                         height: 100% !important;
@@ -9426,7 +9459,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         box-shadow: inset 0 0 0 2px #ccc !important;
                         box-sizing: border-box !important;
                     }
-                    
+
                     .etiqueta-numero {
                         font-size: 100px !important;
                         font-weight: 900 !important;
@@ -9436,9 +9469,9 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         letter-spacing: 3px !important;
                         text-transform: uppercase !important;
                     }
-                    
+
                     .etiqueta-info {
-                        font-size: 76px !important; 
+                        font-size: 76px !important;
                         font-weight: 700 !important;
                         color: #333 !important;
                         margin: 0 !important;
@@ -9446,7 +9479,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         letter-spacing: 3px !important;
                         text-transform: uppercase !important;
                     }
-                    
+
                     .etiqueta-data {
                         font-size: 60px !important;
                         font-weight: 700 !important;
@@ -9455,7 +9488,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         line-height: 1 !important;
                         letter-spacing: 3px !important;
                     }
-                    
+
                     .etiqueta-contador {
                         font-size: 110px !important;
                         font-weight: 900 !important;
@@ -9471,7 +9504,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         box-shadow: inset 0 0 0 2px #ccc !important;
                         margin-bottom: 25px !important;
                     }
-                    
+
                     .etiqueta-lojas {
                         font-size: 42px !important;
                         font-weight: 700 !important;
@@ -9493,7 +9526,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                         opacity: 1 !important;
                     }
                 }
-                
+
                 @media screen {
                     #printIdentificationDiv {
                         display: none;
@@ -9501,18 +9534,18 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                 }
             </style>
         `;
-        
+
         const filial = selectedFilial;
-        
+
         // Para cada item/loja da expedição, gerar suas etiquetas separadamente
         for (const item of items) {
             const loja = lojas.find(l => l.id === item.loja_id);
             if (!loja) continue;
-            
+
             const lojaInfo = `${loja.codigo} - ${loja.nome}`;
             // A quantidade total de etiquetas é a soma de Pallets e RollTrainers
             const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
-            
+
             // Criar etiquetas para esta loja específica
             for (let i = 1; i <= totalItensLoja; i++) {
                 etiquetasHtml += `
@@ -9528,19 +9561,21 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                                 <div class="etiqueta-lojas">Conferente: ${liderNome}</div>
                                 <hr class="etiqueta-divider">
                                 <div class="etiqueta-info">CD ${filial.nome} - ${filial.descricao}</div>
-                                <div class="text-xs text-gray-500 mt-4">Carga: ${numeroCarga} | Expedição: ${expeditionId} | Data: ${dataFormatada}</div>
-                            </div>
+                                <div class="text-xs text-gray-500 mt-4">
+                                    ${numeroCarga !== 'N/A' ? `Carga: ${numeroCarga} | ` : ''}Data: ${dataFormatada}
+                                </div>
+                                </div>
                         </div>
                     </div>
                 `;
             }
         }
-        
+
         printDiv.innerHTML = etiquetasHtml;
         document.body.appendChild(printDiv);
-        
+
         showNotification(lojaId ? `Preparando impressão para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressão de todas as etiquetas.', 'info');
-        
+
         // Imprime
         setTimeout(() => {
             window.print();
@@ -9551,7 +9586,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
                 }
             }, 2000);
         }, 500);
-        
+
     } catch (error) {
         console.error('Erro ao buscar dados para impressão:', error);
         showNotification('Erro ao carregar dados para impressão: ' + error.message, 'error');
