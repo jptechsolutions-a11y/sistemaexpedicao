@@ -8467,7 +8467,7 @@ function renderIdentificacaoExpedicoes(expeditionsToRender) { // Recebe a lista 
             <div class="identificacao-card">
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        {/* **** ID REMOVIDO DAQUI **** */}
+                       
                         <h3 class="text-lg font-bold text-gray-800">Identificação de Expedição</h3>
                         <p class="text-sm text-gray-500">${new Date(exp.data_hora).toLocaleString('pt-BR')}</p>
                         <p class="text-sm text-gray-600 mt-2"><strong>Lojas:</strong> ${lojasInfo}</p>
