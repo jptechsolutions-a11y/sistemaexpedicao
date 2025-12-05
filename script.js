@@ -2572,7 +2572,34 @@ async function lancarCarga() {
                     return;
                 }
 
-                const newExpeditionData = { data_hora: new Date().toISOString(), status: 'aguardando_veiculo', doca_id: docaAlvoId, veiculo_id: veiculoId, motorista_id: motoristaId, lider_id: cargasSelecionadas[0].lider_id, data_alocacao_veiculo: new Date().toISOString(), observacoes: observacoes || null };
+                // 🚨 CORREÇÃO: AGREGAR NÚMEROS DE CARGA 🚨
+                let todosNumerosCarga = [];
+                cargasSelecionadas.forEach(c => {
+                    if (c.numeros_carga) {
+                        if (Array.isArray(c.numeros_carga)) {
+                            todosNumerosCarga.push(...c.numeros_carga);
+                        } else if (typeof c.numeros_carga === 'string') {
+                             // Trata formato string do postgres ex: "{123,456}" ou "123"
+                             const clean = c.numeros_carga.replace(/[{}"]/g, '');
+                             if (clean) todosNumerosCarga.push(...clean.split(',').map(s => s.trim()));
+                        }
+                    }
+                });
+                // Remove duplicatas e vazios
+                todosNumerosCarga = [...new Set(todosNumerosCarga)].filter(n => n && n.trim() !== "");
+
+                const newExpeditionData = { 
+                    data_hora: new Date().toISOString(), 
+                    status: 'aguardando_veiculo', 
+                    doca_id: docaAlvoId, 
+                    veiculo_id: veiculoId, 
+                    motorista_id: motoristaId, 
+                    lider_id: cargasSelecionadas[0].lider_id, 
+                    data_alocacao_veiculo: new Date().toISOString(), 
+                    observacoes: observacoes || null,
+                    numeros_carga: todosNumerosCarga.length > 0 ? todosNumerosCarga : null // ✅ Agora salva as cargas!
+                };
+                
                 const newExpeditionResponse = await supabaseRequest('expeditions', 'POST', newExpeditionData);
                 const newExpeditionId = newExpeditionResponse[0].id;
 
@@ -2595,12 +2622,12 @@ async function lancarCarga() {
                 await Promise.all(updatePromises);
 
                 showNotification('Expedição montada! Defina a ordem de carregamento.', 'info');
-document.getElementById('alocar_veiculoSelect').value = '';
-document.getElementById('alocar_motoristaSelect').value = '';
-document.getElementById('alocar_observacoes').value = '';
+                document.getElementById('alocar_veiculoSelect').value = '';
+                document.getElementById('alocar_motoristaSelect').value = '';
+                document.getElementById('alocar_observacoes').value = '';
 
-// Chama o novo modal para definir a ordem
-await openOrdemCarregamentoModal(newExpeditionId);
+                // Chama o novo modal para definir a ordem
+                await openOrdemCarregamentoModal(newExpeditionId);
 
             } catch (error) {
                 showNotification(`Erro ao agrupar: ${error.message}`, 'error');
