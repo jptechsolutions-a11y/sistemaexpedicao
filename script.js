@@ -3222,9 +3222,13 @@ function renderMotoristasListHtml(motoristasData) {
         if ((m.displayStatus === 'retornando_cd' || m.displayStatus === 'retornando_com_imobilizado') && m.veiculoId) {
             actionButton = `<button class="btn btn-primary btn-small" onclick="marcarRetornoCD('${m.id}', '${m.veiculoId}')">Cheguei no CD</button>`;
         } 
-        // 2. Finalizar Descarga de Imobilizado
+       // 2. Finalizar Descarga de Imobilizado
         else if (m.displayStatus === 'descarregando_imobilizado' && m.veiculoId) {
             actionButton = `<button class="btn btn-warning btn-small" onclick="finalizarDescargaImobilizado('${m.id}', '${m.veiculoId}')">Finalizar Descarga</button>`;
+        }
+        // 3. Em Rota (Para abrir as opções e Registrar Chegada/Saída)
+        else if ((m.displayStatus === 'saiu_para_entrega' || m.displayStatus === 'em_viagem') && m.veiculoId) {
+            actionButton = `<button class="btn btn-success btn-small" onclick="document.getElementById('placaMotorista').value='${m.veiculoId}'; consultarExpedicoesPorPlaca();">Registrar</button>`;
         }
         
         // O BLOCO DE LÓGICA DO CARREGAMENTO FOI REMOVIDO DEFINITIVAMENTE.
@@ -3269,7 +3273,7 @@ function renderMotoristasListHtml(motoristasData) {
                 const expeditionsWithItems = expeditions.map(exp => {
                     const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
                     return { ...exp, items: items.filter(i => i.expedition_id === exp.id), veiculo_placa: veiculo?.placa };
-                }).filter(exp => exp.veiculo_placa === placa);
+                }).filter(exp => String(exp.veiculo_id) === String(placa) || exp.veiculo_placa === placa);
                 
                 renderExpedicoesMotorista(expeditionsWithItems);
             } catch (error) {
@@ -3321,18 +3325,17 @@ function renderMotoristasListHtml(motoristasData) {
                 
                 if (item.status_descarga === 'pendente' && emTransito) {
                     statusDescargaLabel = 'Próxima Entrega'; statusColor = 'text-blue-600';
-                    actionButton = `<button class="btn btn-success" onclick="openQrModal('iniciar_descarga', '${item.id}', '${loja.codlojaqr || ''}', '${exp.id}')">Iniciar Descarga</button>`;
+                    actionButton = `<button class="btn btn-success" onclick="iniciarDescarga('${item.id}')">Registrar Chegada</button>`;
                     emTransito = false;
                 } else if (item.status_descarga === 'pendente' && !emTransito) {
                     statusDescargaLabel = 'Aguardando'; statusColor = 'text-gray-500';
                 } else if (item.status_descarga === 'em_descarga') {
                     statusDescargaLabel = 'Em Descarga'; statusColor = 'text-yellow-600';
-                    actionButton = `<button class="btn btn-primary" onclick="openQrModal('finalizar_descarga', '${item.id}', '${loja.codlojaqr || ''}', '${exp.id}')">Finalizar Descarga</button>`;
+                    actionButton = `<button class="btn btn-primary" onclick="finalizarDescarga('${item.id}')">Registrar Saída</button>`;
                     emTransito = false;
                 } else if (item.status_descarga === 'descarregado') {
-                    statusDescargaLabel = 'Descarregado'; statusColor = 'text-green-600';
-                }
 
+                 
                 html += `
                     <div class="loja-descarga-card">
                         <div class="flex justify-between items-center mb-2">
