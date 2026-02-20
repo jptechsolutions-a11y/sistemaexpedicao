@@ -3342,7 +3342,7 @@ function renderMotoristasListHtml(motoristasData) {
             }).join('');
         }
 
-        function renderPainelDescarga(exp) {
+       function renderPainelDescarga(exp) {
             let html = `<div class="motorista-card"><h3 class="text-xl font-semibold mb-4">Roteiro de Entregas</h3>`;
             let emTransito = true;
             
@@ -3350,7 +3350,7 @@ function renderMotoristasListHtml(motoristasData) {
                 const loja = lojas.find(l => l.id === item.loja_id);
                 let actionButton = '', statusDescargaLabel = '', statusColor = '';
                 
-               if (item.status_descarga === 'pendente' && emTransito) {
+                if (item.status_descarga === 'pendente' && emTransito) {
                     statusDescargaLabel = 'Próxima Entrega'; statusColor = 'text-blue-600';
                     actionButton = `<button class="btn btn-success" onclick="iniciarDescarga('${item.id}')">Registrar Chegada</button>`;
                     emTransito = false;
@@ -3361,14 +3361,16 @@ function renderMotoristasListHtml(motoristasData) {
                     actionButton = `<button class="btn btn-primary" onclick="finalizarDescarga('${item.id}')">Registrar Saída</button>`;
                     emTransito = false;
                 } else if (item.status_descarga === 'descarregado') {
+                    statusDescargaLabel = 'Concluído'; statusColor = 'text-green-600';
+                }
 
                 html += `
-                    <div class="loja-descarga-card">
+                    <div class="loja-descarga-card p-3 border-b">
                         <div class="flex justify-between items-center mb-2">
                              <h4 class="font-bold">${loja?.nome || 'N/A'}</h4>
                              <span class="font-bold ${statusColor}">${statusDescargaLabel}</span>
                         </div>
-                        <div class="text-center mt-4">${actionButton}</div>
+                        <div class="text-center mt-2">${actionButton}</div>
                     </div>`;
             });
             return html + `</div>`;
