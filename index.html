@@ -210,18 +210,19 @@
 
                     <div class="filters-section">
                         <div class="filters-grid">
-                            <div class="form-group">
-                                <label for="homeDataInicio">Data Início:</label>
-                                <input type="date" id="homeDataInicio" onchange="loadHomeData()">
+                            <div class="filter-group">
+                                <label>Data Início:</label>
+                                <input type="date" id="homeDataInicio" onchange="window.loadHomeData()">
                             </div>
-                            <div class="form-group">
-                                <label for="homeDataFim">Data Fim:</label>
-                                <input type="date" id="homeDataFim" onchange="loadHomeData()">
+                            <div class="filter-group">
+                                <label>Data Fim:</label>
+                                <input type="date" id="homeDataFim" onchange="window.loadHomeData()">
                             </div>
                             <div class="form-group">
                                 <label for="homeSearchInput">Busca Aberta:</label>
-                                <input type="text" id="homeSearchInput" placeholder="Buscar por Loja, Motorista..."
-                                    onkeyup="loadHomeData()">
+                                <input type="text" id="homeBuscaTudo"
+                                    placeholder="Buscar por remetente, nota fiscal, CTE..."
+                                    onkeyup="window.loadHomeData()">
                             </div>
                         </div>
                     </div>
@@ -316,9 +317,10 @@
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-xl font-semibold text-gray-800">Rastreamento em Tempo Real</h2>
                             <div class="flex items-center gap-4">
-                                <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="homeAutoRefresh" onchange="toggleHomeAutoRefresh()">
-                                    <label for="homeAutoRefresh" class="text-sm text-gray-600">Auto-refresh</label>
+                                <div class="auto-refresh-toggle" style="margin-right: 15px;">
+                                    <input type="checkbox" id="homeAutoRefresh"
+                                        onchange="window.toggleHomeAutoRefresh()">
+                                    <label for="homeAutoRefresh">Auto Recarregar (30s)</label>
                                 </div>
                                 <span class="text-xs text-gray-500" id="homeLastUpdate">Última atualização: --:--</span>
                                 <button class="btn btn-primary btn-small" onclick="showHomeMapFullscreen()">🗺️ Tela
@@ -569,7 +571,7 @@
         const headers = { 'Content-Type': 'application/json' };
     </script>
     <script type="module" src="js/main.js"></script>
-    <script src="script.js?v=2.6"></script>
+    <script src="script.js?v=2.7"></script>
     <div id="notificationContainer"></div>
 
 </body>
