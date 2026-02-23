@@ -1,14 +1,15 @@
 ﻿import { supabaseRequest } from '../api.js';
 import { getState, setState } from '../state.js';
 import { loadUserPermissions } from '../auth.js';
-import { getStatusLabel, getPermittedSubTabs, showSubTab, showNotification, showYesNoModal } from '../utils.js';
+import { getStatusLabel, getPermittedSubTabs, showSubTab, showYesNoModal } from '../utils.js';
+import { showNotification } from '../ui.js';
 
 const getGlobal = (key) => typeof window !== 'undefined' ? window[key] : getState()[key];
 
 Object.defineProperty(window, 'currentUser', { get: () => getGlobal('currentUser'), set: (v) => window.currentUser = v });
 Object.defineProperty(window, 'pontosInteresse', { get: () => getGlobal('pontosInteresse'), set: (v) => window.pontosInteresse = v });
 
-  async function loadConfiguracoes() {
+async function loadConfiguracoes() {
     if (!currentUser) {
         document.getElementById('passwordFormContainer').style.display = 'block';
         document.getElementById('configuracoesContent').style.display = 'none';
@@ -25,13 +26,13 @@ Object.defineProperty(window, 'pontosInteresse', { get: () => getGlobal('pontosI
             showNotification('Erro ao carregar grupos de acesso.', 'error');
         }
     }
-    
+
     document.getElementById('passwordFormContainer').style.display = 'none';
     document.getElementById('configuracoesContent').style.display = 'block';
     updateSystemStatus();
-    
+
     const permittedConfiguracoesTabs = getPermittedSubTabs('configuracoes');
-    
+
     if (permittedConfiguracoesTabs.length > 0) {
         const initialSubTab = permittedConfiguracoesTabs.length === 1 ? permittedConfiguracoesTabs[0] : 'filiais';
         const initialElement = document.querySelector(`#configuracoes .sub-tabs button[onclick*="'${initialSubTab}'"]`);
@@ -39,7 +40,7 @@ Object.defineProperty(window, 'pontosInteresse', { get: () => getGlobal('pontosI
     }
 }
 
-        // SUBSTITUIR A VERSÃO EXISTENTE DE checkPassword
+// SUBSTITUIR A VERSÃO EXISTENTE DE checkPassword
 async function checkPassword() {
     const nome = document.getElementById('userInput').value.trim();
     const senha = document.getElementById('passwordInput').value;
@@ -74,7 +75,7 @@ async function checkPassword() {
         document.getElementById('configuracoesContent').style.display = 'block';
         showSubTab('configuracoes', 'filiais', document.querySelector('#configuracoes .sub-tab'));
         updateSystemStatus();
-        
+
     } catch (err) {
         showAlert('passwordAlert', 'Erro ao verificar credenciais. Verifique a conexão.', 'error');
         console.error(err);
@@ -82,12 +83,12 @@ async function checkPassword() {
 }
 
 
-        function showAlert(containerId, message, type) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
-        }
-        
-      // Substitua a função showAddForm no seu script.js (cerca da linha 2689)
+function showAlert(containerId, message, type) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+}
+
+// Substitua a função showAddForm no seu script.js (cerca da linha 2689)
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
 function showAddForm(type, itemToEdit = null) {
@@ -97,11 +98,11 @@ function showAddForm(type, itemToEdit = null) {
     fieldsContainer.innerHTML = ''; // Limpa campos anteriores
 
     let formHtml = '';
-    
+
     // Adiciona lógica de edição
     const isEditing = itemToEdit && typeof itemToEdit === 'object';
     const editData = isEditing ? itemToEdit : {};
-    
+
     // Atualiza o texto do botão salvar
     const saveButton = document.querySelector('#addFormModal button[type="submit"]');
     if (saveButton) {
@@ -209,10 +210,10 @@ function showAddForm(type, itemToEdit = null) {
         title.textContent = isEditing ? `Editar Usuário: ${editData.nome}` : `Adicionar Novo Usuário`;
         // Usar gruposAcesso global para preencher o select
         const gruposHtml = gruposAcesso.map(g => `<option value="${g.id}" ${editData.grupo_id === g.id ? 'selected' : ''}>${g.nome}</option>`).join('');
-        
+
         // Se estiver editando, o itemToEdit.nome será o valor de 'acesso' a ser editado
         const nomeAcesso = editData.nome || '';
-        
+
         formHtml = `
             ${isEditing ? `<input type="hidden" id="edit_acesso_id" value="${editData.id || ''}">` : ''}
             <div class="form-group"><label>Nome de Usuário:</label><input type="text" id="add_nome" value="${nomeAcesso}" required></div>
@@ -224,7 +225,7 @@ function showAddForm(type, itemToEdit = null) {
         `;
     } else if (type === 'pontoInteresse') {
         title.textContent = isEditing ? `Editar Ponto: ${editData.nome}` : 'Adicionar Ponto de Interesse';
-         // Lógica do select de lojas para preencher campos (apenas para a criação)
+        // Lógica do select de lojas para preencher campos (apenas para a criação)
         const lojasOptions = lojas.map(loja => `<option value="${loja.id}">${loja.codigo} - ${loja.nome}</option>`).join('');
 
         formHtml = `
@@ -264,10 +265,10 @@ function showAddForm(type, itemToEdit = null) {
             </div>
         `;
     }
-    
+
     fieldsContainer.innerHTML = formHtml;
     modal.style.display = 'flex';
-    
+
     // NOVO: Adicionar listener para o select de loja no Ponto de Interesse (apenas no modo de adição)
     if (type === 'pontoInteresse' && !isEditing) {
         const lojaSelect = document.getElementById('add_loja_id');
@@ -290,12 +291,12 @@ function showAddForm(type, itemToEdit = null) {
 }
 
 
-        function hideAddForm() {
-            document.getElementById('addFormModal').style.display = 'none';
-            document.getElementById('addFormAlert').innerHTML = '';
-        }
+function hideAddForm() {
+    document.getElementById('addFormModal').style.display = 'none';
+    document.getElementById('addFormAlert').innerHTML = '';
+}
 
-        async function handleSave() {
+async function handleSave() {
     const title = document.getElementById('addFormTitle').textContent;
     let success = false;
     try {
@@ -308,39 +309,39 @@ function showAddForm(type, itemToEdit = null) {
         else if (title.includes('Grupo')) success = await saveGroup(); // NOVO
         else if (title.includes('Acesso') || title.includes('Usuário')) success = await saveAcesso(); // Ajuste no texto
         else if (title.includes('Ponto de Interesse')) success = await savePontoInteresse();
-                
-                if (success) {
-                     showNotification('Cadastro realizado com sucesso!', 'success');
-                     hideAddForm();
-                     await loadSelectData(); 
-                     if (title.includes('Filial')) await loadFiliais();
-                     
-                     if (document.getElementById('configuracoes').classList.contains('active')) {
-                         const activeSubTabEl = document.querySelector('#configuracoes .sub-tab.active');
-                         if(activeSubTabEl) {
-                            const activeSubTab = activeSubTabEl.getAttribute('onclick').match(/'([^']*)','([^']*)'/)[2];
-                            showSubTab('configuracoes', activeSubTab);
-                         }
-                     }
+
+        if (success) {
+            showNotification('Cadastro realizado com sucesso!', 'success');
+            hideAddForm();
+            await loadSelectData();
+            if (title.includes('Filial')) await loadFiliais();
+
+            if (document.getElementById('configuracoes').classList.contains('active')) {
+                const activeSubTabEl = document.querySelector('#configuracoes .sub-tab.active');
+                if (activeSubTabEl) {
+                    const activeSubTab = activeSubTabEl.getAttribute('onclick').match(/'([^']*)','([^']*)'/)[2];
+                    showSubTab('configuracoes', activeSubTab);
                 }
-            } catch (error) {
-                 showAlert('addFormAlert', `Erro ao salvar: ${error.message}`, 'error');
             }
         }
+    } catch (error) {
+        showAlert('addFormAlert', `Erro ao salvar: ${error.message}`, 'error');
+    }
+}
 
-       async function saveFilial() {
+async function saveFilial() {
     const isEdit = !!document.getElementById('edit_filial_nome');
     const nomeOriginal = isEdit ? document.getElementById('edit_filial_nome').value : null;
-    
-    const data = { 
-        nome: document.getElementById('add_nome').value, 
+
+    const data = {
+        nome: document.getElementById('add_nome').value,
         descricao: document.getElementById('add_descricao').value,
         endereco_cd: document.getElementById('add_endereco_cd').value,
         latitude_cd: document.getElementById('add_latitude_cd').value ? parseFloat(document.getElementById('add_latitude_cd').value) : null,
         longitude_cd: document.getElementById('add_longitude_cd').value ? parseFloat(document.getElementById('add_longitude_cd').value) : null,
-        ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true 
+        ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true
     };
-    
+
     if (isEdit) {
         await supabaseRequest(`filiais?nome=eq.${nomeOriginal}`, 'PATCH', data, false);
         showNotification('Filial atualizada com sucesso!', 'success');
@@ -352,21 +353,21 @@ function showAddForm(type, itemToEdit = null) {
     }
     return true;
 }
-        async function saveLoja() {
+async function saveLoja() {
     const isEdit = !!document.getElementById('edit_loja_id');
     const lojaId = isEdit ? document.getElementById('edit_loja_id').value : null;
-    
-    const data = { 
-        nome: document.getElementById('add_nome').value, 
-        codigo: document.getElementById('add_codigo').value, 
-        cidade: document.getElementById('add_cidade').value, 
+
+    const data = {
+        nome: document.getElementById('add_nome').value,
+        codigo: document.getElementById('add_codigo').value,
+        cidade: document.getElementById('add_cidade').value,
         codlojaqr: document.getElementById('add_codlojaqr').value,
         endereco_completo: document.getElementById('add_endereco_completo').value,
         latitude: document.getElementById('add_latitude') ? parseFloat(document.getElementById('add_latitude').value) : null,
         longitude: document.getElementById('add_longitude') ? parseFloat(document.getElementById('add_longitude').value) : null,
-        ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true 
+        ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true
     };
-    
+
     if (isEdit) {
         await supabaseRequest(`lojas?id=eq.${lojaId}`, 'PATCH', data);
         showNotification('Loja atualizada com sucesso!', 'success');
@@ -376,18 +377,18 @@ function showAddForm(type, itemToEdit = null) {
     }
     return true;
 }
-        
-        async function saveDoca() {
+
+async function saveDoca() {
     const isEdit = !!document.getElementById('edit_doca_id');
     const docaId = isEdit ? document.getElementById('edit_doca_id').value : null;
-    
-    const data = { 
-        nome: document.getElementById('add_nome').value, 
-        capacidade_pallets: parseInt(document.getElementById('add_capacidade_pallets').value), 
-        coddoca: document.getElementById('add_coddoca').value, 
-        ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true 
+
+    const data = {
+        nome: document.getElementById('add_nome').value,
+        capacidade_pallets: parseInt(document.getElementById('add_capacidade_pallets').value),
+        coddoca: document.getElementById('add_coddoca').value,
+        ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true
     };
-    
+
     if (isEdit) {
         await supabaseRequest(`docas?id=eq.${docaId}`, 'PATCH', data);
         showNotification('Doca atualizada com sucesso!', 'success');
@@ -399,23 +400,23 @@ function showAddForm(type, itemToEdit = null) {
     renderDocasConfig();
     return true;
 }
-  
+
 
 async function saveLider() {
     const isEdit = !!document.getElementById('edit_lider_id');
     const liderId = isEdit ? document.getElementById('edit_lider_id').value : null;
-    
-    const data = { 
-        nome: document.getElementById('add_nome').value, 
-        codigo_funcionario: document.getElementById('add_codigo_funcionario').value, 
-        ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true 
+
+    const data = {
+        nome: document.getElementById('add_nome').value,
+        codigo_funcionario: document.getElementById('add_codigo_funcionario').value,
+        ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true
     };
-    
+
     // 🚨 AJUSTE CRÍTICO: Se estiver editando, não envie o código do funcionário 
     // para evitar o erro de violação de chave única (409).
     if (isEdit) {
-        delete data.codigo_funcionario; 
-        
+        delete data.codigo_funcionario;
+
         await supabaseRequest(`lideres?id=eq.${liderId}`, 'PATCH', data);
         showNotification('atualizado com sucesso!', 'success');
     } else {
@@ -426,18 +427,18 @@ async function saveLider() {
     renderLideresConfig();
     return true;
 }
-        async function saveVeiculo() {
+async function saveVeiculo() {
     const isEdit = !!document.getElementById('edit_veiculo_id');
     const veiculoId = isEdit ? document.getElementById('edit_veiculo_id').value : null;
-    
-    const data = { 
-        placa: document.getElementById('add_placa').value, 
-        modelo: document.getElementById('add_modelo').value, 
-        capacidade_pallets: parseInt(document.getElementById('add_capacidade_pallets').value), 
-        tipo: document.getElementById('add_tipo').value, 
-        status: document.getElementById('add_status').value 
+
+    const data = {
+        placa: document.getElementById('add_placa').value,
+        modelo: document.getElementById('add_modelo').value,
+        capacidade_pallets: parseInt(document.getElementById('add_capacidade_pallets').value),
+        tipo: document.getElementById('add_tipo').value,
+        status: document.getElementById('add_status').value
     };
-    
+
     if (isEdit) {
         await supabaseRequest(`veiculos?id=eq.${veiculoId}`, 'PATCH', data, false);
         showNotification('Veículo atualizado com sucesso!', 'success');
@@ -449,16 +450,16 @@ async function saveLider() {
     renderVeiculosConfig();
     return true;
 }
-        async function saveMotorista() {
+async function saveMotorista() {
     const isEdit = !!document.getElementById('edit_motorista_id');
     const motoristaId = isEdit ? document.getElementById('edit_motorista_id').value : null;
-    
-    const data = { 
-        nome: document.getElementById('add_nome').value, 
-        PRODUTIVO: document.getElementById('add_produtivo').value, 
-        status: document.getElementById('add_status').value 
+
+    const data = {
+        nome: document.getElementById('add_nome').value,
+        PRODUTIVO: document.getElementById('add_produtivo').value,
+        status: document.getElementById('add_status').value
     };
-    
+
     if (isEdit) {
         await supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'PATCH', data, false);
         showNotification('Motorista atualizado com sucesso!', 'success');
@@ -470,23 +471,23 @@ async function saveLider() {
     renderMotoristasConfig();
     return true;
 }
-      // SUBSTITUIR A VERSÃO EXISTENTE DE saveAcesso
+// SUBSTITUIR A VERSÃO EXISTENTE DE saveAcesso
 async function saveAcesso() {
     const isEdit = !!document.getElementById('edit_acesso_id');
     const userId = isEdit ? document.getElementById('edit_acesso_id').value : null;
-    
-    const data = { 
-        nome: document.getElementById('add_nome').value, 
+
+    const data = {
+        nome: document.getElementById('add_nome').value,
         grupo_id: document.getElementById('add_grupo_id').value || null,
         // Mantém tipo_acesso por compatibilidade, mas o campo de input foi removido
-        tipo_acesso: 'CUSTOM' 
+        tipo_acesso: 'CUSTOM'
     };
-    
+
     const senha = document.getElementById('add_senha').value;
     if (!isEdit || senha.trim()) {
         data.senha = senha || document.getElementById('add_nome').value; // usar nome como senha padrão se vazio
     }
-    
+
     if (isEdit) {
         await supabaseRequest(`acessos?id=eq.${userId}`, 'PATCH', data, false);
         showNotification('Usuário atualizado com sucesso!', 'success');
@@ -497,12 +498,12 @@ async function saveAcesso() {
     renderAcessosConfig();
     return true;
 }
-        async function renderVeiculosConfig() {
+async function renderVeiculosConfig() {
     const tbody = document.getElementById('veiculosConfigBody');
     if (!tbody) return;
-    
+
     tbody.innerHTML = `<tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando veículos...</td></tr>`;
-    
+
     try {
         const veiculosData = await supabaseRequest('veiculos?order=placa');
         if (!veiculosData || veiculosData.length === 0) {
@@ -535,11 +536,11 @@ async function editVeiculo(veiculoId) {
         showNotification('Veículo não encontrado', 'error');
         return;
     }
-    
+
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
-    
+
     title.textContent = 'Editar Veículo';
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_veiculo_id" value="${veiculo.id}">
@@ -556,7 +557,7 @@ async function editVeiculo(veiculoId) {
             <option value="manutencao" ${veiculo.status === 'manutencao' ? 'selected' : ''}>Manutenção</option>
         </select></div>
     `;
-    
+
     modal.style.display = 'flex';
 }
 
@@ -580,11 +581,11 @@ async function editMotorista(motoristaId) {
         showNotification('Motorista não encontrado', 'error');
         return;
     }
-    
+
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
-    
+
     title.textContent = 'Editar Motorista';
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_motorista_id" value="${motorista.id}">
@@ -596,7 +597,7 @@ async function editMotorista(motoristaId) {
             <option value="folga" ${motorista.status === 'folga' ? 'selected' : ''}>Folga</option>
         </select></div>
     `;
-    
+
     modal.style.display = 'flex';
 }
 
@@ -613,13 +614,13 @@ async function deleteMotorista(motoristaId) {
         }
     }
 }
-        
-        async function renderMotoristasConfig() {
+
+async function renderMotoristasConfig() {
     const tbody = document.getElementById('motoristasConfigBody');
     if (!tbody) return;
-    
+
     tbody.innerHTML = `<tr><td colspan="4" class="loading"><div class="spinner"></div>Carregando motoristas...</td></tr>`;
-    
+
     try {
         const motoristasData = await supabaseRequest('motoristas?order=nome');
         tbody.innerHTML = motoristasData.map(motorista => `
@@ -639,37 +640,37 @@ async function deleteMotorista(motoristaId) {
         tbody.innerHTML = `<tr><td colspan="4" class="alert alert-error">Erro ao carregar motoristas: ${error.message}</td></tr>`;
     }
 }
-        
-        function updateSystemStatus() {
-            const statusEl = document.getElementById('systemStatus');
-            if(statusEl) {
-                statusEl.textContent = `
+
+function updateSystemStatus() {
+    const statusEl = document.getElementById('systemStatus');
+    if (statusEl) {
+        statusEl.textContent = `
         Filial Ativa: ${selectedFilial.nome}
         Usuário Logado: ${currentUser.nome}
         Tipo de Acesso: ${currentUser.tipo_acesso}
         Cache: ${lojas.length} lojas, ${docas.length} docas, ${lideres.length} líderes
                 `;
-            }
-        }
- // Variável global para o mapa
-        let mapInstance = null;
-        let markersLayer = null;
+    }
+}
+// Variável global para o mapa
+let mapInstance = null;
+let markersLayer = null;
 
-        function showLocationMap(expeditionId, lat, lng, vehiclePlaca) {
+function showLocationMap(expeditionId, lat, lng, vehiclePlaca) {
     console.log(`Abrindo mapa para ${vehiclePlaca} em:`, lat, lng); // DEBUG
-    
+
     document.getElementById('mapModalTitle').textContent = `Localização de ${vehiclePlaca}`;
     document.getElementById('mapModal').style.display = 'flex';
-    
+
     // Aguardar o modal aparecer antes de inicializar o mapa
     setTimeout(() => {
         initMap(lat, lng, vehiclePlaca);
     }, 100);
 }
-        function showAllVehiclesMap() {
+function showAllVehiclesMap() {
     document.getElementById('mapModalTitle').textContent = 'Localização de Todos os Veículos e Lojas';
     document.getElementById('mapModal').style.display = 'flex';
-    
+
     setTimeout(() => {
         initAllVehiclesAndLojasMap();
     }, 100);
@@ -679,31 +680,31 @@ function initAllVehiclesAndLojasMap() {
     if (mapInstance) {
         mapInstance.remove();
     }
-    
+
     const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
     mapInstance = L.map('map').setView(cdCoords, 11);
-    
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
-    
+
     const bounds = L.latLngBounds();
     bounds.extend(cdCoords);
 
     rastreioData.forEach(rastreio => {
         const { lat, lng } = rastreio.coordenadas;
-        
+
         let color = '#0077B6';
         if (rastreio.status_rastreio === 'em_descarga') color = '#F59E0B';
         else if (rastreio.status_rastreio === 'retornando') color = '#10B981';
-        
+
         const vehicleIcon = L.divIcon({
             className: 'custom-marker',
             html: `<div style="background: ${color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${rastreio.veiculo_placa}</div>`,
             iconSize: [70, 25],
             iconAnchor: [35, 12]
         });
-        
+
         L.marker([lat, lng], { icon: vehicleIcon })
             .addTo(mapInstance)
             .bindPopup(`
@@ -713,30 +714,30 @@ function initAllVehiclesAndLojasMap() {
                     <span style="color: ${color}; font-weight: bold;">${getStatusLabel(rastreio.status_rastreio)}</span>
                 </div>
             `);
-        
+
         bounds.extend([lat, lng]);
     });
-    
+
     lojas.forEach(loja => {
         if (loja.latitude && loja.longitude) {
             const lat = parseFloat(loja.latitude);
             const lng = parseFloat(loja.longitude);
-            
+
             let cor = '#10B981';
             if (loja.nome.toLowerCase().includes('fort')) cor = '#EF4444';
             else if (loja.nome.toLowerCase().includes('comper')) cor = '#10B981';
-            
+
             const lojaIcon = L.divIcon({
                 className: 'custom-marker',
                 html: `<div style="background: ${cor}; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🏪 ${loja.codigo}</div>`,
                 iconSize: [60, 25],
                 iconAnchor: [30, 12]
             });
-            
+
             L.marker([lat, lng], { icon: lojaIcon })
                 .addTo(mapInstance)
                 .bindPopup(`<b>${loja.nome}</b><br>Código: ${loja.codigo}`);
-            
+
             bounds.extend([lat, lng]);
         }
     });
@@ -746,69 +747,69 @@ function initAllVehiclesAndLojasMap() {
     }
 }
 
-        function initMap(lat, lng, vehiclePlaca) {
-            // Destruir mapa existente se houver
-            if (mapInstance) {
-                mapInstance.remove();
-            }
-            
-            // Criar novo mapa
-            mapInstance = L.map('map').setView([lat, lng], 15);
-            
-            // Adicionar camada do OpenStreetMap
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(mapInstance);
-            
-            // Criar ícone personalizado para veículo
-            const vehicleIcon = L.divIcon({
-                className: 'custom-marker',
-                html: `<div style="background: #0077B6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${vehiclePlaca}</div>`,
-                iconSize: [80, 30],
-                iconAnchor: [40, 15]
-            });
-            
-            // Adicionar marcador do veículo
-            L.marker([lat, lng], { icon: vehicleIcon })
-                .addTo(mapInstance)
-                .bindPopup(`<b>${vehiclePlaca}</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`);
-        }
+function initMap(lat, lng, vehiclePlaca) {
+    // Destruir mapa existente se houver
+    if (mapInstance) {
+        mapInstance.remove();
+    }
 
-        function initAllVehiclesMap() {
-            // Destruir mapa existente se houver
-            if (mapInstance) {
-                mapInstance.remove();
-            }
-            
-            // Criar novo mapa centrado em Cuiabá
-            mapInstance = L.map('map').setView([-15.6014, -56.0979], 11);
-            
-            // Adicionar camada do OpenStreetMap
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(mapInstance);
-            
-            // Adicionar marcadores para todos os veículos
-            const bounds = L.latLngBounds();
-            
-            rastreioData.forEach(rastreio => {
-                const { lat, lng } = rastreio.coordenadas;
-                
-                // Definir cor baseada no status
-                let color = '#0077B6'; // azul padrão
-                if (rastreio.status_rastreio === 'em_descarga') color = '#F59E0B'; // laranja
-                else if (rastreio.status_rastreio === 'retornando') color = '#10B981'; // verde
-                
-                const vehicleIcon = L.divIcon({
-                    className: 'custom-marker',
-                    html: `<div style="background: ${color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${rastreio.veiculo_placa}</div>`,
-                    iconSize: [70, 25],
-                    iconAnchor: [35, 12]
-                });
-                
-                const marker = L.marker([lat, lng], { icon: vehicleIcon })
-                    .addTo(mapInstance)
-                    .bindPopup(`
+    // Criar novo mapa
+    mapInstance = L.map('map').setView([lat, lng], 15);
+
+    // Adicionar camada do OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(mapInstance);
+
+    // Criar ícone personalizado para veículo
+    const vehicleIcon = L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="background: #0077B6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${vehiclePlaca}</div>`,
+        iconSize: [80, 30],
+        iconAnchor: [40, 15]
+    });
+
+    // Adicionar marcador do veículo
+    L.marker([lat, lng], { icon: vehicleIcon })
+        .addTo(mapInstance)
+        .bindPopup(`<b>${vehiclePlaca}</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`);
+}
+
+function initAllVehiclesMap() {
+    // Destruir mapa existente se houver
+    if (mapInstance) {
+        mapInstance.remove();
+    }
+
+    // Criar novo mapa centrado em Cuiabá
+    mapInstance = L.map('map').setView([-15.6014, -56.0979], 11);
+
+    // Adicionar camada do OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(mapInstance);
+
+    // Adicionar marcadores para todos os veículos
+    const bounds = L.latLngBounds();
+
+    rastreioData.forEach(rastreio => {
+        const { lat, lng } = rastreio.coordenadas;
+
+        // Definir cor baseada no status
+        let color = '#0077B6'; // azul padrão
+        if (rastreio.status_rastreio === 'em_descarga') color = '#F59E0B'; // laranja
+        else if (rastreio.status_rastreio === 'retornando') color = '#10B981'; // verde
+
+        const vehicleIcon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="background: ${color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${rastreio.veiculo_placa}</div>`,
+            iconSize: [70, 25],
+            iconAnchor: [35, 12]
+        });
+
+        const marker = L.marker([lat, lng], { icon: vehicleIcon })
+            .addTo(mapInstance)
+            .bindPopup(`
                         <div style="text-align: center;">
                             <b>${rastreio.veiculo_placa}</b><br>
                             <small>${rastreio.motorista_nome}</small><br>
@@ -817,31 +818,31 @@ function initAllVehiclesAndLojasMap() {
                             <small>Entregas: ${rastreio.entregas_concluidas}/${rastreio.total_entregas}</small>
                         </div>
                     `);
-                
-                bounds.extend([lat, lng]);
-            });
-            
-            // Ajustar zoom para mostrar todos os veículos
-            if (rastreioData.length > 0) {
-                mapInstance.fitBounds(bounds, { padding: [20, 20] });
-            }
-        }
 
-        function closeMapModal() {
-            document.getElementById('mapModal').style.display = 'none';
-            if (mapInstance) {
-                mapInstance.remove();
-                mapInstance = null;
-            }
-        }
-        // ===== ADICIONAR TODAS ESSAS FUNÇÕES NO SEU JAVASCRIPT =====
+        bounds.extend([lat, lng]);
+    });
+
+    // Ajustar zoom para mostrar todos os veículos
+    if (rastreioData.length > 0) {
+        mapInstance.fitBounds(bounds, { padding: [20, 20] });
+    }
+}
+
+function closeMapModal() {
+    document.getElementById('mapModal').style.display = 'none';
+    if (mapInstance) {
+        mapInstance.remove();
+        mapInstance = null;
+    }
+}
+// ===== ADICIONAR TODAS ESSAS FUNÇÕES NO SEU JAVASCRIPT =====
 
 // === FUNÇÕES PARA TRAJETO NO HISTÓRICO ===
 
 async function showTrajectoryMap(expeditionId, vehiclePlaca) {
     document.getElementById('mapModalTitle').textContent = `Trajeto da Viagem - ${vehiclePlaca}`;
     document.getElementById('mapModal').style.display = 'flex';
-    
+
     setTimeout(async () => {
         await initTrajectoryMap(expeditionId, vehiclePlaca);
     }, 100);
@@ -860,13 +861,13 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             `expedition_items?expedition_id=eq.${expeditionId}&order=ordem_entrega.asc,data_inicio_descarga.asc`,
             'GET', null, false
         );
-        
+
         if (!expeditionItems || expeditionItems.length === 0) {
             showNotification('Não há pontos de entrega para traçar a rota.', 'info');
             const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
             mapInstance = L.map('map').setView(cdCoords, 11);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
-            setTimeout(() => { mapInstance.invalidateSize(); }, 200); 
+            setTimeout(() => { mapInstance.invalidateSize(); }, 200);
             return;
         }
 
@@ -874,7 +875,7 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
         const waypoints = [
             L.latLng(selectedFilial.latitude_cd, selectedFilial.longitude_cd)
         ];
-        
+
         expeditionItems.forEach(item => {
             const loja = lojas.find(l => l.id === item.loja_id);
             if (loja && loja.latitude && loja.longitude) {
@@ -884,12 +885,12 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
 
         // Se não houver pontos suficientes para traçar rota
         if (waypoints.length < 2) {
-             showNotification('Não há coordenadas de loja válidas para traçar a rota.', 'info');
-             const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
-             mapInstance = L.map('map').setView(cdCoords, 11);
-             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
-             setTimeout(() => { mapInstance.invalidateSize(); }, 200); 
-             return;
+            showNotification('Não há coordenadas de loja válidas para traçar a rota.', 'info');
+            const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
+            mapInstance = L.map('map').setView(cdCoords, 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
+            setTimeout(() => { mapInstance.invalidateSize(); }, 200);
+            return;
         }
 
         // 2. CRIAR MAPA
@@ -897,19 +898,19 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(mapInstance);
-        
+
         // 3. CRIAR ROTEAMENTO COM TRATAMENTO DE ERRO ROBUSTO
         const routingControl = L.Routing.control({
             waypoints: waypoints,
-            createMarker: function(i, waypoint, n) {
-                 let iconHtml = '';
+            createMarker: function (i, waypoint, n) {
+                let iconHtml = '';
                 if (i === 0) {
                     iconHtml = '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🏭 CD</div>';
                 } else {
-                    const loja = lojas.find(l => l.id === expeditionItems[i-1].loja_id); 
+                    const loja = lojas.find(l => l.id === expeditionItems[i - 1].loja_id);
                     iconHtml = `<div style="background: #EF4444; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">#${i} - ${loja?.codigo || 'N/A'}</div>`;
                 }
-                
+
                 const markerIcon = L.divIcon({
                     className: 'custom-marker',
                     html: iconHtml,
@@ -918,12 +919,12 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
                 });
                 return L.marker(waypoint.latLng, {
                     icon: markerIcon
-                }).bindPopup(`<b>${waypoint.name || `Ponto ${i+1}`}</b>`);
+                }).bindPopup(`<b>${waypoint.name || `Ponto ${i + 1}`}</b>`);
             },
             routeWhileDragging: false,
             autoRoute: true,
-            lineOptions: { 
-                styles: [{ color: '#0077B6', weight: 6, opacity: 0.8 }] 
+            lineOptions: {
+                styles: [{ color: '#0077B6', weight: 6, opacity: 0.8 }]
             },
             router: L.Routing.osrmv1({
                 serviceUrl: 'https://router.project-osrm.org/route/v1',
@@ -933,13 +934,13 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             fitSelectedRoutes: true,
             show: false // Esconde o painel de instruções
         }).addTo(mapInstance);
-        
+
         // 4. TRATAMENTO DE SUCESSO
-        routingControl.on('routesfound', function(e) {
+        routingControl.on('routesfound', function (e) {
             const route = e.routes[0];
             const distance = route.summary.totalDistance / 1000;
             const duration = route.summary.totalTime / 60;
-            
+
             // Ajustar o zoom do mapa para a rota completa
             try {
                 const bounds = route.bounds || L.latLngBounds(waypoints);
@@ -952,12 +953,12 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
 
             // Cria o painel de estatísticas
             const statsControl = L.control({ position: 'topright' });
-            statsControl.onAdd = function() {
+            statsControl.onAdd = function () {
                 const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
                 div.style.background = 'white';
                 div.style.padding = '10px';
                 div.style.fontSize = '12px';
-                
+
                 div.innerHTML = `
                     <p><b>Estatísticas da Rota</b></p>
                     <p><strong>Veículo:</strong> ${vehiclePlaca}</p>
@@ -968,56 +969,56 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
                 return div;
             };
             statsControl.addTo(mapInstance);
-            
+
             showNotification('Rota calculada com sucesso!', 'success', 2000);
         });
-        
+
         // 5. TRATAMENTO DE ERRO CRÍTICO
-        routingControl.on('routingerror', function(e) {
-             console.error("Erro no Routing Machine:", e.error);
-             
-             // Remove o controle com erro
-             try {
-                 mapInstance.removeControl(routingControl);
-             } catch (err) {
-                 console.warn('Erro ao remover controle:', err);
-             }
-             
-             // Ajusta zoom para os waypoints mesmo sem rota
-             const boundsWaypoints = L.latLngBounds(waypoints);
-             if (boundsWaypoints.isValid()) {
-                 mapInstance.fitBounds(boundsWaypoints, { padding: [30, 30] });
-             }
-             
-             // Adiciona linha reta entre os pontos como fallback
-             const fallbackPolyline = L.polyline(waypoints, {
-                 color: '#F59E0B',
-                 weight: 4,
-                 opacity: 0.6,
-                 dashArray: '10, 10'
-             }).addTo(mapInstance);
-             
-             // Painel de aviso
-             const warningControl = L.control({ position: 'topright' });
-             warningControl.onAdd = function() {
-                 const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
-                 div.style.background = '#FEF3C7';
-                 div.style.border = '2px solid #F59E0B';
-                 div.style.padding = '10px';
-                 div.style.fontSize = '12px';
-                 div.style.maxWidth = '250px';
-                 
-                 div.innerHTML = `
+        routingControl.on('routingerror', function (e) {
+            console.error("Erro no Routing Machine:", e.error);
+
+            // Remove o controle com erro
+            try {
+                mapInstance.removeControl(routingControl);
+            } catch (err) {
+                console.warn('Erro ao remover controle:', err);
+            }
+
+            // Ajusta zoom para os waypoints mesmo sem rota
+            const boundsWaypoints = L.latLngBounds(waypoints);
+            if (boundsWaypoints.isValid()) {
+                mapInstance.fitBounds(boundsWaypoints, { padding: [30, 30] });
+            }
+
+            // Adiciona linha reta entre os pontos como fallback
+            const fallbackPolyline = L.polyline(waypoints, {
+                color: '#F59E0B',
+                weight: 4,
+                opacity: 0.6,
+                dashArray: '10, 10'
+            }).addTo(mapInstance);
+
+            // Painel de aviso
+            const warningControl = L.control({ position: 'topright' });
+            warningControl.onAdd = function () {
+                const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
+                div.style.background = '#FEF3C7';
+                div.style.border = '2px solid #F59E0B';
+                div.style.padding = '10px';
+                div.style.fontSize = '12px';
+                div.style.maxWidth = '250px';
+
+                div.innerHTML = `
                      <p><b>⚠️ Rota Simplificada</b></p>
                      <p style="margin: 5px 0;">O serviço OSRM falhou. Linha reta exibida.</p>
                      <p><strong>Veículo:</strong> ${vehiclePlaca}</p>
                      <p><strong>Paradas:</strong> ${waypoints.length - 1}</p>
                  `;
-                 return div;
-             };
-             warningControl.addTo(mapInstance);
-             
-             showNotification('Rota simplificada: Serviço OSRM instável. Linha reta exibida.', 'error', 5000);
+                return div;
+            };
+            warningControl.addTo(mapInstance);
+
+            showNotification('Rota simplificada: Serviço OSRM instável. Linha reta exibida.', 'error', 5000);
         });
 
         // 6. ESCONDER PAINEL DE INSTRUÇÕES
@@ -1025,12 +1026,12 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
         if (routingAlt) routingAlt.style.display = 'none';
 
         // 7. GARANTIA DE EXIBIÇÃO
-        setTimeout(() => { 
+        setTimeout(() => {
             if (mapInstance) {
-                mapInstance.invalidateSize(); 
+                mapInstance.invalidateSize();
             }
-        }, 500); 
-        
+        }, 500);
+
     } catch (error) {
         console.error('Erro fatal ao carregar trajeto:', error);
         closeMapModal();
@@ -1041,27 +1042,27 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
 function calculateTripStats(trajectoryData) {
     let distanciaTotal = 0;
     let velocidades = [];
-    
+
     for (let i = 1; i < trajectoryData.length; i++) {
         const p1 = trajectoryData[i - 1];
         const p2 = trajectoryData[i];
-        
+
         // Apenas calcula a distância se a velocidade for > 0, para ignorar paradas longas
         if (p2.velocidade > 0) {
             const lat1 = parseFloat(p1.latitude);
             const lon1 = parseFloat(p1.longitude);
             const lat2 = parseFloat(p2.latitude);
             const lon2 = parseFloat(p2.longitude);
-            
+
             const R = 6371; // Raio da Terra em km
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             const distancia = R * c;
-            
+
             distanciaTotal += distancia;
         }
 
@@ -1069,17 +1070,17 @@ function calculateTripStats(trajectoryData) {
             velocidades.push(parseFloat(p2.velocidade));
         }
     }
-    
-    const velocidadeMedia = velocidades.length > 0 ? 
+
+    const velocidadeMedia = velocidades.length > 0 ?
         velocidades.reduce((a, b) => a + b, 0) / velocidades.length : 0;
-    
+
     const inicio = new Date(trajectoryData[0].data_gps);
     const fim = new Date(trajectoryData[trajectoryData.length - 1].data_gps);
     const duracaoMs = fim - inicio;
     const duracaoHoras = Math.floor(duracaoMs / 3600000);
     const duracaoMinutos = Math.floor((duracaoMs % 3600000) / 60000);
     const duracao = `${duracaoHoras}h ${duracaoMinutos}min`;
-    
+
     return {
         distancia: distanciaTotal,
         velocidadeMedia: velocidadeMedia,
@@ -1093,13 +1094,13 @@ async function loadPontosInteresse() {
     try {
         // Agora, a requisição busca os dados diretamente do banco de dados Supabase
         const pontosInteresseData = await supabaseRequest('pontos_interesse?order=nome', 'GET', null, false);
-        
+
         if (!pontosInteresseData) {
             pontosInteresse = [];
         } else {
             pontosInteresse = pontosInteresseData;
         }
-        
+
         renderPontosInteresseTable();
         showNotification('Pontos de interesse carregados com sucesso!', 'success');
     } catch (error) {
@@ -1113,12 +1114,12 @@ async function loadPontosInteresse() {
 function renderPontosInteresseTable() {
     const tbody = document.getElementById('pontosInteresseBody');
     if (!tbody) return;
-    
+
     if (pontosInteresse.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Nenhum ponto de interesse cadastrado.</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = pontosInteresse.map(ponto => `
         <tr>
             <td class="font-medium">${ponto.nome}</td>
@@ -1140,7 +1141,7 @@ function showAddPontoInteresse() {
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
-    
+
     title.textContent = 'Adicionar Ponto de Interesse';
     fieldsContainer.innerHTML = `
         <div class="form-group md:col-span-2">
@@ -1174,7 +1175,7 @@ function showAddPontoInteresse() {
             <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">📍 Usar Localização Atual</button>
         </div>
     `;
-    
+
     document.getElementById('add_loja_id').addEventListener('change', (e) => {
         const selectedLojaId = e.target.value;
         if (selectedLojaId) {
@@ -1188,7 +1189,7 @@ function showAddPontoInteresse() {
             }
         }
     });
-    
+
     modal.style.display = 'flex';
 }
 function getCurrentLocation() {
@@ -1211,7 +1212,7 @@ function getCurrentLocation() {
 async function savePontoInteresse() {
     const isEdit = !!document.getElementById('edit_ponto_id');
     const pontoId = isEdit ? document.getElementById('edit_ponto_id').value : null;
-    
+
     const data = {
         nome: document.getElementById('add_nome').value,
         tipo: document.getElementById('add_tipo').value,
@@ -1219,10 +1220,10 @@ async function savePontoInteresse() {
         longitude: parseFloat(document.getElementById('add_longitude').value),
         raio_deteccao: parseInt(document.getElementById('add_raio_deteccao').value),
         cor: document.getElementById('add_cor').value,
-        ativo: document.getElementById('add_ativo') ? 
+        ativo: document.getElementById('add_ativo') ?
             document.getElementById('add_ativo').value === 'true' : true
     };
-    
+
     try {
         if (isEdit) {
             await supabaseRequest(`pontos_interesse?id=eq.${pontoId}`, 'PATCH', data, false);
@@ -1231,7 +1232,7 @@ async function savePontoInteresse() {
             await supabaseRequest('pontos_interesse', 'POST', data, false);
             showNotification('Ponto de interesse adicionado!', 'success');
         }
-        
+
         hideAddForm();
         await loadPontosInteresse();
         return true;
@@ -1243,10 +1244,10 @@ async function savePontoInteresse() {
 
 async function addPontosInteresseToMap() {
     if (!mapInstance || !pontosInteresse) return;
-    
+
     pontosInteresse.forEach(ponto => {
         if (!ponto.ativo) return;
-        
+
         // Ícone personalizado para o ponto
         const pontoIcon = L.divIcon({
             className: 'custom-marker',
@@ -1254,12 +1255,12 @@ async function addPontosInteresseToMap() {
             iconSize: [40, 20],
             iconAnchor: [20, 10]
         });
-        
+
         // Adicionar marcador
         L.marker([ponto.latitude, ponto.longitude], { icon: pontoIcon })
             .addTo(mapInstance)
             .bindPopup(`<b>${ponto.nome}</b><br><small>${ponto.tipo}</small>`);
-        
+
         // Adicionar círculo de detecção
         L.circle([ponto.latitude, ponto.longitude], {
             color: ponto.cor,
@@ -1273,7 +1274,7 @@ async function addPontosInteresseToMap() {
 function showPontosInteresseMap() {
     document.getElementById('mapModalTitle').textContent = 'Pontos de Interesse Cadastrados';
     document.getElementById('mapModal').style.display = 'flex';
-    
+
     setTimeout(async () => {
         await initPontosInteresseMap();
     }, 100);
@@ -1283,15 +1284,15 @@ async function initPontosInteresseMap() {
     if (mapInstance) {
         mapInstance.remove();
     }
-    
+
     mapInstance = L.map('map').setView([-15.6014, -56.0979], 11);
-    
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
-    
+
     await addPontosInteresseToMap();
-    
+
     // Ajustar zoom para mostrar todos os pontos
     if (pontosInteresse.length > 0) {
         const bounds = L.latLngBounds();
@@ -1305,12 +1306,12 @@ async function initPontosInteresseMap() {
 // Função para detectar proximidade durante rastreamento
 function checkProximityToPontosInteresse(lat, lng) {
     const proximityAlerts = [];
-    
+
     pontosInteresse.forEach(ponto => {
         if (!ponto.ativo) return;
-        
+
         const distance = calculateDistance(lat, lng, ponto.latitude, ponto.longitude);
-        
+
         if (distance <= ponto.raio_deteccao) {
             proximityAlerts.push({
                 ponto: ponto,
@@ -1318,7 +1319,7 @@ function checkProximityToPontosInteresse(lat, lng) {
             });
         }
     });
-    
+
     return proximityAlerts;
 }
 
@@ -1326,10 +1327,10 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371000; // Raio da Terra em metros
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-             Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-             Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
 
@@ -1339,11 +1340,11 @@ async function editPontoInteresse(pontoId) {
         showNotification('Ponto não encontrado', 'error');
         return;
     }
-    
+
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
-    
+
     title.textContent = 'Editar Ponto de Interesse';
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_ponto_id" value="${ponto.id}">
@@ -1392,7 +1393,7 @@ async function editPontoInteresse(pontoId) {
             </select>
         </div>
     `;
-    
+
     modal.style.display = 'flex';
 }
 
@@ -1419,9 +1420,9 @@ async function showLojasConfig() {
 async function renderLojasConfig() {
     const tbody = document.getElementById('lojasConfigBody');
     if (!tbody) return;
-    
+
     tbody.innerHTML = `<tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando lojas...</td></tr>`;
-    
+
     try {
         const lojasData = await supabaseRequest('lojas?order=codigo,nome');
         tbody.innerHTML = lojasData.map(loja => `
@@ -1435,10 +1436,10 @@ async function renderLojasConfig() {
                     <div class="flex gap-1">
                         <button class="btn btn-warning btn-small" onclick="editLoja('${loja.id}')">Editar</button>
                         <button class="btn btn-danger btn-small" onclick="deleteLoja('${loja.id}')">Excluir</button>
-                        ${(loja.latitude && loja.longitude) ? 
-                            `<button class="btn btn-primary btn-small" onclick="showLojaMap('${loja.id}')">Mapa</button>` : 
-                            `<button class="btn btn-secondary btn-small" disabled title="Sem coordenadas">Sem GPS</button>`
-                        }
+                        ${(loja.latitude && loja.longitude) ?
+                `<button class="btn btn-primary btn-small" onclick="showLojaMap('${loja.id}')">Mapa</button>` :
+                `<button class="btn btn-secondary btn-small" disabled title="Sem coordenadas">Sem GPS</button>`
+            }
                     </div>
                 </td>
             </tr>
@@ -1455,12 +1456,12 @@ async function editFilial(nomeFilial) {
         showNotification('Filial não encontrada', 'error');
         return;
     }
-    
+
     const filial = filiais[0];
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
-    
+
     title.textContent = 'Editar Filial';
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_filial_nome" value="${filial.nome}">
@@ -1471,7 +1472,7 @@ async function editFilial(nomeFilial) {
         <div class="form-group"><label>Longitude do CD:</label><input type="number" id="add_longitude_cd" step="0.000001" value="${filial.longitude_cd || ''}"></div>
         <div class="form-group"><label>Status:</label><select id="add_ativo"><option value="true" ${filial.ativo ? 'selected' : ''}>Ativa</option><option value="false" ${!filial.ativo ? 'selected' : ''}>Inativa</option></select></div>
     `;
-    
+
     modal.style.display = 'flex';
 }
 
@@ -1494,11 +1495,11 @@ async function editDoca(docaId) {
         showNotification('Doca não encontrada', 'error');
         return;
     }
-    
+
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
-    
+
     title.textContent = 'Editar Doca';
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_doca_id" value="${doca.id}">
@@ -1507,7 +1508,7 @@ async function editDoca(docaId) {
         <div class="form-group"><label>Código QR:</label><input type="text" id="add_coddoca" value="${doca.coddoca || ''}" required></div>
         <div class="form-group"><label>Status:</label><select id="add_ativo"><option value="true" ${doca.ativo ? 'selected' : ''}>Ativa</option><option value="false" ${!doca.ativo ? 'selected' : ''}>Inativa</option></select></div>
     `;
-    
+
     modal.style.display = 'flex';
 }
 
@@ -1531,11 +1532,11 @@ async function editLider(liderId) {
         showNotification('não encontrado', 'error');
         return;
     }
-    
+
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
-    
+
     title.textContent = 'Editar Líder';
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_lider_id" value="${lider.id}">
@@ -1543,7 +1544,7 @@ async function editLider(liderId) {
         <div class="form-group"><label>Matrícula:</label><input type="text" id="add_codigo_funcionario" value="${lider.codigo_funcionario || ''}" required></div>
         <div class="form-group"><label>Status:</label><select id="add_ativo"><option value="true" ${lider.ativo ? 'selected' : ''}>Ativo</option><option value="false" ${!lider.ativo ? 'selected' : ''}>Inativo</option></select></div>
     `;
-    
+
     modal.style.display = 'flex';
 }
 
@@ -1569,15 +1570,15 @@ async function editAcesso(nomeUsuario) {
         showNotification('Acesso não encontrado', 'error');
         return;
     }
-    
+
     const acesso = acessosData[0];
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
-    
+
     title.textContent = 'Editar Acesso';
     const gruposHtml = gruposAcesso.map(g => `<option value="${g.id}" ${acesso.grupo_id === g.id ? 'selected' : ''}>${g.nome}</option>`).join('');
-    
+
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_acesso_id" value="${acesso.id}">
         <div class="form-group"><label>Nome de Usuário:</label><input type="text" id="add_nome" value="${acesso.nome}" required></div>
@@ -1587,7 +1588,7 @@ async function editAcesso(nomeUsuario) {
             ${gruposHtml}
         </select></div>
     `;
-    
+
     modal.style.display = 'flex';
 }
 
@@ -1610,11 +1611,11 @@ async function editLoja(lojaId) {
         showNotification('Loja não encontrada', 'error');
         return;
     }
-    
+
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
-    
+
     title.textContent = 'Editar Loja';
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_loja_id" value="${loja.id}">
@@ -1631,7 +1632,7 @@ async function editLoja(lojaId) {
             <button type="button" class="btn btn-primary" onclick="geocodeAddress()">🌍 Buscar por Endereço</button>
         </div>
     `;
-    
+
     modal.style.display = 'flex';
 }
 
@@ -1655,10 +1656,10 @@ function showLojaMap(lojaId) {
         showNotification('Coordenadas da loja não definidas', 'error');
         return;
     }
-    
+
     document.getElementById('mapModalTitle').textContent = `Localização - ${loja.nome}`;
     document.getElementById('mapModal').style.display = 'flex';
-    
+
     setTimeout(() => {
         initSingleLojaMap(parseFloat(loja.latitude), parseFloat(loja.longitude), loja);
     }, 100);
@@ -1668,20 +1669,20 @@ function initSingleLojaMap(lat, lng, loja) {
     if (mapInstance) {
         mapInstance.remove();
     }
-    
+
     mapInstance = L.map('map').setView([lat, lng], 15);
-    
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
-    
+
     const lojaIcon = L.divIcon({
         className: 'custom-marker',
         html: `<div style="background: #EF4444; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🏪 ${loja.codigo}</div>`,
         iconSize: [100, 40],
         iconAnchor: [50, 20]
     });
-    
+
     L.marker([lat, lng], { icon: lojaIcon })
         .addTo(mapInstance)
         .bindPopup(`
@@ -1697,18 +1698,18 @@ function initSingleLojaMap(lat, lng, loja) {
 
 async function geocodeAddress() {
     const endereco = document.getElementById('add_endereco_completo').value.trim();
-    
+
     if (!endereco) {
         showNotification('Digite um endereço para buscar as coordenadas', 'error');
         return;
     }
-    
+
     try {
         showNotification('Buscando coordenadas...', 'info');
-        
+
         const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(endereco)}&limit=1&countrycodes=br`);
         const data = await response.json();
-        
+
         if (data && data.length > 0) {
             const result = data[0];
             document.getElementById('add_latitude').value = parseFloat(result.lat).toFixed(6);
@@ -1726,7 +1727,7 @@ async function geocodeAddress() {
 function showAllLojasMap() {
     document.getElementById('mapModalTitle').textContent = 'Todas as Lojas Cadastradas';
     document.getElementById('mapModal').style.display = 'flex';
-    
+
     setTimeout(() => {
         initAllLojasMap();
     }, 100);
@@ -1737,53 +1738,53 @@ function initAllLojasMap() {
     if (mapInstance) {
         mapInstance.remove();
     }
-    
+
     // Ponto de partida dinâmico da filial
-    const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979]; 
-    
+    const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
+
     mapInstance = L.map('map').setView(cdCoords, 11);
-    
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
-    
+
     const cdIcon = L.divIcon({
         className: 'custom-marker',
         html: '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🏭 CD</div>',
         iconSize: [60, 30],
         iconAnchor: [30, 15]
     });
-    
+
     L.marker(cdCoords, { icon: cdIcon })
         .addTo(mapInstance)
         .bindPopup(`<h3><strong>Centro de Distribuição</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
-    
+
     const bounds = L.latLngBounds();
     bounds.extend(cdCoords);
-    
+
     let lojasComGPS = 0;
     let lojasSemGPS = 0;
-    
+
     lojas.forEach(loja => {
         if (loja.latitude && loja.longitude) {
             lojasComGPS++;
             const lat = parseFloat(loja.latitude);
             const lng = parseFloat(loja.longitude);
-            
+
             let cor = '#10B981';
             if (loja.nome.toLowerCase().includes('fort')) {
                 cor = '#EF4444';
             } else if (loja.nome.toLowerCase().includes('comper')) {
                 cor = '#0077B6';
             }
-            
+
             const lojaIcon = L.divIcon({
                 className: 'custom-marker',
                 html: `<div style="background: ${cor}; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">🏪 ${loja.codigo}</div>`,
                 iconSize: [60, 25],
                 iconAnchor: [30, 12]
             });
-            
+
             L.marker([lat, lng], { icon: lojaIcon })
                 .addTo(mapInstance)
                 .bindPopup(`
@@ -1795,29 +1796,29 @@ function initAllLojasMap() {
                         <p><strong>Coordenadas:</strong><br>${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
                     </div>
                 `);
-            
+
             bounds.extend([lat, lng]);
         } else {
             lojasSemGPS++;
         }
     });
-    
+
     if (lojasComGPS > 0) {
         mapInstance.fitBounds(bounds, { padding: [20, 20] });
     }
-    
+
     const infoControl = L.control({ position: 'topleft' });
-    infoControl.onAdd = function() {
+    infoControl.onAdd = function () {
         const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
         div.style.background = 'white';
         div.style.padding = '10px';
         div.style.fontSize = '12px';
-        
+
         let alertText = '';
         if (lojasSemGPS > 0) {
             alertText = `<p style="color: #F59E0B; font-weight: bold; margin-top: 8px;">⚠️ ${lojasSemGPS} loja(s) sem coordenadas definidas</p>`;
         }
-        
+
         div.innerHTML = `
             <div>
                 <h4 style="margin: 0 0 8px 0;"><strong>Lojas da Filial ${selectedFilial.nome}</strong></h4>
@@ -1844,13 +1845,13 @@ function calculateRouteToLoja(lojaId) {
         showNotification('Coordenadas da loja não definidas', 'error');
         return;
     }
-    
+
     closeMapModal();
-    
+
     setTimeout(() => {
         document.getElementById('mapModalTitle').textContent = `Rota: CD → ${loja.nome}`;
         document.getElementById('mapModal').style.display = 'flex';
-        
+
         setTimeout(() => {
             showSimulatedRoute(loja);
         }, 100);
@@ -1861,18 +1862,18 @@ function calculateRouteToLoja(lojaId) {
 // Novas funções para geolocalização da filial
 async function geocodeAddressFilial() {
     const endereco = document.getElementById('add_endereco_cd').value.trim();
-    
+
     if (!endereco) {
         showNotification('Digite um endereço para buscar as coordenadas', 'error');
         return;
     }
-    
+
     try {
         showNotification('Buscando coordenadas...', 'info');
-        
+
         const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(endereco)}&limit=1&countrycodes=br`);
         const data = await response.json();
-        
+
         if (data && data.length > 0) {
             const result = data[0];
             document.getElementById('add_latitude_cd').value = parseFloat(result.lat).toFixed(6);
@@ -1916,19 +1917,19 @@ async function getRouteFromAPI(waypoints) {
 
     try {
         const response = await fetch(url);
-        
+
         if (response.status === 429) {
             // Limite de requisições. Lançar erro para que o allSettled capture.
-            throw new Error('Limite de requisições OSRM (429)'); 
+            throw new Error('Limite de requisições OSRM (429)');
         }
-        
+
         if (!response.ok) {
             // Outros erros HTTP (404, 500, etc.)
             throw new Error(`Erro na API de roteamento: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.routes && data.routes.length > 0) {
             const route = data.routes[0];
             return {
@@ -1943,7 +1944,7 @@ async function getRouteFromAPI(waypoints) {
         // 🚨 FIX CRÍTICO: Tratamento de erro de rede (Failed to fetch/Timeout) 🚨
         console.error('Falha crítica de rede/conexão OSRM:', error);
         // Lança o erro para que o Promise.allSettled capture como 'rejected' e o fluxo continue.
-        throw new Error('Falha de conexão OSRM: A rota não pôde ser calculada.'); 
+        throw new Error('Falha de conexão OSRM: A rota não pôde ser calculada.');
     }
 }
 
@@ -1951,7 +1952,7 @@ async function getRouteFromAPI(waypoints) {
 // NOVO CÓDIGO: Função para Snap-to-Road (Map Matching)
 async function getMapMatchedRoute(coordinates) {
     if (coordinates.length < 2) return null;
-    
+
     // Converte a lista de objetos LatLng em strings "lng,lat;lng,lat"
     const coordsString = coordinates.map(p => `${p.lng},${p.lat}`).join(';');
     // Usa o endpoint Map Matching do OSRM para ajustar a rota às vias
@@ -1960,7 +1961,7 @@ async function getMapMatchedRoute(coordinates) {
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`OSRM Match Failed: ${response.status}`);
-        
+
         const data = await response.json();
         if (data.matchings && data.matchings.length > 0) {
             // Retorna as coordenadas ajustadas à rua
@@ -1982,7 +1983,7 @@ function getDragAfterElement(container, y) {
         const box = child.getBoundingClientRect();
         // Calcula a distância do meio do elemento até o cursor Y
         const offset = y - box.top - box.height / 2;
-        
+
         // Se a distância for negativa e mais próxima do zero (acima do meio do elemento)
         if (offset < 0 && offset > closest.offset) {
             return { offset: offset, element: child };
@@ -2004,7 +2005,7 @@ async function openOrdemCarregamentoModal(expeditionId) {
     try {
         // Busca os itens da expedição e os dados das lojas associadas
         const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}&select=*,lojas(codigo,nome)`);
-        
+
         if (!items || items.length === 0) {
             showNotification('Nenhum item encontrado para esta expedição.', 'error');
             closeOrdemCarregamentoModal();
@@ -2084,19 +2085,19 @@ async function saveOrdemCarregamento() {
             const endpoint = `expedition_items?id=eq.${update.id}`; // Especifica o ID do item
             const payload = { ordem_entrega: update.ordem_entrega }; // Envia apenas o dado a ser atualizado
             // 🚨 FIX CRÍTICO: Passa 'false' para não tentar injetar 'filial' no payload do item
-            return supabaseRequest(endpoint, 'PATCH', payload, false); 
+            return supabaseRequest(endpoint, 'PATCH', payload, false);
         });
 
         // Executa todas as atualizações
         await Promise.all(updatePromises);
 
         showNotification('Ordem de carregamento salva com sucesso!', 'success');
-        
+
         closeOrdemCarregamentoModal();
 
         // Recarrega os dados
         loadTransportList();
-        await loadSelectData(); 
+        await loadSelectData();
     } catch (error) {
         // A mensagem de erro agora virá do supabaseRequest, que já é detalhada
         // Apenas para garantir, logamos o erro completo no console.
@@ -2110,7 +2111,7 @@ async function renderFiliaisConfig() {
     const tbody = document.getElementById('filiaisConfigBody');
     if (!tbody) return;
     tbody.innerHTML = `<tr><td colspan="5" class="loading"><div class="spinner"></div>Carregando filiais...</td></tr>`;
-    
+
     try {
         const filiaisData = await supabaseRequest('filiais?order=nome', 'GET', null, false);
         tbody.innerHTML = filiaisData.map(filial => `
@@ -2136,7 +2137,7 @@ async function renderDocasConfig() {
     const tbody = document.getElementById('docasConfigBody');
     if (!tbody) return;
     tbody.innerHTML = `<tr><td colspan="5" class="loading"><div class="spinner"></div>Carregando docas...</td></tr>`;
-    
+
     try {
         const docasData = await supabaseRequest('docas?order=nome');
         tbody.innerHTML = docasData.map(doca => `
@@ -2162,7 +2163,7 @@ async function renderLideresConfig() {
     const tbody = document.getElementById('lideresConfigBody');
     if (!tbody) return;
     tbody.innerHTML = `<tr><td colspan="4" class="loading"><div class="spinner"></div>Carregando líderes...</td></tr>`;
-    
+
     try {
         const lideresData = await supabaseRequest('lideres?order=nome');
         tbody.innerHTML = lideresData.map(lider => `
@@ -2186,12 +2187,12 @@ async function renderLideresConfig() {
 function renderPontosInteresseConfig() {
     const tbody = document.getElementById('pontosInteresseConfigBody');
     if (!tbody) return;
-    
+
     if (pontosInteresse.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Nenhum ponto de interesse cadastrado.</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = pontosInteresse.map(ponto => `
         <tr>
             <td class="font-medium">${ponto.nome}</td>
@@ -2225,10 +2226,10 @@ async function renderAcessosConfig() {
         // 1. Carregar Grupos de Acesso
         const gruposData = await supabaseRequest('grupos_acesso?order=nome', 'GET', null, false);
         let gruposHtml = '<tr><td colspan="3" class="font-bold text-center bg-gray-200">GRUPOS DE ACESSO</td></tr>';
-        
+
         gruposData.forEach(grupo => {
             // Usamos JSON.stringify e o replace para passar o objeto como string para o onclick
-            const grupoJson = JSON.stringify(grupo).replace(/"/g, "'"); 
+            const grupoJson = JSON.stringify(grupo).replace(/"/g, "'");
             gruposHtml += `
                 <tr class="hover:bg-gray-50">
                     <td class="font-medium">${grupo.nome}</td>
@@ -2243,15 +2244,15 @@ async function renderAcessosConfig() {
                 </tr>
             `;
         });
-        
+
         // 2. Carregar Usuários Individuais
         const acessosData = await supabaseRequest('acessos?select=id,nome,grupo_id(nome)&order=nome', 'GET', null, false);
         let acessosHtml = '<tr><td colspan="3" class="font-bold text-center bg-gray-200">USUÁRIOS INDIVIDUAIS</td></tr>';
 
         acessosData.forEach(acesso => {
-            const grupoNome = acesso.grupo_id && typeof acesso.grupo_id === 'object' && acesso.grupo_id.nome 
-                             ? acesso.grupo_id.nome 
-                             : 'SEM GRUPO';
+            const grupoNome = acesso.grupo_id && typeof acesso.grupo_id === 'object' && acesso.grupo_id.nome
+                ? acesso.grupo_id.nome
+                : 'SEM GRUPO';
 
             acessosHtml += `
                 <tr class="hover:bg-gray-50">
@@ -2269,7 +2270,7 @@ async function renderAcessosConfig() {
         });
 
         tbody.innerHTML = gruposHtml + acessosHtml;
-        
+
     } catch (error) {
         tbody.innerHTML = `<tr><td colspan="3" class="alert alert-error">Erro ao carregar acessos: ${error.message}</td></tr>`;
     }

@@ -3040,6 +3040,6 @@ document.getElementById('initialLoginForm').reset();
 document.getElementById('initialLoginAlert').innerHTML = '';
 
 showNotification('Sessão encerrada.', 'info');
-}
+
 
 
