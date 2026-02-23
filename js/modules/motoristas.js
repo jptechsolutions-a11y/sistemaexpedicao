@@ -41,8 +41,8 @@ export async function renderMotoristasStatusList() {
         supabaseRequest('expedition_items')
     ]);
 
-    const motoristas = getState('motoristas') || [];
-    const veiculos = getState('veiculos') || [];
+    const motoristas = window.motoristas || [];
+    const veiculos = window.veiculos || [];
 
     const dispCount = motoristas.filter(m => m.status === 'disponivel').length;
     const ativoCount = motoristas.filter(m => ['em_viagem', 'descarregando_imobilizado', 'saiu_para_entrega'].includes(m.status)).length;
@@ -160,7 +160,7 @@ export async function consultarExpedicoesPorPlaca() {
         const expeditions = await supabaseRequest("expeditions?status=in.(aguardando_veiculo,em_carregamento,saiu_para_entrega)&order=data_hora.desc");
         const items = await supabaseRequest('expedition_items');
 
-        const veiculos = getState('veiculos') || [];
+        const veiculos = window.veiculos || [];
 
         const expeditionsWithItems = expeditions.map(exp => {
             const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
@@ -185,7 +185,7 @@ export function renderExpedicoesMotorista(expeditions) {
         return;
     }
 
-    const docas = getState('docas') || [];
+    const docas = window.docas || [];
 
     container.innerHTML = expeditions.map(exp => {
         if (exp.status === 'saiu_para_entrega') {
@@ -215,7 +215,7 @@ export function renderPainelDescarga(exp) {
     let html = `<div class="motorista-card"><h3 class="text-xl font-semibold mb-4">Roteiro de Entregas</h3>`;
     let emTransito = true;
 
-    const lojas = getState('lojas') || [];
+    const lojas = window.lojas || [];
 
     exp.items.forEach(item => {
         const loja = lojas.find(l => l.id === item.loja_id);
@@ -273,7 +273,7 @@ export async function showYesNoModal(message) {
 
 export async function marcarRetornoCD(motoristaId, veiculoId) {
     try {
-        const motoristas = getState('motoristas') || [];
+        const motoristas = window.motoristas || [];
         const motorista = motoristas.find(m => m.id === motoristaId);
         let novoStatusMotorista, novoStatusVeiculo, msg;
 
@@ -333,8 +333,8 @@ export async function generateMotoristaReports() {
         });
 
         const motoristasStats = {};
-        const motoristas = getState('motoristas') || [];
-        const veiculos = getState('veiculos') || [];
+        const motoristas = window.motoristas || [];
+        const veiculos = window.veiculos || [];
 
         expedicoesFiltradas.forEach(exp => {
             if (!exp.motorista_id) return;

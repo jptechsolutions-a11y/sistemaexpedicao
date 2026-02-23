@@ -1,4 +1,4 @@
-Ôªøimport { supabaseRequest } from '../api.js';
+import { supabaseRequest } from '../api.js';
 import { getState } from '../state.js';
 import { showNotification } from '../ui.js';
 import { minutesToHHMM } from '../utils.js';
@@ -13,9 +13,9 @@ async function loadHomeData() {
     const dataFimInput = document.getElementById('homeDataFim');
     const searchInput = document.getElementById('homeSearchInput');
 
-    // Verifica se os elementos existem antes de tentar us√°-los
+    // Verifica se os elementos existem antes de tentar us·-los
     if (!dataInicioInput || !dataFimInput || !searchInput) {
-        console.error("Erro: Elementos da p√°gina inicial n√£o encontrados. A fun√ß√£o loadHomeData n√£o pode ser executada.");
+        console.error("Erro: Elementos da p·gina inicial n„o encontrados. A funÁ„o loadHomeData n„o pode ser executada.");
         return;
     }
 
@@ -209,7 +209,7 @@ async function loadHomeData() {
             const data = {
                 labels: ['PERLOG', 'JJS'],
                 datasets: [{
-                    label: 'N¬∫ de Viagens',
+                    label: 'N∫ de Viagens',
                     data: [perlogCount, jjsCount],
                     backgroundColor: ['#0077B6', '#00D4AA'],
                     borderColor: '#fff',
@@ -302,11 +302,11 @@ async function loadHomeData() {
             label: 'Entregas',
             data: top5.map(m => m.entregas),
             backgroundColor: [
-                'rgba(255, 215, 0, 0.8)',    // Ouro - 1¬∫ lugar
-                'rgba(192, 192, 192, 0.8)',  // Prata - 2¬∫ lugar
-                'rgba(205, 127, 50, 0.8)',   // Bronze - 3¬∫ lugar
-                'rgba(0, 212, 170, 0.8)',    // Turquesa - 4¬∫
-                'rgba(0, 119, 182, 0.8)'     // Azul - 5¬∫
+                'rgba(255, 215, 0, 0.8)',    // Ouro - 1∫ lugar
+                'rgba(192, 192, 192, 0.8)',  // Prata - 2∫ lugar
+                'rgba(205, 127, 50, 0.8)',   // Bronze - 3∫ lugar
+                'rgba(0, 212, 170, 0.8)',    // Turquesa - 4∫
+                'rgba(0, 119, 182, 0.8)'     // Azul - 5∫
             ],
             borderColor: [
                 'rgba(255, 215, 0, 1)',
@@ -317,7 +317,7 @@ async function loadHomeData() {
             ],
             borderWidth: 2,
             borderRadius: 6,
-            barThickness: 35 // üö® Tamanho fixo das barras
+            barThickness: 35 // ?? Tamanho fixo das barras
         }]
     };
 
@@ -330,7 +330,7 @@ async function loadHomeData() {
                 display: false 
             },
             tooltip: {
-                enabled: true, // üö® Habilita apenas o tooltip padr√£o
+                enabled: true, // ?? Habilita apenas o tooltip padr„o
                 backgroundColor: 'rgba(0, 0, 0, 0.8)',
                 padding: 12,
                 titleFont: {
@@ -355,7 +355,7 @@ async function loadHomeData() {
                 },
                 anchor: 'center',
                 align: 'center',
-                formatter: (value) => value // Mostra apenas o n√∫mero
+                formatter: (value) => value // Mostra apenas o n˙mero
             }
         },
         scales: {
@@ -423,7 +423,7 @@ async function loadHomeData() {
             const data = {
                 labels: lojasData.map(l => l.nome),
                 datasets: [{
-                    label: 'Tempo M√©dio em Loja',
+                    label: 'Tempo MÈdio em Loja',
                     data: lojasData.map(l => l.tempoMedio),
                     backgroundColor: backgroundColors,
                     borderColor: borderColors,
@@ -448,7 +448,7 @@ async function loadHomeData() {
                         callbacks: {
                             label: function(context) {
                                 const loja = lojasData[context.dataIndex];
-                                return [ `Tempo M√©dio: ${minutesToHHMM(context.raw)}`, `Total de Entregas: ${loja.entregas}` ];
+                                return [ `Tempo MÈdio: ${minutesToHHMM(context.raw)}`, `Total de Entregas: ${loja.entregas}` ];
                             }
                         }
                     }
@@ -482,7 +482,7 @@ async function loadHomeData() {
             `).join('');
         }
 
-        // --- FUN√á√ïES DO MAPA DA HOME ---
+        // --- FUN«’ES DO MAPA DA HOME ---
 async function initHomeMap() {
     // Destruir mapa existente se houver
     if (homeMapInstance) {
@@ -490,10 +490,10 @@ async function initHomeMap() {
         homeMapInstance = null;
     }
     
-    // Aguardar o elemento estar dispon√≠vel
+    // Aguardar o elemento estar disponÌvel
     const mapElement = document.getElementById('homeMap');
     if (!mapElement) {
-        console.warn('Elemento do mapa da home n√£o encontrado');
+        console.warn('Elemento do mapa da home n„o encontrado');
         return;
     }
     
@@ -506,7 +506,7 @@ async function initHomeMap() {
         
         // Adicionar camada do mapa
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '¬© OpenStreetMap contributors'
+            attribution: '© OpenStreetMap contributors'
         }).addTo(homeMapInstance);
         
         // Carregar dados do rastreio para o mapa
@@ -545,20 +545,20 @@ async function loadHomeMapData() {
         // Adicionar marcador do CD
         const cdIcon = L.divIcon({
             className: 'custom-marker',
-            html: '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">üè≠ CD</div>',
+            html: '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">?? CD</div>',
             iconSize: [80, 30],
             iconAnchor: [40, 15]
         });
         
         L.marker(cdCoords, { icon: cdIcon })
             .addTo(homeMapInstance)
-            .bindPopup(`<h3><strong>Centro de Distribui√ß√£o</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
+            .bindPopup(`<h3><strong>Centro de DistribuiÁ„o</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
         
         // Carregar dados de rastreio atuais
         const expeditionsEmRota = await supabaseRequest('expeditions?status=eq.saiu_para_entrega&order=data_saida_entrega.desc');
         const motoristasRetornando = await supabaseRequest('motoristas?status=in.(retornando_cd,retornando_com_imobilizado)');
         
-        // Buscar localiza√ß√µes GPS
+        // Buscar localizaÁıes GPS
         let locations = [];
         if (expeditionsEmRota.length > 0) {
             const expeditionIds = expeditionsEmRota.map(exp => exp.id);
@@ -576,7 +576,7 @@ async function loadHomeMapData() {
         const bounds = L.latLngBounds();
         bounds.extend(cdCoords);
         
-        // Adicionar ve√≠culos em rota
+        // Adicionar veÌculos em rota
         expeditionsEmRota.forEach(exp => {
             const location = locations.find(loc => loc.expedition_id === exp.id);
             if (location && location.latitude && location.longitude) {
@@ -586,12 +586,12 @@ async function loadHomeMapData() {
                 const motorista = motoristas.find(m => m.id === exp.motorista_id);
                 const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
                 
-                // Determinar status do ve√≠culo para cor
-                let color = '#F59E0B'; // laranja para em tr√¢nsito
-                let statusText = 'Em Tr√¢nsito';
+                // Determinar status do veÌculo para cor
+                let color = '#F59E0B'; // laranja para em tr‚nsito
+                let statusText = 'Em Tr‚nsito';
                 
-                // Verificar se est√° descarregando (l√≥gica simplificada)
-                // Na implementa√ß√£o real, voc√™ pode verificar o status atual das entregas
+                // Verificar se est· descarregando (lÛgica simplificada)
+                // Na implementaÁ„o real, vocÍ pode verificar o status atual das entregas
                 
                 const vehicleIcon = L.divIcon({
                     className: 'custom-marker',
@@ -607,7 +607,7 @@ async function loadHomeMapData() {
                             <h4><strong>${veiculo?.placa || 'N/A'}</strong></h4>
                             <p><strong>Motorista:</strong> ${motorista?.nome || 'N/A'}</p>
                             <p><strong>Status:</strong> <span style="color: ${color};">${statusText}</span></p>
-                            <p><strong>√öltima atualiza√ß√£o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
+                            <p><strong>⁄ltima atualizaÁ„o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
                         </div>
                     `);
                 
@@ -615,7 +615,7 @@ async function loadHomeMapData() {
             }
         });
         
-        // Adicionar ve√≠culos retornando
+        // Adicionar veÌculos retornando
         motoristasRetornando.forEach(motorista => {
             const location = returningLocations.find(loc => loc.motorista_id === motorista.id);
             if (location && location.latitude && location.longitude) {
@@ -639,7 +639,7 @@ async function loadHomeMapData() {
                             <h4><strong>${veiculo?.placa || 'N/A'}</strong></h4>
                             <p><strong>Motorista:</strong> ${motorista.nome}</p>
                             <p><strong>Status:</strong> <span style="color: ${color};">Retornando</span></p>
-                            <p><strong>√öltima atualiza√ß√£o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
+                            <p><strong>⁄ltima atualizaÁ„o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
                         </div>
                     `);
                 
@@ -653,20 +653,20 @@ async function loadHomeMapData() {
                 const lat = parseFloat(loja.latitude);
                 const lng = parseFloat(loja.longitude);
                 
-                let cor = '#10B981'; // verde padr√£o
+                let cor = '#10B981'; // verde padr„o
                 if (loja.nome.toLowerCase().includes('fort')) cor = '#EF4444'; // vermelho
                 else if (loja.nome.toLowerCase().includes('comper')) cor = '#0077B6'; // azul
                 
                 const lojaIcon = L.divIcon({
                     className: 'custom-marker',
-                    html: `<div style="background: ${cor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">üè™ ${loja.codigo}</div>`,
+                    html: `<div style="background: ${cor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">?? ${loja.codigo}</div>`,
                     iconSize: [50, 18],
                     iconAnchor: [25, 9]
                 });
                 
                 L.marker([lat, lng], { icon: lojaIcon })
                     .addTo(homeMapInstance)
-                    .bindPopup(`<strong>${loja.nome}</strong><br>C√≥digo: ${loja.codigo}`);
+                    .bindPopup(`<strong>${loja.nome}</strong><br>CÛdigo: ${loja.codigo}`);
                 
                 bounds.extend([lat, lng]);
             }
@@ -728,12 +728,12 @@ function updateHomeLastRefreshTime() {
     const now = new Date();
     const element = document.getElementById('homeLastUpdate');
     if (element) {
-        element.textContent = `√öltima atualiza√ß√£o: ${now.toLocaleTimeString('pt-BR')}`;
+        element.textContent = `⁄ltima atualizaÁ„o: ${now.toLocaleTimeString('pt-BR')}`;
     }
 }
 
 function showHomeMapFullscreen() {
-    document.getElementById('mapModalTitle').textContent = 'Vis√£o Geral em Tempo Real - Tela Cheia';
+    document.getElementById('mapModalTitle').textContent = 'Vis„o Geral em Tempo Real - Tela Cheia';
     document.getElementById('mapModal').style.display = 'flex';
     
     setTimeout(async () => {
@@ -745,10 +745,10 @@ function showHomeMapFullscreen() {
         mapInstance = L.map('map').setView(cdCoords, 11);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '¬© OpenStreetMap contributors'
+            attribution: '© OpenStreetMap contributors'
         }).addTo(mapInstance);
         
-        // Reutilizar a mesma l√≥gica do mapa da home
+        // Reutilizar a mesma lÛgica do mapa da home
         await loadHomeMapDataForFullscreen();
     }, 100);
 }
@@ -761,14 +761,14 @@ async function loadHomeMapDataForFullscreen() {
         // Adicionar marcador do CD
         const cdIcon = L.divIcon({
             className: 'custom-marker',
-            html: '<div style="background: #0077B6; color: white; padding: 8px 16px; border-radius: 10px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">üè≠ CD</div>',
+            html: '<div style="background: #0077B6; color: white; padding: 8px 16px; border-radius: 10px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">?? CD</div>',
             iconSize: [100, 40],
             iconAnchor: [50, 20]
         });
         
         L.marker(cdCoords, { icon: cdIcon })
             .addTo(mapInstance)
-            .bindPopup(`<h3><strong>Centro de Distribui√ß√£o</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
+            .bindPopup(`<h3><strong>Centro de DistribuiÁ„o</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
         
         const bounds = L.latLngBounds();
         bounds.extend(cdCoords);
@@ -777,7 +777,7 @@ async function loadHomeMapDataForFullscreen() {
         const expeditionsEmRota = await supabaseRequest('expeditions?status=eq.saiu_para_entrega&order=data_saida_entrega.desc');
         const motoristasRetornando = await supabaseRequest('motoristas?status=in.(retornando_cd,retornando_com_imobilizado)');
         
-        // Buscar localiza√ß√µes GPS
+        // Buscar localizaÁıes GPS
         let locations = [];
         if (expeditionsEmRota.length > 0) {
             const expeditionIds = expeditionsEmRota.map(exp => exp.id);
@@ -792,7 +792,7 @@ async function loadHomeMapDataForFullscreen() {
             returningLocations = await supabaseRequest(query, 'GET', null, false);
         }
         
-        // Adicionar ve√≠culos em rota (√≠cones maiores para fullscreen)
+        // Adicionar veÌculos em rota (Ìcones maiores para fullscreen)
         expeditionsEmRota.forEach(exp => {
             const location = locations.find(loc => loc.expedition_id === exp.id);
             if (location && location.latitude && location.longitude) {
@@ -802,8 +802,8 @@ async function loadHomeMapDataForFullscreen() {
                 const motorista = motoristas.find(m => m.id === exp.motorista_id);
                 const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
                 
-                let color = '#F59E0B'; // laranja para em tr√¢nsito
-                let statusText = 'Em Tr√¢nsito';
+                let color = '#F59E0B'; // laranja para em tr‚nsito
+                let statusText = 'Em Tr‚nsito';
                 
                 const vehicleIcon = L.divIcon({
                     className: 'custom-marker',
@@ -820,7 +820,7 @@ async function loadHomeMapDataForFullscreen() {
                             <p><strong>Motorista:</strong> ${motorista?.nome || 'N/A'}</p>
                             <p><strong>Status:</strong> <span style="color: ${color}; font-weight: bold;">${statusText}</span></p>
                             <p><strong>Velocidade:</strong> ${location.velocidade || 0} km/h</p>
-                            <p><strong>√öltima atualiza√ß√£o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
+                            <p><strong>⁄ltima atualizaÁ„o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
                         </div>
                     `);
                 
@@ -828,7 +828,7 @@ async function loadHomeMapDataForFullscreen() {
             }
         });
         
-        // Adicionar ve√≠culos retornando
+        // Adicionar veÌculos retornando
         motoristasRetornando.forEach(motorista => {
             const location = returningLocations.find(loc => loc.motorista_id === motorista.id);
             if (location && location.latitude && location.longitude) {
@@ -853,7 +853,7 @@ async function loadHomeMapDataForFullscreen() {
                             <p><strong>Motorista:</strong> ${motorista.nome}</p>
                             <p><strong>Status:</strong> <span style="color: ${color}; font-weight: bold;">Retornando</span></p>
                             <p><strong>Velocidade:</strong> ${location.velocidade || 0} km/h</p>
-                            <p><strong>√öltima atualiza√ß√£o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
+                            <p><strong>⁄ltima atualizaÁ„o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
                         </div>
                     `);
                 
@@ -861,7 +861,7 @@ async function loadHomeMapDataForFullscreen() {
             }
         });
         
-        // Adicionar lojas (√≠cones maiores)
+        // Adicionar lojas (Ìcones maiores)
         lojas.forEach(loja => {
             if (loja.latitude && loja.longitude && loja.ativo) {
                 const lat = parseFloat(loja.latitude);
@@ -873,7 +873,7 @@ async function loadHomeMapDataForFullscreen() {
                 
                 const lojaIcon = L.divIcon({
                     className: 'custom-marker',
-                    html: `<div style="background: ${cor}; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">üè™ ${loja.codigo}</div>`,
+                    html: `<div style="background: ${cor}; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">?? ${loja.codigo}</div>`,
                     iconSize: [70, 25],
                     iconAnchor: [35, 12]
                 });
@@ -883,9 +883,9 @@ async function loadHomeMapDataForFullscreen() {
                     .bindPopup(`
                         <div style="text-align: center;">
                             <h4><strong>${loja.nome}</strong></h4>
-                            <p><strong>C√≥digo:</strong> ${loja.codigo}</p>
+                            <p><strong>CÛdigo:</strong> ${loja.codigo}</p>
                             <p><strong>Cidade:</strong> ${loja.cidade}</p>
-                            ${loja.endereco_completo ? `<p><strong>Endere√ßo:</strong><br>${loja.endereco_completo}</p>` : ''}
+                            ${loja.endereco_completo ? `<p><strong>EndereÁo:</strong><br>${loja.endereco_completo}</p>` : ''}
                         </div>
                     `);
                 

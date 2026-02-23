@@ -175,9 +175,9 @@ export async function loadHistoricoFaturamento() {
             return;
         }
 
-        const veiculos = getState('veiculos') || [];
-        const motoristas = getState('motoristas') || [];
-        const lojas = getState('lojas') || [];
+        const veiculos = window.veiculos || [];
+        const motoristas = window.motoristas || [];
+        const lojas = window.lojas || [];
 
         let expeditionsWithItems = expeditions.map(exp => {
             const expItems = items.filter(item => item.expedition_id === exp.id);
@@ -321,9 +321,9 @@ export async function loadFaturamentoData(subTabName = 'faturamentoAtivo') {
             const expeditions = await supabaseRequest("expeditions?status=in.(em_carregamento,carregado,aguardando_faturamento,faturamento_iniciado,faturado,em_carregamento_faturando)&order=data_hora.asc");
             const items = await supabaseRequest('expedition_items');
 
-            const veiculos = getState('veiculos') || [];
-            const motoristas = getState('motoristas') || [];
-            const lojas = getState('lojas') || [];
+            const veiculos = window.veiculos || [];
+            const motoristas = window.motoristas || [];
+            const lojas = window.lojas || [];
 
             const expeditionsWithItems = expeditions.map(exp => {
                 const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;

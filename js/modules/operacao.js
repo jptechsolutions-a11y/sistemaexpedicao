@@ -172,10 +172,10 @@ export async function loadIdentificacaoExpedicoes() {
             return;
         }
 
-        const lideres = getState('lideres') || [];
-        const veiculos = getState('veiculos') || [];
-        const motoristas = getState('motoristas') || [];
-        const lojas = getState('lojas') || [];
+        const lideres = window.lideres || [];
+        const veiculos = window.veiculos || [];
+        const motoristas = window.motoristas || [];
+        const lojas = window.lojas || [];
 
         allIdentificacaoExpeditions = expeditions.map(exp => {
             const expItems = items.filter(item => item.expedition_id === exp.id);
@@ -246,7 +246,7 @@ export function renderIdentificacaoExpedicoes(expeditionsToRender) {
         return;
     }
 
-    const lojas = getState('lojas') || [];
+    const lojas = window.lojas || [];
 
     container.innerHTML = expeditionsToRender.map(exp => {
         const totalItens = exp.total_pallets + exp.total_rolltrainers;
@@ -470,8 +470,8 @@ export async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome
             </style>
         `;
 
-        const filial = getState('selectedFilial') || {};
-        const lojas = getState('lojas') || [];
+        const filial = window.selectedFilial || {};
+        const lojas = window.lojas || [];
 
         for (const item of items) {
             const loja = lojas.find(l => l.id === item.loja_id);

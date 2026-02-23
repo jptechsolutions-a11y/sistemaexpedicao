@@ -22,9 +22,9 @@ export async function loadHistorico() {
         const expeditions = await supabaseRequest('expeditions?status=eq.entregue&order=data_hora.desc&limit=1000');
         const items = await supabaseRequest('expedition_items');
 
-        const veiculos = getState('veiculos') || [];
-        const motoristas = getState('motoristas') || [];
-        const lojas = getState('lojas') || [];
+        const veiculos = window.veiculos || [];
+        const motoristas = window.motoristas || [];
+        const lojas = window.lojas || [];
 
         allHistorico = expeditions.map(exp => {
             const expItems = items.filter(item => item.expedition_id === exp.id);
@@ -91,7 +91,7 @@ export function renderHistorico(data) {
         return;
     }
 
-    const lojas = getState('lojas') || [];
+    const lojas = window.lojas || [];
 
     container.innerHTML = data.map(exp => {
         const tempos = {
@@ -258,8 +258,8 @@ export function generateHistoricoIndicators(data) {
     let totalRolls = 0;
     let ocupacoes = [];
     let lojasAtendidas = new Set();
-    const veiculos = getState('veiculos') || [];
-    const lojas = getState('lojas') || [];
+    const veiculos = window.veiculos || [];
+    const lojas = window.lojas || [];
 
     data.forEach(exp => {
         if (exp.data_alocacao_veiculo) temposAlocar.push((new Date(exp.data_alocacao_veiculo) - new Date(exp.data_hora)) / 60000);
@@ -635,10 +635,10 @@ export async function showDetalhesExpedicao(expeditionId) {
         }
 
         const exp = expedition[0];
-        const veiculos = getState('veiculos') || [];
-        const motoristas = getState('motoristas') || [];
-        const lideres = getState('lideres') || [];
-        const lojas = getState('lojas') || [];
+        const veiculos = window.veiculos || [];
+        const motoristas = window.motoristas || [];
+        const lideres = window.lideres || [];
+        const lojas = window.lojas || [];
 
         const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
         const motorista = motoristas.find(m => m.id === exp.motorista_id);

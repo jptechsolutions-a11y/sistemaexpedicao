@@ -1,14 +1,10 @@
-ï»¿import { supabaseRequest } from '../api.js';
+import { supabaseRequest } from '../api.js';
 import { getState } from '../state.js';
 import { showNotification } from '../ui.js';
 import { getPermittedSubTabs, showSubTab, getStatusLabel } from '../utils.js';
 import { openOrdemCarregamentoModal } from './configuracoes.js';
 
-const getGlobal = (key) => typeof window !== 'undefined' ? window[key] : getState()[key];
-Object.defineProperty(window, 'veiculos', { get: () => getGlobal('veiculos') });
-Object.defineProperty(window, 'motoristas', { get: () => getGlobal('motoristas') });
-Object.defineProperty(window, 'lojas', { get: () => getGlobal('lojas') });
-Object.defineProperty(window, 'docas', { get: () => getGlobal('docas') });
+
 
 let cargasDisponiveis = [];
 
@@ -24,11 +20,11 @@ async function lancarCarga() {
     const observacoes = document.getElementById('lancar_observacoes').value;
 
     if (!lojaId || !liderId || !docaId || (isNaN(pallets) && isNaN(rolltrainers))) {
-        showNotification('Preencha Loja, Doca, LÃ­der e ao menos um tipo de carga!', 'error');
+        showNotification('Preencha Loja, Doca, Líder e ao menos um tipo de carga!', 'error');
         return;
     }
     if ((pallets < 0) || (rolltrainers < 0)) {
-        showNotification('As quantidades nÃ£o podem ser negativas.', 'error');
+        showNotification('As quantidades não podem ser negativas.', 'error');
         return;
     }
 
@@ -45,34 +41,34 @@ async function lancarCarga() {
             observacoes: observacoes || null,
             status: 'aguardando_agrupamento',
             numeros_carga: numerosCarga.length > 0 ? numerosCarga : null
-            // filial serÃ¡ injetada automaticamente pela funÃ§Ã£o supabaseRequest
+            // filial será injetada automaticamente pela função supabaseRequest
         };
 
-        // 1. Cria a ExpediÃ§Ã£o principal COM filtro de filial (true)
+        // 1. Cria a Expedição principal COM filtro de filial (true)
         const expeditionResponse = await supabaseRequest('expeditions', 'POST', expeditionData, true);
 
         if (!expeditionResponse || expeditionResponse.length === 0) {
-            throw new Error("A criaÃ§Ã£o da expediÃ§Ã£o falhou.");
+            throw new Error("A criação da expedição falhou.");
         }
 
         const newExpeditionId = expeditionResponse[0].id;
 
-        // 2. Cria o item da expediÃ§Ã£o SEM enviar campo filial (o trigger cuida)
+        // 2. Cria o item da expedição SEM enviar campo filial (o trigger cuida)
         const itemData = {
             expedition_id: newExpeditionId,
             loja_id: lojaId,
             pallets: pallets || 0,
             rolltrainers: rolltrainers || 0,
             status_descarga: 'pendente'
-            // NÃƒO incluir campo filial aqui - o trigger set_filial_expedition_items cuida disso
+            // NÃO incluir campo filial aqui - o trigger set_filial_expedition_items cuida disso
         };
 
-        // IMPORTANTE: NÃ£o precisa passar false, pois a funÃ§Ã£o jÃ¡ sabe que nÃ£o deve enviar filial para expedition_items
+        // IMPORTANTE: Não precisa passar false, pois a função já sabe que não deve enviar filial para expedition_items
         await supabaseRequest('expedition_items', 'POST', itemData);
 
         const lojaNome = lojas.find(l => l.id === lojaId)?.nome || 'Loja';
         const cargasInfo = numerosCarga.length > 0 ? ` (Cargas: ${numerosCarga.join(', ')})` : '';
-        showNotification(`ExpediÃ§Ã£o para ${lojaNome}${cargasInfo} lanÃ§ada com sucesso!`, 'success');
+        showNotification(`Expedição para ${lojaNome}${cargasInfo} lançada com sucesso!`, 'success');
 
         document.getElementById('expeditionForm').reset();
         document.getElementById('lancar_lojaSelect').focus();
@@ -82,8 +78,8 @@ async function lancarCarga() {
         }
 
     } catch (error) {
-        console.error('Erro ao lanÃ§ar carga:', error);
-        showNotification(`Erro ao lanÃ§ar carga: ${error.message}`, 'error');
+        console.error('Erro ao lançar carga:', error);
+        showNotification(`Erro ao lançar carga: ${error.message}`, 'error');
     }
 }
 
@@ -130,7 +126,7 @@ function renderCargasDisponiveis(cargas, veiculosList, motoristasList) {
                             <input type="checkbox" id="carga_${carga.id}" value="${carga.id}" onchange="atualizarResumoAgrupamento()" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-3">
                             <div>
                                 <strong class="text-gray-800">${loja ? `${loja.codigo} - ${loja.nome}` : 'N/A'}</strong><br>
-                                ${numerosCarga ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mb-1 inline-block">ðŸ“¦ ${numerosCarga}</span><br>` : ''}
+                                ${numerosCarga ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mb-1 inline-block">?? ${numerosCarga}</span><br>` : ''}
                                 <span class="text-sm text-gray-500">${carga.items[0].pallets}P + ${carga.items[0].rolltrainers}R | ${new Date(carga.data_hora).toLocaleTimeString('pt-BR')}</span>
                             </div>
                         </label>
@@ -194,7 +190,7 @@ async function agruparEAlocar() {
     const observacoes = document.getElementById('alocar_observacoes').value;
 
     if (checkboxes.length === 0 || !veiculoId || !motoristaId) {
-        showNotification('Selecione ao menos uma carga, um veÃ­culo e um motorista!', 'error');
+        showNotification('Selecione ao menos uma carga, um veículo e um motorista!', 'error');
         return;
     }
 
@@ -214,11 +210,11 @@ async function agruparEAlocar() {
         const docaAlvoId = rankedDocks.find(docaId => docas.find(d => d.id == docaId)?.status === 'disponivel');
 
         if (!docaAlvoId) {
-            showNotification(`Nenhuma das docas de destino estÃ¡ disponÃ­vel. Aguarde e tente novamente.`, 'error');
+            showNotification(`Nenhuma das docas de destino está disponível. Aguarde e tente novamente.`, 'error');
             return;
         }
 
-        // ðŸš¨ CORREÃ‡ÃƒO: AGREGAR NÃšMEROS DE CARGA ðŸš¨
+        // ?? CORREÇÃO: AGREGAR NÚMEROS DE CARGA ??
         let todosNumerosCarga = [];
         cargasSelecionadas.forEach(c => {
             if (c.numeros_carga) {
@@ -243,7 +239,7 @@ async function agruparEAlocar() {
             lider_id: cargasSelecionadas[0].lider_id,
             data_alocacao_veiculo: new Date().toISOString(),
             observacoes: observacoes || null,
-            numeros_carga: todosNumerosCarga.length > 0 ? todosNumerosCarga : null // âœ… Agora salva as cargas!
+            numeros_carga: todosNumerosCarga.length > 0 ? todosNumerosCarga : null // ? Agora salva as cargas!
         };
 
         const newExpeditionResponse = await supabaseRequest('expeditions', 'POST', newExpeditionData);
@@ -267,7 +263,7 @@ async function agruparEAlocar() {
 
         await Promise.all(updatePromises);
 
-        showNotification('ExpediÃ§Ã£o montada! Defina a ordem de carregamento.', 'info');
+        showNotification('Expedição montada! Defina a ordem de carregamento.', 'info');
         document.getElementById('alocar_veiculoSelect').value = '';
         document.getElementById('alocar_motoristaSelect').value = '';
         document.getElementById('alocar_observacoes').value = '';
@@ -280,7 +276,7 @@ async function agruparEAlocar() {
     }
 }
 
-// SUBSTITUIR A FUNÃ‡ÃƒO loadFaturamento
+// SUBSTITUIR A FUNÇÃO loadFaturamento
 
 window.loadTransportList = loadTransportList;
 window.lancarCarga = lancarCarga;

@@ -1,28 +1,28 @@
 ﻿Chart.register(ChartDataLabels);
 
 // Variáveis globais (do sistema original)
-let lojas = [], docas = [], lideres = [], veiculos = [], motoristas = [], filiais = [];
-let selectedFilial = null;
-let currentUser = null; // Para controle de acesso
-let cargasDisponiveis = [];
-let allExpeditions = [], filteredExpeditions = [];
-let allHistorico = [], filteredHistorico = [];
-let chartInstances = {};
-let html5QrCodeScanner = null;
-let scannerIsRunning = false;
-let activeTimers = {};
-let modalState = { action: null, scannedValue: null, mainId: null, secondaryId: null, expectedCode: null };
-let editLojaLineCounter = 0;
-let rastreioTimer = null;
-let rastreioData = [];
-let pontosInteresse = []; // Pontos fixos no mapa
-let homeMapInstance = null;
-let homeMapTimer = null;
+var lojas = [], docas = [], lideres = [], veiculos = [], motoristas = [], filiais = [];
+var selectedFilial = null;
+var currentUser = null; // Para controle de acesso
+var cargasDisponiveis = [];
+var allExpeditions = [], filteredExpeditions = [];
+var allHistorico = [], filteredHistorico = [];
+var chartInstances = {};
+var html5QrCodeScanner = null;
+var scannerIsRunning = false;
+var activeTimers = {};
+var modalState = { action: null, scannedValue: null, mainId: null, secondaryId: null, expectedCode: null };
+var editLojaLineCounter = 0;
+var rastreioTimer = null;
+var rastreioData = [];
+var pontosInteresse = []; // Pontos fixos no mapa
+var homeMapInstance = null;
+var homeMapTimer = null;
 // Variáveis e lógicas de permissão (ADICIONADO)
-let userPermissions = [];
-let masterUserPermission = false;
-let gruposAcesso = [];
-let allIdentificacaoExpeditions = []; // Guarda a lista completa para o filtro
+var userPermissions = [];
+var masterUserPermission = false;
+var gruposAcesso = [];
+var allIdentificacaoExpeditions = []; // Guarda a lista completa para o filtro
 const subTabViewIds = new Set(['faturamento', 'operacao']);
 
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
@@ -2610,9 +2610,10 @@ async function handlePrintChoice(lojaId) {
     const expeditionId = document.getElementById('currentPrintExpeditionId').value;
 
     // 1. Busca informações adicionais necessárias para a impressão
-    const expeditionData = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=lider_id,numeros_carga`);
-    const lider = expeditionData[0].lider_id ? lideres.find(l => l.id === expeditionData[0].lider_id) : { nome: 'N/A' };
-    const numeroCarga = expeditionData[0].numeros_carga && expeditionData[0].numeros_carga.length > 0 ? expeditionData[0].numeros_carga[0] : 'N/A';
+    const expeditionData = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=lider_id,numeros_carga`, 'GET', null, false);
+    const liderObj = (expeditionData && expeditionData.length > 0 && expeditionData[0].lider_id) ? lideres.find(l => l.id === expeditionData[0].lider_id) : null;
+    const lider = liderObj || { nome: 'N/A' };
+    const numeroCarga = (expeditionData && expeditionData.length > 0 && expeditionData[0].numeros_carga && expeditionData[0].numeros_carga.length > 0) ? expeditionData[0].numeros_carga[0] : 'N/A';
 
     closePrintIdentificationModal();
 

@@ -1,14 +1,11 @@
-Ôªøimport { supabaseRequest } from '../api.js';
+import { supabaseRequest } from '../api.js';
 import { getState, setState } from '../state.js';
 import { loadUserPermissions } from '../auth.js';
 import { getStatusLabel, getPermittedSubTabs, showSubTab } from '../utils.js';
 import { showYesNoModal } from './motoristas.js';
 import { showNotification } from '../ui.js';
 
-const getGlobal = (key) => typeof window !== 'undefined' ? window[key] : getState()[key];
 
-Object.defineProperty(window, 'currentUser', { get: () => getGlobal('currentUser'), set: (v) => window.currentUser = v });
-Object.defineProperty(window, 'pontosInteresse', { get: () => getGlobal('pontosInteresse'), set: (v) => window.pontosInteresse = v });
 
 async function loadConfiguracoes() {
     if (!currentUser) {
@@ -41,13 +38,13 @@ async function loadConfiguracoes() {
     }
 }
 
-// SUBSTITUIR A VERS√ÉO EXISTENTE DE checkPassword
+// SUBSTITUIR A VERS√O EXISTENTE DE checkPassword
 async function checkPassword() {
     const nome = document.getElementById('userInput').value.trim();
     const senha = document.getElementById('passwordInput').value;
 
     if (!nome || !senha) {
-        showAlert('passwordAlert', 'Nome e senha s√£o obrigat√≥rios.', 'error');
+        showAlert('passwordAlert', 'Nome e senha s„o obrigatÛrios.', 'error');
         return;
     }
 
@@ -56,7 +53,7 @@ async function checkPassword() {
         const result = await supabaseRequest(endpoint, 'GET', null, false);
 
         if (!result || result.length === 0) {
-            showAlert('passwordAlert', 'Nome de usu√°rio ou senha incorretos.', 'error');
+            showAlert('passwordAlert', 'Nome de usu·rio ou senha incorretos.', 'error');
             document.getElementById('passwordInput').value = '';
             return;
         }
@@ -68,7 +65,7 @@ async function checkPassword() {
             grupoId: user.grupo_id
         };
 
-        // NOVO: Carregar as permiss√µes do usu√°rio
+        // NOVO: Carregar as permissıes do usu·rio
         await loadUserPermissions(currentUser.id, currentUser.grupoId);
 
         showNotification('Acesso concedido!', 'success');
@@ -78,7 +75,7 @@ async function checkPassword() {
         updateSystemStatus();
 
     } catch (err) {
-        showAlert('passwordAlert', 'Erro ao verificar credenciais. Verifique a conex√£o.', 'error');
+        showAlert('passwordAlert', 'Erro ao verificar credenciais. Verifique a conex„o.', 'error');
         console.error(err);
     }
 }
@@ -89,7 +86,7 @@ function showAlert(containerId, message, type) {
     container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
 }
 
-// Substitua a fun√ß√£o showAddForm no seu script.js (cerca da linha 2689)
+// Substitua a funÁ„o showAddForm no seu script.js (cerca da linha 2689)
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
 function showAddForm(type, itemToEdit = null) {
@@ -100,14 +97,14 @@ function showAddForm(type, itemToEdit = null) {
 
     let formHtml = '';
 
-    // Adiciona l√≥gica de edi√ß√£o
+    // Adiciona lÛgica de ediÁ„o
     const isEditing = itemToEdit && typeof itemToEdit === 'object';
     const editData = isEditing ? itemToEdit : {};
 
-    // Atualiza o texto do bot√£o salvar
+    // Atualiza o texto do bot„o salvar
     const saveButton = document.querySelector('#addFormModal button[type="submit"]');
     if (saveButton) {
-        saveButton.textContent = isEditing ? 'Salvar Edi√ß√£o' : 'Salvar';
+        saveButton.textContent = isEditing ? 'Salvar EdiÁ„o' : 'Salvar';
     }
 
 
@@ -116,8 +113,8 @@ function showAddForm(type, itemToEdit = null) {
         formHtml = `
             ${isEditing ? `<input type="hidden" id="edit_filial_nome" value="${editData.nome}">` : ''}
             <div class="form-group"><label>Nome da Filial (Ex: 464):</label><input type="text" id="add_nome" value="${editData.nome || ''}" required ${isEditing ? 'readonly' : ''}></div>
-            <div class="form-group"><label>Descri√ß√£o (Ex: MT):</label><input type="text" id="add_descricao" value="${editData.descricao || ''}" required></div>
-            <div class="form-group md:col-span-2"><label>Endere√ßo do CD (Ponto de Partida):</label><input type="text" id="add_endereco_cd" value="${editData.endereco_cd || ''}" placeholder="Rua, N√∫mero, Cidade" required></div>
+            <div class="form-group"><label>DescriÁ„o (Ex: MT):</label><input type="text" id="add_descricao" value="${editData.descricao || ''}" required></div>
+            <div class="form-group md:col-span-2"><label>EndereÁo do CD (Ponto de Partida):</label><input type="text" id="add_endereco_cd" value="${editData.endereco_cd || ''}" placeholder="Rua, N˙mero, Cidade" required></div>
             <div class="form-group"><label>Latitude do CD:</label><input type="number" id="add_latitude_cd" step="0.000001" value="${editData.latitude_cd || ''}" placeholder="-15.601400"></div>
             <div class="form-group"><label>Longitude do CD:</label><input type="number" id="add_longitude_cd" step="0.000001" value="${editData.longitude_cd || ''}" placeholder="-56.097900"></div>
             <div class="form-group"><label>Status:</label><select id="add_ativo">
@@ -125,8 +122,8 @@ function showAddForm(type, itemToEdit = null) {
                 <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativa</option>
             </select></div>
             <div class="text-center mt-4 md:col-span-2">
-                <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocationFilial()">üìç Usar Localiza√ß√£o Atual</button>
-                <button type="button" class="btn btn-primary" onclick="geocodeAddressFilial()">üåç Buscar por Endere√ßo</button>
+                <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocationFilial()">?? Usar LocalizaÁ„o Atual</button>
+                <button type="button" class="btn btn-primary" onclick="geocodeAddressFilial()">?? Buscar por EndereÁo</button>
             </div>
         `;
     } else if (type === 'loja') {
@@ -134,10 +131,10 @@ function showAddForm(type, itemToEdit = null) {
         formHtml = `
             ${isEditing ? `<input type="hidden" id="edit_loja_id" value="${editData.id}">` : ''}
             <div class="form-group"><label>Nome da Loja:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
-            <div class="form-group"><label>C√≥digo da Loja:</label><input type="text" id="add_codigo" value="${editData.codigo || ''}" required></div>
+            <div class="form-group"><label>CÛdigo da Loja:</label><input type="text" id="add_codigo" value="${editData.codigo || ''}" required></div>
             <div class="form-group"><label>Cidade:</label><input type="text" id="add_cidade" value="${editData.cidade || ''}" required></div>
-            <div class="form-group"><label>C√≥digo QR:</label><input type="text" id="add_codlojaqr" value="${editData.codlojaqr || ''}" required></div>
-            <div class="form-group md:col-span-2"><label>Endere√ßo Completo:</label><input type="text" id="add_endereco_completo" value="${editData.endereco_completo || ''}" placeholder="Rua, N√∫mero, Bairro, CEP" required></div>
+            <div class="form-group"><label>CÛdigo QR:</label><input type="text" id="add_codlojaqr" value="${editData.codlojaqr || ''}" required></div>
+            <div class="form-group md:col-span-2"><label>EndereÁo Completo:</label><input type="text" id="add_endereco_completo" value="${editData.endereco_completo || ''}" placeholder="Rua, N˙mero, Bairro, CEP" required></div>
             <div class="form-group"><label>Latitude:</label><input type="number" id="add_latitude" step="0.000001" value="${editData.latitude || ''}" placeholder="-15.601400"></div>
             <div class="form-group"><label>Longitude:</label><input type="number" id="add_longitude" step="0.000001" value="${editData.longitude || ''}" placeholder="-56.097900"></div>
             <div class="form-group"><label>Status:</label><select id="add_ativo">
@@ -145,8 +142,8 @@ function showAddForm(type, itemToEdit = null) {
                 <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativa</option>
             </select></div>
             <div class="text-center mt-4 md:col-span-2">
-                <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">üìç Usar Localiza√ß√£o Atual</button>
-                <button type="button" class="btn btn-primary" onclick="geocodeAddress()">üåç Buscar por Endere√ßo</button>
+                <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">?? Usar LocalizaÁ„o Atual</button>
+                <button type="button" class="btn btn-primary" onclick="geocodeAddress()">?? Buscar por EndereÁo</button>
             </div>
         `;
     } else if (type === 'doca') {
@@ -155,25 +152,25 @@ function showAddForm(type, itemToEdit = null) {
             ${isEditing ? `<input type="hidden" id="edit_doca_id" value="${editData.id}">` : ''}
             <div class="form-group"><label>Nome da Doca:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
             <div class="form-group"><label>Capacidade (Pallets):</label><input type="number" id="add_capacidade_pallets" min="0" value="${editData.capacidade_pallets || ''}" required></div>
-            <div class="form-group"><label>C√≥digo QR:</label><input type="text" id="add_coddoca" value="${editData.coddoca || ''}" required></div>
+            <div class="form-group"><label>CÛdigo QR:</label><input type="text" id="add_coddoca" value="${editData.coddoca || ''}" required></div>
              <div class="form-group"><label>Status:</label><select id="add_ativo">
                 <option value="true" ${editData.ativo !== false ? 'selected' : ''}>Ativa</option>
                 <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativa</option>
             </select></div>
         `;
     } else if (type === 'lider') {
-        title.textContent = isEditing ? `Editar L√≠der: ${editData.nome}` : `Adicionar Novo L√≠der`;
+        title.textContent = isEditing ? `Editar LÌder: ${editData.nome}` : `Adicionar Novo LÌder`;
         formHtml = `
             ${isEditing ? `<input type="hidden" id="edit_lider_id" value="${editData.id}">` : ''}
-            <div class="form-group"><label>Nome do L√≠der:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
-            <div class="form-group"><label>Matr√≠cula:</label><input type="text" id="add_codigo_funcionario" value="${editData.codigo_funcionario || ''}" required></div>
+            <div class="form-group"><label>Nome do LÌder:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
+            <div class="form-group"><label>MatrÌcula:</label><input type="text" id="add_codigo_funcionario" value="${editData.codigo_funcionario || ''}" required></div>
             <div class="form-group"><label>Status:</label><select id="add_ativo">
                 <option value="true" ${editData.ativo !== false ? 'selected' : ''}>Ativa</option>
                 <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativa</option>
             </select></div>
         `;
     } else if (type === 'veiculo') {
-        title.textContent = isEditing ? `Editar Ve√≠culo: ${editData.placa}` : `Adicionar Novo Ve√≠culo`;
+        title.textContent = isEditing ? `Editar VeÌculo: ${editData.placa}` : `Adicionar Novo VeÌculo`;
         formHtml = `
             ${isEditing ? `<input type="hidden" id="edit_veiculo_id" value="${editData.id}">` : ''}
             <div class="form-group"><label>Placa:</label><input type="text" id="add_placa" value="${editData.placa || ''}" required></div>
@@ -184,9 +181,9 @@ function showAddForm(type, itemToEdit = null) {
                 <option value="PERLOG" ${editData.tipo === 'PERLOG' ? 'selected' : ''}>PERLOG</option>
             </select></div>
             <div class="form-group"><label>Status:</label><select id="add_status" required>
-                <option value="disponivel" ${editData.status === 'disponivel' ? 'selected' : ''}>Dispon√≠vel</option>
+                <option value="disponivel" ${editData.status === 'disponivel' ? 'selected' : ''}>DisponÌvel</option>
                 <option value="em_uso" ${editData.status === 'em_uso' ? 'selected' : ''}>Em Uso</option>
-                <option value="manutencao" ${editData.status === 'manutencao' ? 'selected' : ''}>Manuten√ß√£o</option>
+                <option value="manutencao" ${editData.status === 'manutencao' ? 'selected' : ''}>ManutenÁ„o</option>
             </select></div>
         `;
     } else if (type === 'motorista') {
@@ -194,30 +191,30 @@ function showAddForm(type, itemToEdit = null) {
         formHtml = `
             ${isEditing ? `<input type="hidden" id="edit_motorista_id" value="${editData.id}">` : ''}
             <div class="form-group"><label>Nome:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
-            <div class="form-group"><label>Produtivo (Matr√≠cula):</label><input type="text" id="add_produtivo" value="${editData.PRODUTIVO || ''}" required></div>
+            <div class="form-group"><label>Produtivo (MatrÌcula):</label><input type="text" id="add_produtivo" value="${editData.PRODUTIVO || ''}" required></div>
             <div class="form-group"><label>Status:</label><select id="add_status" required>
-                <option value="disponivel" ${editData.status === 'disponivel' ? 'selected' : ''}>Dispon√≠vel</option>
+                <option value="disponivel" ${editData.status === 'disponivel' ? 'selected' : ''}>DisponÌvel</option>
                 <option value="em_viagem" ${editData.status === 'em_viagem' ? 'selected' : ''}>Em Viagem</option>
                 <option value="folga" ${editData.status === 'folga' ? 'selected' : ''}>Folga</option>
             </select></div>
         `;
-    } else if (type === 'grupo') { // L√ìGICA DO GRUPO (CRIA√á√ÉO E EDI√á√ÉO)
+    } else if (type === 'grupo') { // L”GICA DO GRUPO (CRIA«√O E EDI«√O)
         title.textContent = isEditing ? `Editar Grupo: ${editData.nome}` : `Adicionar Novo Grupo`;
         formHtml = `
             ${isEditing ? `<input type="hidden" id="edit_grupo_id" value="${editData.id}">` : ''}
             <div class="form-group"><label>Nome do Grupo:</label><input type="text" id="add_nome" value="${editData.nome || ''}" required></div>
         `;
-    } else if (type === 'acesso') { // L√ìGICA DE USU√ÅRIO
-        title.textContent = isEditing ? `Editar Usu√°rio: ${editData.nome}` : `Adicionar Novo Usu√°rio`;
+    } else if (type === 'acesso') { // L”GICA DE USU¡RIO
+        title.textContent = isEditing ? `Editar Usu·rio: ${editData.nome}` : `Adicionar Novo Usu·rio`;
         // Usar gruposAcesso global para preencher o select
         const gruposHtml = gruposAcesso.map(g => `<option value="${g.id}" ${editData.grupo_id === g.id ? 'selected' : ''}>${g.nome}</option>`).join('');
 
-        // Se estiver editando, o itemToEdit.nome ser√° o valor de 'acesso' a ser editado
+        // Se estiver editando, o itemToEdit.nome ser· o valor de 'acesso' a ser editado
         const nomeAcesso = editData.nome || '';
 
         formHtml = `
             ${isEditing ? `<input type="hidden" id="edit_acesso_id" value="${editData.id || ''}">` : ''}
-            <div class="form-group"><label>Nome de Usu√°rio:</label><input type="text" id="add_nome" value="${nomeAcesso}" required></div>
+            <div class="form-group"><label>Nome de Usu·rio:</label><input type="text" id="add_nome" value="${nomeAcesso}" required></div>
             <div class="form-group"><label>${isEditing ? 'Nova Senha:' : 'Senha:'}</label><input type="password" id="add_senha" ${!isEditing ? 'required' : ''} placeholder="${isEditing ? 'Deixe em branco para manter a atual' : ''}"></div>
             <div class="form-group"><label>Grupo de Acesso:</label><select id="add_grupo_id" required>
                 <option value="">Selecione um Grupo</option>
@@ -226,7 +223,7 @@ function showAddForm(type, itemToEdit = null) {
         `;
     } else if (type === 'pontoInteresse') {
         title.textContent = isEditing ? `Editar Ponto: ${editData.nome}` : 'Adicionar Ponto de Interesse';
-        // L√≥gica do select de lojas para preencher campos (apenas para a cria√ß√£o)
+        // LÛgica do select de lojas para preencher campos (apenas para a criaÁ„o)
         const lojasOptions = lojas.map(loja => `<option value="${loja.id}">${loja.codigo} - ${loja.nome}</option>`).join('');
 
         formHtml = `
@@ -240,15 +237,15 @@ function showAddForm(type, itemToEdit = null) {
             </div>
             <div class="form-group"><label>Nome do Ponto:</label><input type="text" id="add_nome" value="${editData.nome || ''}" placeholder="Ex: CD Principal, Loja 123, etc." required></div>
             <div class="form-group"><label>Tipo:</label><select id="add_tipo" required>
-                <option value="CD" ${editData.tipo === 'CD' ? 'selected' : ''}>Centro de Distribui√ß√£o</option>
+                <option value="CD" ${editData.tipo === 'CD' ? 'selected' : ''}>Centro de DistribuiÁ„o</option>
                 <option value="LOJA" ${editData.tipo === 'LOJA' ? 'selected' : ''}>Loja</option>
-                <option value="POSTO" ${editData.tipo === 'POSTO' ? 'selected' : ''}>Posto de Combust√≠vel</option>
-                <option value="CASA" ${editData.tipo === 'CASA' ? 'selected' : ''}>Casa/Resid√™ncia</option>
+                <option value="POSTO" ${editData.tipo === 'POSTO' ? 'selected' : ''}>Posto de CombustÌvel</option>
+                <option value="CASA" ${editData.tipo === 'CASA' ? 'selected' : ''}>Casa/ResidÍncia</option>
                 <option value="OUTRO" ${editData.tipo === 'OUTRO' ? 'selected' : ''}>Outro</option>
             </select></div>
             <div class="form-group"><label>Latitude:</label><input type="number" id="add_latitude" step="0.000001" value="${editData.latitude || ''}" placeholder="-15.601400" required></div>
             <div class="form-group"><label>Longitude:</label><input type="number" id="add_longitude" step="0.000001" value="${editData.longitude || ''}" placeholder="-56.097900" required></div>
-            <div class="form-group"><label>Raio de Detec√ß√£o (metros):</label><input type="number" id="add_raio_deteccao" min="50" max="2000" value="${editData.raio_deteccao || 200}" required></div>
+            <div class="form-group"><label>Raio de DetecÁ„o (metros):</label><input type="number" id="add_raio_deteccao" min="50" max="2000" value="${editData.raio_deteccao || 200}" required></div>
             <div class="form-group"><label>Cor no Mapa:</label><select id="add_cor">
                 <option value="#0077B6" ${editData.cor === '#0077B6' ? 'selected' : ''}>Azul</option>
                 <option value="#EF4444" ${editData.cor === '#EF4444' ? 'selected' : ''}>Vermelho</option>
@@ -262,7 +259,7 @@ function showAddForm(type, itemToEdit = null) {
                 <option value="false" ${editData.ativo === false ? 'selected' : ''}>Inativo</option>
             </select></div>
             <div class="text-center mt-4 md:col-span-2">
-                <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">üìç Usar Localiza√ß√£o Atual</button>
+                <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">?? Usar LocalizaÁ„o Atual</button>
             </div>
         `;
     }
@@ -270,7 +267,7 @@ function showAddForm(type, itemToEdit = null) {
     fieldsContainer.innerHTML = formHtml;
     modal.style.display = 'flex';
 
-    // NOVO: Adicionar listener para o select de loja no Ponto de Interesse (apenas no modo de adi√ß√£o)
+    // NOVO: Adicionar listener para o select de loja no Ponto de Interesse (apenas no modo de adiÁ„o)
     if (type === 'pontoInteresse' && !isEditing) {
         const lojaSelect = document.getElementById('add_loja_id');
         if (lojaSelect) {
@@ -304,11 +301,11 @@ async function handleSave() {
         if (title.includes('Filial')) success = await saveFilial();
         else if (title.includes('Loja')) success = await saveLoja();
         else if (title.includes('Doca')) success = await saveDoca();
-        else if (title.includes('L√≠der')) success = await saveLider();
-        else if (title.includes('Ve√≠culo')) success = await saveVeiculo();
+        else if (title.includes('LÌder')) success = await saveLider();
+        else if (title.includes('VeÌculo')) success = await saveVeiculo();
         else if (title.includes('Motorista')) success = await saveMotorista();
         else if (title.includes('Grupo')) success = await saveGroup(); // NOVO
-        else if (title.includes('Acesso') || title.includes('Usu√°rio')) success = await saveAcesso(); // Ajuste no texto
+        else if (title.includes('Acesso') || title.includes('Usu·rio')) success = await saveAcesso(); // Ajuste no texto
         else if (title.includes('Ponto de Interesse')) success = await savePontoInteresse();
 
         if (success) {
@@ -413,8 +410,8 @@ async function saveLider() {
         ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true
     };
 
-    // üö® AJUSTE CR√çTICO: Se estiver editando, n√£o envie o c√≥digo do funcion√°rio 
-    // para evitar o erro de viola√ß√£o de chave √∫nica (409).
+    // ?? AJUSTE CRÕTICO: Se estiver editando, n„o envie o cÛdigo do funcion·rio 
+    // para evitar o erro de violaÁ„o de chave ˙nica (409).
     if (isEdit) {
         delete data.codigo_funcionario;
 
@@ -442,10 +439,10 @@ async function saveVeiculo() {
 
     if (isEdit) {
         await supabaseRequest(`veiculos?id=eq.${veiculoId}`, 'PATCH', data, false);
-        showNotification('Ve√≠culo atualizado com sucesso!', 'success');
+        showNotification('VeÌculo atualizado com sucesso!', 'success');
     } else {
         await supabaseRequest('veiculos', 'POST', data);
-        showNotification('Ve√≠culo cadastrado com sucesso!', 'success');
+        showNotification('VeÌculo cadastrado com sucesso!', 'success');
     }
     await loadSelectData();
     renderVeiculosConfig();
@@ -472,7 +469,7 @@ async function saveMotorista() {
     renderMotoristasConfig();
     return true;
 }
-// SUBSTITUIR A VERS√ÉO EXISTENTE DE saveAcesso
+// SUBSTITUIR A VERS√O EXISTENTE DE saveAcesso
 async function saveAcesso() {
     const isEdit = !!document.getElementById('edit_acesso_id');
     const userId = isEdit ? document.getElementById('edit_acesso_id').value : null;
@@ -480,21 +477,21 @@ async function saveAcesso() {
     const data = {
         nome: document.getElementById('add_nome').value,
         grupo_id: document.getElementById('add_grupo_id').value || null,
-        // Mant√©m tipo_acesso por compatibilidade, mas o campo de input foi removido
+        // MantÈm tipo_acesso por compatibilidade, mas o campo de input foi removido
         tipo_acesso: 'CUSTOM'
     };
 
     const senha = document.getElementById('add_senha').value;
     if (!isEdit || senha.trim()) {
-        data.senha = senha || document.getElementById('add_nome').value; // usar nome como senha padr√£o se vazio
+        data.senha = senha || document.getElementById('add_nome').value; // usar nome como senha padr„o se vazio
     }
 
     if (isEdit) {
         await supabaseRequest(`acessos?id=eq.${userId}`, 'PATCH', data, false);
-        showNotification('Usu√°rio atualizado com sucesso!', 'success');
+        showNotification('Usu·rio atualizado com sucesso!', 'success');
     } else {
         await supabaseRequest('acessos', 'POST', data, false);
-        showNotification('Usu√°rio cadastrado com sucesso!', 'success');
+        showNotification('Usu·rio cadastrado com sucesso!', 'success');
     }
     renderAcessosConfig();
     return true;
@@ -503,12 +500,12 @@ async function renderVeiculosConfig() {
     const tbody = document.getElementById('veiculosConfigBody');
     if (!tbody) return;
 
-    tbody.innerHTML = `<tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando ve√≠culos...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="loading"><div class="spinner"></div>Carregando veÌculos...</td></tr>`;
 
     try {
         const veiculosData = await supabaseRequest('veiculos?order=placa');
         if (!veiculosData || veiculosData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-gray-500">Nenhum ve√≠culo cadastrado nesta filial.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-gray-500">Nenhum veÌculo cadastrado nesta filial.</td></tr>`;
             return;
         }
 
@@ -528,13 +525,13 @@ async function renderVeiculosConfig() {
             </tr>
         `).join('');
     } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="6" class="alert alert-error">Erro ao carregar ve√≠culos: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="alert alert-error">Erro ao carregar veÌculos: ${error.message}</td></tr>`;
     }
 }
 async function editVeiculo(veiculoId) {
     const veiculo = veiculos.find(v => v.id === veiculoId);
     if (!veiculo) {
-        showNotification('Ve√≠culo n√£o encontrado', 'error');
+        showNotification('VeÌculo n„o encontrado', 'error');
         return;
     }
 
@@ -542,7 +539,7 @@ async function editVeiculo(veiculoId) {
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
 
-    title.textContent = 'Editar Ve√≠culo';
+    title.textContent = 'Editar VeÌculo';
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_veiculo_id" value="${veiculo.id}">
         <div class="form-group"><label>Placa:</label><input type="text" id="add_placa" value="${veiculo.placa}" required></div>
@@ -553,9 +550,9 @@ async function editVeiculo(veiculoId) {
             <option value="PERLOG" ${veiculo.tipo === 'PERLOG' ? 'selected' : ''}>PERLOG</option>
         </select></div>
         <div class="form-group"><label>Status:</label><select id="add_status" required>
-            <option value="disponivel" ${veiculo.status === 'disponivel' ? 'selected' : ''}>Dispon√≠vel</option>
+            <option value="disponivel" ${veiculo.status === 'disponivel' ? 'selected' : ''}>DisponÌvel</option>
             <option value="em_uso" ${veiculo.status === 'em_uso' ? 'selected' : ''}>Em Uso</option>
-            <option value="manutencao" ${veiculo.status === 'manutencao' ? 'selected' : ''}>Manuten√ß√£o</option>
+            <option value="manutencao" ${veiculo.status === 'manutencao' ? 'selected' : ''}>ManutenÁ„o</option>
         </select></div>
     `;
 
@@ -563,15 +560,15 @@ async function editVeiculo(veiculoId) {
 }
 
 async function deleteVeiculo(veiculoId) {
-    const confirmed = await showYesNoModal('Deseja excluir este ve√≠culo? Esta a√ß√£o n√£o pode ser desfeita.');
+    const confirmed = await showYesNoModal('Deseja excluir este veÌculo? Esta aÁ„o n„o pode ser desfeita.');
     if (confirmed) {
         try {
             await supabaseRequest(`veiculos?id=eq.${veiculoId}`, 'DELETE', null, false);
-            showNotification('Ve√≠culo exclu√≠do com sucesso!', 'success');
+            showNotification('VeÌculo excluÌdo com sucesso!', 'success');
             await loadSelectData();
             renderVeiculosConfig();
         } catch (error) {
-            showNotification(`Erro ao excluir ve√≠culo: ${error.message}`, 'error');
+            showNotification(`Erro ao excluir veÌculo: ${error.message}`, 'error');
         }
     }
 }
@@ -579,7 +576,7 @@ async function deleteVeiculo(veiculoId) {
 async function editMotorista(motoristaId) {
     const motorista = motoristas.find(m => m.id === motoristaId);
     if (!motorista) {
-        showNotification('Motorista n√£o encontrado', 'error');
+        showNotification('Motorista n„o encontrado', 'error');
         return;
     }
 
@@ -591,9 +588,9 @@ async function editMotorista(motoristaId) {
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_motorista_id" value="${motorista.id}">
         <div class="form-group"><label>Nome:</label><input type="text" id="add_nome" value="${motorista.nome}" required></div>
-        <div class="form-group"><label>Produtivo (Matr√≠cula):</label><input type="text" id="add_produtivo" value="${motorista.PRODUTIVO || ''}" required></div>
+        <div class="form-group"><label>Produtivo (MatrÌcula):</label><input type="text" id="add_produtivo" value="${motorista.PRODUTIVO || ''}" required></div>
         <div class="form-group"><label>Status:</label><select id="add_status" required>
-            <option value="disponivel" ${motorista.status === 'disponivel' ? 'selected' : ''}>Dispon√≠vel</option>
+            <option value="disponivel" ${motorista.status === 'disponivel' ? 'selected' : ''}>DisponÌvel</option>
             <option value="em_viagem" ${motorista.status === 'em_viagem' ? 'selected' : ''}>Em Viagem</option>
             <option value="folga" ${motorista.status === 'folga' ? 'selected' : ''}>Folga</option>
         </select></div>
@@ -603,11 +600,11 @@ async function editMotorista(motoristaId) {
 }
 
 async function deleteMotorista(motoristaId) {
-    const confirmed = await showYesNoModal('Deseja excluir este motorista? Esta a√ß√£o n√£o pode ser desfeita.');
+    const confirmed = await showYesNoModal('Deseja excluir este motorista? Esta aÁ„o n„o pode ser desfeita.');
     if (confirmed) {
         try {
             await supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'DELETE', null, false);
-            showNotification('Motorista exclu√≠do com sucesso!', 'success');
+            showNotification('Motorista excluÌdo com sucesso!', 'success');
             await loadSelectData();
             renderMotoristasConfig();
         } catch (error) {
@@ -647,20 +644,20 @@ function updateSystemStatus() {
     if (statusEl) {
         statusEl.textContent = `
         Filial Ativa: ${selectedFilial.nome}
-        Usu√°rio Logado: ${currentUser.nome}
+        Usu·rio Logado: ${currentUser.nome}
         Tipo de Acesso: ${currentUser.tipo_acesso}
-        Cache: ${lojas.length} lojas, ${docas.length} docas, ${lideres.length} l√≠deres
+        Cache: ${lojas.length} lojas, ${docas.length} docas, ${lideres.length} lÌderes
                 `;
     }
 }
-// Vari√°vel global para o mapa
+// Vari·vel global para o mapa
 let mapInstance = null;
 let markersLayer = null;
 
 function showLocationMap(expeditionId, lat, lng, vehiclePlaca) {
     console.log(`Abrindo mapa para ${vehiclePlaca} em:`, lat, lng); // DEBUG
 
-    document.getElementById('mapModalTitle').textContent = `Localiza√ß√£o de ${vehiclePlaca}`;
+    document.getElementById('mapModalTitle').textContent = `LocalizaÁ„o de ${vehiclePlaca}`;
     document.getElementById('mapModal').style.display = 'flex';
 
     // Aguardar o modal aparecer antes de inicializar o mapa
@@ -669,7 +666,7 @@ function showLocationMap(expeditionId, lat, lng, vehiclePlaca) {
     }, 100);
 }
 function showAllVehiclesMap() {
-    document.getElementById('mapModalTitle').textContent = 'Localiza√ß√£o de Todos os Ve√≠culos e Lojas';
+    document.getElementById('mapModalTitle').textContent = 'LocalizaÁ„o de Todos os VeÌculos e Lojas';
     document.getElementById('mapModal').style.display = 'flex';
 
     setTimeout(() => {
@@ -686,7 +683,7 @@ function initAllVehiclesAndLojasMap() {
     mapInstance = L.map('map').setView(cdCoords, 11);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '¬© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
 
     const bounds = L.latLngBounds();
@@ -730,14 +727,14 @@ function initAllVehiclesAndLojasMap() {
 
             const lojaIcon = L.divIcon({
                 className: 'custom-marker',
-                html: `<div style="background: ${cor}; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">üè™ ${loja.codigo}</div>`,
+                html: `<div style="background: ${cor}; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">?? ${loja.codigo}</div>`,
                 iconSize: [60, 25],
                 iconAnchor: [30, 12]
             });
 
             L.marker([lat, lng], { icon: lojaIcon })
                 .addTo(mapInstance)
-                .bindPopup(`<b>${loja.nome}</b><br>C√≥digo: ${loja.codigo}`);
+                .bindPopup(`<b>${loja.nome}</b><br>CÛdigo: ${loja.codigo}`);
 
             bounds.extend([lat, lng]);
         }
@@ -759,10 +756,10 @@ function initMap(lat, lng, vehiclePlaca) {
 
     // Adicionar camada do OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '¬© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
 
-    // Criar √≠cone personalizado para ve√≠culo
+    // Criar Ìcone personalizado para veÌculo
     const vehicleIcon = L.divIcon({
         className: 'custom-marker',
         html: `<div style="background: #0077B6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${vehiclePlaca}</div>`,
@@ -770,7 +767,7 @@ function initMap(lat, lng, vehiclePlaca) {
         iconAnchor: [40, 15]
     });
 
-    // Adicionar marcador do ve√≠culo
+    // Adicionar marcador do veÌculo
     L.marker([lat, lng], { icon: vehicleIcon })
         .addTo(mapInstance)
         .bindPopup(`<b>${vehiclePlaca}</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`);
@@ -782,22 +779,22 @@ function initAllVehiclesMap() {
         mapInstance.remove();
     }
 
-    // Criar novo mapa centrado em Cuiab√°
+    // Criar novo mapa centrado em Cuiab·
     mapInstance = L.map('map').setView([-15.6014, -56.0979], 11);
 
     // Adicionar camada do OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '¬© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
 
-    // Adicionar marcadores para todos os ve√≠culos
+    // Adicionar marcadores para todos os veÌculos
     const bounds = L.latLngBounds();
 
     rastreioData.forEach(rastreio => {
         const { lat, lng } = rastreio.coordenadas;
 
         // Definir cor baseada no status
-        let color = '#0077B6'; // azul padr√£o
+        let color = '#0077B6'; // azul padr„o
         if (rastreio.status_rastreio === 'em_descarga') color = '#F59E0B'; // laranja
         else if (rastreio.status_rastreio === 'retornando') color = '#10B981'; // verde
 
@@ -823,7 +820,7 @@ function initAllVehiclesMap() {
         bounds.extend([lat, lng]);
     });
 
-    // Ajustar zoom para mostrar todos os ve√≠culos
+    // Ajustar zoom para mostrar todos os veÌculos
     if (rastreioData.length > 0) {
         mapInstance.fitBounds(bounds, { padding: [20, 20] });
     }
@@ -836,9 +833,9 @@ function closeMapModal() {
         mapInstance = null;
     }
 }
-// ===== ADICIONAR TODAS ESSAS FUN√á√ïES NO SEU JAVASCRIPT =====
+// ===== ADICIONAR TODAS ESSAS FUN«’ES NO SEU JAVASCRIPT =====
 
-// === FUN√á√ïES PARA TRAJETO NO HIST√ìRICO ===
+// === FUN«’ES PARA TRAJETO NO HIST”RICO ===
 
 async function showTrajectoryMap(expeditionId, vehiclePlaca) {
     document.getElementById('mapModalTitle').textContent = `Trajeto da Viagem - ${vehiclePlaca}`;
@@ -851,7 +848,7 @@ async function showTrajectoryMap(expeditionId, vehiclePlaca) {
 
 
 
-// SUBSTITUIR A FUN√á√ÉO initTrajectoryMap COMPLETA
+// SUBSTITUIR A FUN«√O initTrajectoryMap COMPLETA
 async function initTrajectoryMap(expeditionId, vehiclePlaca) {
     try {
         if (mapInstance) {
@@ -864,7 +861,7 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
         );
 
         if (!expeditionItems || expeditionItems.length === 0) {
-            showNotification('N√£o h√° pontos de entrega para tra√ßar a rota.', 'info');
+            showNotification('N„o h· pontos de entrega para traÁar a rota.', 'info');
             const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
             mapInstance = L.map('map').setView(cdCoords, 11);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
@@ -884,9 +881,9 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             }
         });
 
-        // Se n√£o houver pontos suficientes para tra√ßar rota
+        // Se n„o houver pontos suficientes para traÁar rota
         if (waypoints.length < 2) {
-            showNotification('N√£o h√° coordenadas de loja v√°lidas para tra√ßar a rota.', 'info');
+            showNotification('N„o h· coordenadas de loja v·lidas para traÁar a rota.', 'info');
             const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
             mapInstance = L.map('map').setView(cdCoords, 11);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
@@ -897,7 +894,7 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
         // 2. CRIAR MAPA
         mapInstance = L.map('map');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '¬© OpenStreetMap contributors'
+            attribution: '© OpenStreetMap contributors'
         }).addTo(mapInstance);
 
         // 3. CRIAR ROTEAMENTO COM TRATAMENTO DE ERRO ROBUSTO
@@ -906,7 +903,7 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             createMarker: function (i, waypoint, n) {
                 let iconHtml = '';
                 if (i === 0) {
-                    iconHtml = '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">üè≠ CD</div>';
+                    iconHtml = '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">?? CD</div>';
                 } else {
                     const loja = lojas.find(l => l.id === expeditionItems[i - 1].loja_id);
                     iconHtml = `<div style="background: #EF4444; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">#${i} - ${loja?.codigo || 'N/A'}</div>`;
@@ -933,7 +930,7 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             }),
             showAlternatives: false,
             fitSelectedRoutes: true,
-            show: false // Esconde o painel de instru√ß√µes
+            show: false // Esconde o painel de instruÁıes
         }).addTo(mapInstance);
 
         // 4. TRATAMENTO DE SUCESSO
@@ -952,7 +949,7 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
                 mapInstance.fitBounds(fallbackBounds, { padding: [30, 30] });
             }
 
-            // Cria o painel de estat√≠sticas
+            // Cria o painel de estatÌsticas
             const statsControl = L.control({ position: 'topright' });
             statsControl.onAdd = function () {
                 const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
@@ -961,9 +958,9 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
                 div.style.fontSize = '12px';
 
                 div.innerHTML = `
-                    <p><b>Estat√≠sticas da Rota</b></p>
-                    <p><strong>Ve√≠culo:</strong> ${vehiclePlaca}</p>
-                    <p><strong>Dist√¢ncia:</strong> ${distance.toFixed(1)} km</p>
+                    <p><b>EstatÌsticas da Rota</b></p>
+                    <p><strong>VeÌculo:</strong> ${vehiclePlaca}</p>
+                    <p><strong>Dist‚ncia:</strong> ${distance.toFixed(1)} km</p>
                     <p><strong>Tempo Estimado:</strong> ${minutesToHHMM(duration)}</p>
                     <p><strong>Paradas:</strong> ${waypoints.length - 1}</p>
                 `;
@@ -974,7 +971,7 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             showNotification('Rota calculada com sucesso!', 'success', 2000);
         });
 
-        // 5. TRATAMENTO DE ERRO CR√çTICO
+        // 5. TRATAMENTO DE ERRO CRÕTICO
         routingControl.on('routingerror', function (e) {
             console.error("Erro no Routing Machine:", e.error);
 
@@ -1010,23 +1007,23 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
                 div.style.maxWidth = '250px';
 
                 div.innerHTML = `
-                     <p><b>‚ö†Ô∏è Rota Simplificada</b></p>
-                     <p style="margin: 5px 0;">O servi√ßo OSRM falhou. Linha reta exibida.</p>
-                     <p><strong>Ve√≠culo:</strong> ${vehiclePlaca}</p>
+                     <p><b>?? Rota Simplificada</b></p>
+                     <p style="margin: 5px 0;">O serviÁo OSRM falhou. Linha reta exibida.</p>
+                     <p><strong>VeÌculo:</strong> ${vehiclePlaca}</p>
                      <p><strong>Paradas:</strong> ${waypoints.length - 1}</p>
                  `;
                 return div;
             };
             warningControl.addTo(mapInstance);
 
-            showNotification('Rota simplificada: Servi√ßo OSRM inst√°vel. Linha reta exibida.', 'error', 5000);
+            showNotification('Rota simplificada: ServiÁo OSRM inst·vel. Linha reta exibida.', 'error', 5000);
         });
 
-        // 6. ESCONDER PAINEL DE INSTRU√á√ïES
+        // 6. ESCONDER PAINEL DE INSTRU«’ES
         const routingAlt = document.querySelector('.leaflet-routing-alt');
         if (routingAlt) routingAlt.style.display = 'none';
 
-        // 7. GARANTIA DE EXIBI√á√ÉO
+        // 7. GARANTIA DE EXIBI«√O
         setTimeout(() => {
             if (mapInstance) {
                 mapInstance.invalidateSize();
@@ -1039,7 +1036,7 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
         showNotification('Erro fatal ao carregar dados do trajeto.', 'error');
     }
 }
-// A fun√ß√£o calculateTripStats tamb√©m precisa ser ajustada para usar os dados do GPS
+// A funÁ„o calculateTripStats tambÈm precisa ser ajustada para usar os dados do GPS
 function calculateTripStats(trajectoryData) {
     let distanciaTotal = 0;
     let velocidades = [];
@@ -1048,7 +1045,7 @@ function calculateTripStats(trajectoryData) {
         const p1 = trajectoryData[i - 1];
         const p2 = trajectoryData[i];
 
-        // Apenas calcula a dist√¢ncia se a velocidade for > 0, para ignorar paradas longas
+        // Apenas calcula a dist‚ncia se a velocidade for > 0, para ignorar paradas longas
         if (p2.velocidade > 0) {
             const lat1 = parseFloat(p1.latitude);
             const lon1 = parseFloat(p1.longitude);
@@ -1089,11 +1086,11 @@ function calculateTripStats(trajectoryData) {
     };
 }
 
-// === FUN√á√ïES PARA PONTOS DE INTERESSE ===
+// === FUN«’ES PARA PONTOS DE INTERESSE ===
 
 async function loadPontosInteresse() {
     try {
-        // Agora, a requisi√ß√£o busca os dados diretamente do banco de dados Supabase
+        // Agora, a requisiÁ„o busca os dados diretamente do banco de dados Supabase
         const pontosInteresseData = await supabaseRequest('pontos_interesse?order=nome', 'GET', null, false);
 
         if (!pontosInteresseData) {
@@ -1127,7 +1124,7 @@ function renderPontosInteresseTable() {
             <td><span class="px-2 py-1 rounded text-xs font-medium" style="background: ${ponto.cor}20; color: ${ponto.cor};">${ponto.tipo}</span></td>
             <td class="text-xs font-mono">${parseFloat(ponto.latitude).toFixed(6)}, ${parseFloat(ponto.longitude).toFixed(6)}</td>
             <td class="text-center">${ponto.raio_deteccao}m</td>
-            <td class="text-center">${ponto.ativo ? '‚úÖ' : '‚ùå'}</td>
+            <td class="text-center">${ponto.ativo ? '?' : '?'}</td>
             <td>
                 <div class="flex gap-1">
                     <button class="btn btn-warning btn-small" onclick="editPontoInteresse('${ponto.id}')">Editar</button>
@@ -1154,15 +1151,15 @@ function showAddPontoInteresse() {
         </div>
         <div class="form-group"><label>Nome do Ponto:</label><input type="text" id="add_nome" placeholder="Ex: CD Principal, Loja 123, etc." required></div>
         <div class="form-group"><label>Tipo:</label><select id="add_tipo" required>
-            <option value="CD">Centro de Distribui√ß√£o</option>
+            <option value="CD">Centro de DistribuiÁ„o</option>
             <option value="LOJA">Loja</option>
-            <option value="POSTO">Posto de Combust√≠vel</option>
-            <option value="CASA">Casa/Resid√™ncia</option>
+            <option value="POSTO">Posto de CombustÌvel</option>
+            <option value="CASA">Casa/ResidÍncia</option>
             <option value="OUTRO">Outro</option>
         </select></div>
         <div class="form-group"><label>Latitude:</label><input type="number" id="add_latitude" step="0.000001" placeholder="-15.601400" required></div>
         <div class="form-group"><label>Longitude:</label><input type="number" id="add_longitude" step="0.000001" value="" placeholder="-56.097900" required></div>
-        <div class="form-group"><label>Raio de Detec√ß√£o (metros):</label><input type="number" id="add_raio_deteccao" min="50" max="2000" value="200" required></div>
+        <div class="form-group"><label>Raio de DetecÁ„o (metros):</label><input type="number" id="add_raio_deteccao" min="50" max="2000" value="200" required></div>
         <div class="form-group"><label>Cor no Mapa:</label><select id="add_cor">
             <option value="#0077B6">Azul</option>
             <option value="#EF4444">Vermelho</option>
@@ -1173,7 +1170,7 @@ function showAddPontoInteresse() {
         </select></div>
         <div class="form-group" style="display:none;"><label>Status:</label><select id="add_ativo"><option value="true">Ativo</option><option value="false">Inativo</option></select></div>
         <div class="text-center mt-4 md:col-span-2">
-            <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">üìç Usar Localiza√ß√£o Atual</button>
+            <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">?? Usar LocalizaÁ„o Atual</button>
         </div>
     `;
 
@@ -1199,14 +1196,14 @@ function getCurrentLocation() {
             (position) => {
                 document.getElementById('add_latitude').value = position.coords.latitude.toFixed(6);
                 document.getElementById('add_longitude').value = position.coords.longitude.toFixed(6);
-                showNotification('Localiza√ß√£o atual capturada!', 'success');
+                showNotification('LocalizaÁ„o atual capturada!', 'success');
             },
             (error) => {
-                showNotification('Erro ao obter localiza√ß√£o: ' + error.message, 'error');
+                showNotification('Erro ao obter localizaÁ„o: ' + error.message, 'error');
             }
         );
     } else {
-        showNotification('Geolocaliza√ß√£o n√£o suportada pelo navegador.', 'error');
+        showNotification('GeolocalizaÁ„o n„o suportada pelo navegador.', 'error');
     }
 }
 
@@ -1249,7 +1246,7 @@ async function addPontosInteresseToMap() {
     pontosInteresse.forEach(ponto => {
         if (!ponto.ativo) return;
 
-        // √çcone personalizado para o ponto
+        // Õcone personalizado para o ponto
         const pontoIcon = L.divIcon({
             className: 'custom-marker',
             html: `<div style="background: ${ponto.cor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${ponto.tipo}</div>`,
@@ -1262,7 +1259,7 @@ async function addPontosInteresseToMap() {
             .addTo(mapInstance)
             .bindPopup(`<b>${ponto.nome}</b><br><small>${ponto.tipo}</small>`);
 
-        // Adicionar c√≠rculo de detec√ß√£o
+        // Adicionar cÌrculo de detecÁ„o
         L.circle([ponto.latitude, ponto.longitude], {
             color: ponto.cor,
             fillColor: ponto.cor,
@@ -1289,7 +1286,7 @@ async function initPontosInteresseMap() {
     mapInstance = L.map('map').setView([-15.6014, -56.0979], 11);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '¬© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
 
     await addPontosInteresseToMap();
@@ -1304,7 +1301,7 @@ async function initPontosInteresseMap() {
     }
 }
 
-// Fun√ß√£o para detectar proximidade durante rastreamento
+// FunÁ„o para detectar proximidade durante rastreamento
 function checkProximityToPontosInteresse(lat, lng) {
     const proximityAlerts = [];
 
@@ -1338,7 +1335,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 async function editPontoInteresse(pontoId) {
     const ponto = pontosInteresse.find(p => p.id === pontoId);
     if (!ponto) {
-        showNotification('Ponto n√£o encontrado', 'error');
+        showNotification('Ponto n„o encontrado', 'error');
         return;
     }
 
@@ -1356,10 +1353,10 @@ async function editPontoInteresse(pontoId) {
         <div class="form-group">
             <label>Tipo:</label>
             <select id="add_tipo" required>
-                <option value="CD" ${ponto.tipo === 'CD' ? 'selected' : ''}>Centro de Distribui√ß√£o</option>
+                <option value="CD" ${ponto.tipo === 'CD' ? 'selected' : ''}>Centro de DistribuiÁ„o</option>
                 <option value="LOJA" ${ponto.tipo === 'LOJA' ? 'selected' : ''}>Loja</option>
-                <option value="POSTO" ${ponto.tipo === 'POSTO' ? 'selected' : ''}>Posto de Combust√≠vel</option>
-                <option value="CASA" ${ponto.tipo === 'CASA' ? 'selected' : ''}>Casa/Resid√™ncia</option>
+                <option value="POSTO" ${ponto.tipo === 'POSTO' ? 'selected' : ''}>Posto de CombustÌvel</option>
+                <option value="CASA" ${ponto.tipo === 'CASA' ? 'selected' : ''}>Casa/ResidÍncia</option>
                 <option value="OUTRO" ${ponto.tipo === 'OUTRO' ? 'selected' : ''}>Outro</option>
             </select>
         </div>
@@ -1372,7 +1369,7 @@ async function editPontoInteresse(pontoId) {
             <input type="number" id="add_longitude" step="0.000001" value="${ponto.longitude}" required>
         </div>
         <div class="form-group">
-            <label>Raio de Detec√ß√£o (metros):</label>
+            <label>Raio de DetecÁ„o (metros):</label>
             <input type="number" id="add_raio_deteccao" min="50" max="2000" value="${ponto.raio_deteccao}" required>
         </div>
         <div class="form-group">
@@ -1404,7 +1401,7 @@ async function deletePontoInteresse(pontoId) {
         try {
             await supabaseRequest(`pontos_interesse?id=eq.${pontoId}`, 'DELETE', null, false);
             pontosInteresse = pontosInteresse.filter(p => p.id !== pontoId);
-            showNotification('Ponto de interesse exclu√≠do!', 'success');
+            showNotification('Ponto de interesse excluÌdo!', 'success');
             renderPontosInteresseTable();
         } catch (error) {
             showNotification(`Erro ao excluir: ${error.message}`, 'error');
@@ -1449,12 +1446,12 @@ async function renderLojasConfig() {
         tbody.innerHTML = `<tr><td colspan="6" class="alert alert-error">Erro ao carregar lojas: ${error.message}</td></tr>`;
     }
 }
-// --- FUN√á√ïES DE EDI√á√ÉO E EXCLUS√ÉO ---
+// --- FUN«’ES DE EDI«√O E EXCLUS√O ---
 
 async function editFilial(nomeFilial) {
     const filiais = await supabaseRequest(`filiais?nome=eq.${nomeFilial}`, 'GET', null, false);
     if (!filiais || filiais.length === 0) {
-        showNotification('Filial n√£o encontrada', 'error');
+        showNotification('Filial n„o encontrada', 'error');
         return;
     }
 
@@ -1467,8 +1464,8 @@ async function editFilial(nomeFilial) {
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_filial_nome" value="${filial.nome}">
         <div class="form-group"><label>Nome da Filial:</label><input type="text" id="add_nome" value="${filial.nome}" required readonly></div>
-        <div class="form-group"><label>Descri√ß√£o:</label><input type="text" id="add_descricao" value="${filial.descricao}" required></div>
-        <div class="form-group md:col-span-2"><label>Endere√ßo do CD:</label><input type="text" id="add_endereco_cd" value="${filial.endereco_cd || ''}" required></div>
+        <div class="form-group"><label>DescriÁ„o:</label><input type="text" id="add_descricao" value="${filial.descricao}" required></div>
+        <div class="form-group md:col-span-2"><label>EndereÁo do CD:</label><input type="text" id="add_endereco_cd" value="${filial.endereco_cd || ''}" required></div>
         <div class="form-group"><label>Latitude do CD:</label><input type="number" id="add_latitude_cd" step="0.000001" value="${filial.latitude_cd || ''}"></div>
         <div class="form-group"><label>Longitude do CD:</label><input type="number" id="add_longitude_cd" step="0.000001" value="${filial.longitude_cd || ''}"></div>
         <div class="form-group"><label>Status:</label><select id="add_ativo"><option value="true" ${filial.ativo ? 'selected' : ''}>Ativa</option><option value="false" ${!filial.ativo ? 'selected' : ''}>Inativa</option></select></div>
@@ -1478,11 +1475,11 @@ async function editFilial(nomeFilial) {
 }
 
 async function deleteFilial(nomeFilial) {
-    const confirmed = await showYesNoModal(`Deseja excluir a filial "${nomeFilial}"? Esta a√ß√£o n√£o pode ser desfeita.`);
+    const confirmed = await showYesNoModal(`Deseja excluir a filial "${nomeFilial}"? Esta aÁ„o n„o pode ser desfeita.`);
     if (confirmed) {
         try {
             await supabaseRequest(`filiais?nome=eq.${nomeFilial}`, 'DELETE', null, false);
-            showNotification('Filial exclu√≠da com sucesso!', 'success');
+            showNotification('Filial excluÌda com sucesso!', 'success');
             renderFiliaisConfig();
         } catch (error) {
             showNotification(`Erro ao excluir filial: ${error.message}`, 'error');
@@ -1493,7 +1490,7 @@ async function deleteFilial(nomeFilial) {
 async function editDoca(docaId) {
     const doca = docas.find(d => d.id === docaId);
     if (!doca) {
-        showNotification('Doca n√£o encontrada', 'error');
+        showNotification('Doca n„o encontrada', 'error');
         return;
     }
 
@@ -1506,7 +1503,7 @@ async function editDoca(docaId) {
         <input type="hidden" id="edit_doca_id" value="${doca.id}">
         <div class="form-group"><label>Nome da Doca:</label><input type="text" id="add_nome" value="${doca.nome}" required></div>
         <div class="form-group"><label>Capacidade (Pallets):</label><input type="number" id="add_capacidade_pallets" min="0" value="${doca.capacidade_pallets}" required></div>
-        <div class="form-group"><label>C√≥digo QR:</label><input type="text" id="add_coddoca" value="${doca.coddoca || ''}" required></div>
+        <div class="form-group"><label>CÛdigo QR:</label><input type="text" id="add_coddoca" value="${doca.coddoca || ''}" required></div>
         <div class="form-group"><label>Status:</label><select id="add_ativo"><option value="true" ${doca.ativo ? 'selected' : ''}>Ativa</option><option value="false" ${!doca.ativo ? 'selected' : ''}>Inativa</option></select></div>
     `;
 
@@ -1514,11 +1511,11 @@ async function editDoca(docaId) {
 }
 
 async function deleteDoca(docaId) {
-    const confirmed = await showYesNoModal('Deseja excluir esta doca? Esta a√ß√£o n√£o pode ser desfeita.');
+    const confirmed = await showYesNoModal('Deseja excluir esta doca? Esta aÁ„o n„o pode ser desfeita.');
     if (confirmed) {
         try {
             await supabaseRequest(`docas?id=eq.${docaId}`, 'DELETE');
-            showNotification('Doca exclu√≠da com sucesso!', 'success');
+            showNotification('Doca excluÌda com sucesso!', 'success');
             await loadSelectData();
             renderDocasConfig();
         } catch (error) {
@@ -1530,7 +1527,7 @@ async function deleteDoca(docaId) {
 async function editLider(liderId) {
     const lider = lideres.find(l => l.id === liderId);
     if (!lider) {
-        showNotification('n√£o encontrado', 'error');
+        showNotification('n„o encontrado', 'error');
         return;
     }
 
@@ -1538,11 +1535,11 @@ async function editLider(liderId) {
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
 
-    title.textContent = 'Editar L√≠der';
+    title.textContent = 'Editar LÌder';
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_lider_id" value="${lider.id}">
-        <div class="form-group"><label>Nome do L√≠der:</label><input type="text" id="add_nome" value="${lider.nome}" required></div>
-        <div class="form-group"><label>Matr√≠cula:</label><input type="text" id="add_codigo_funcionario" value="${lider.codigo_funcionario || ''}" required></div>
+        <div class="form-group"><label>Nome do LÌder:</label><input type="text" id="add_nome" value="${lider.nome}" required></div>
+        <div class="form-group"><label>MatrÌcula:</label><input type="text" id="add_codigo_funcionario" value="${lider.codigo_funcionario || ''}" required></div>
         <div class="form-group"><label>Status:</label><select id="add_ativo"><option value="true" ${lider.ativo ? 'selected' : ''}>Ativo</option><option value="false" ${!lider.ativo ? 'selected' : ''}>Inativo</option></select></div>
     `;
 
@@ -1550,25 +1547,25 @@ async function editLider(liderId) {
 }
 
 async function deleteLider(liderId) {
-    const confirmed = await showYesNoModal('Deseja excluir este l√≠der? Esta a√ß√£o n√£o pode ser desfeita.');
+    const confirmed = await showYesNoModal('Deseja excluir este lÌder? Esta aÁ„o n„o pode ser desfeita.');
     if (confirmed) {
         try {
             await supabaseRequest(`lideres?id=eq.${liderId}`, 'DELETE');
-            showNotification('exclu√≠do com sucesso!', 'success');
+            showNotification('excluÌdo com sucesso!', 'success');
             await loadSelectData();
             renderLideresConfig();
         } catch (error) {
-            showNotification(`Erro ao excluir l√≠der: ${error.message}`, 'error');
+            showNotification(`Erro ao excluir lÌder: ${error.message}`, 'error');
         }
     }
 }
 
-// SUBSTITUIR A VERS√ÉO EXISTENTE DE editAcesso
+// SUBSTITUIR A VERS√O EXISTENTE DE editAcesso
 async function editAcesso(nomeUsuario) {
-    // Busca o ID e o grupo_id para edi√ß√£o
+    // Busca o ID e o grupo_id para ediÁ„o
     const acessosData = await supabaseRequest(`acessos?select=id,nome,grupo_id&nome=eq.${nomeUsuario}`, 'GET', null, false);
     if (!acessosData || acessosData.length === 0) {
-        showNotification('Acesso n√£o encontrado', 'error');
+        showNotification('Acesso n„o encontrado', 'error');
         return;
     }
 
@@ -1582,7 +1579,7 @@ async function editAcesso(nomeUsuario) {
 
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_acesso_id" value="${acesso.id}">
-        <div class="form-group"><label>Nome de Usu√°rio:</label><input type="text" id="add_nome" value="${acesso.nome}" required></div>
+        <div class="form-group"><label>Nome de Usu·rio:</label><input type="text" id="add_nome" value="${acesso.nome}" required></div>
         <div class="form-group"><label>Nova Senha:</label><input type="password" id="add_senha" placeholder="Deixe em branco para manter a atual"></div>
         <div class="form-group"><label>Grupo de Acesso:</label><select id="add_grupo_id" required>
             <option value="">Selecione um Grupo</option>
@@ -1594,11 +1591,11 @@ async function editAcesso(nomeUsuario) {
 }
 
 async function deleteAcesso(nomeUsuario) {
-    const confirmed = await showYesNoModal(`Deseja excluir o acesso do usu√°rio "${nomeUsuario}"?`);
+    const confirmed = await showYesNoModal(`Deseja excluir o acesso do usu·rio "${nomeUsuario}"?`);
     if (confirmed) {
         try {
             await supabaseRequest(`acessos?nome=eq.${nomeUsuario}`, 'DELETE', null, false);
-            showNotification('Acesso exclu√≠do com sucesso!', 'success');
+            showNotification('Acesso excluÌdo com sucesso!', 'success');
             renderAcessosConfig();
         } catch (error) {
             showNotification(`Erro ao excluir acesso: ${error.message}`, 'error');
@@ -1609,7 +1606,7 @@ async function deleteAcesso(nomeUsuario) {
 async function editLoja(lojaId) {
     const loja = lojas.find(l => l.id === lojaId);
     if (!loja) {
-        showNotification('Loja n√£o encontrada', 'error');
+        showNotification('Loja n„o encontrada', 'error');
         return;
     }
 
@@ -1621,16 +1618,16 @@ async function editLoja(lojaId) {
     fieldsContainer.innerHTML = `
         <input type="hidden" id="edit_loja_id" value="${loja.id}">
         <div class="form-group"><label>Nome da Loja:</label><input type="text" id="add_nome" value="${loja.nome}" required></div>
-        <div class="form-group"><label>C√≥digo da Loja:</label><input type="text" id="add_codigo" value="${loja.codigo}" required></div>
+        <div class="form-group"><label>CÛdigo da Loja:</label><input type="text" id="add_codigo" value="${loja.codigo}" required></div>
         <div class="form-group"><label>Cidade:</label><input type="text" id="add_cidade" value="${loja.cidade}" required></div>
-        <div class="form-group"><label>C√≥digo QR:</label><input type="text" id="add_codlojaqr" value="${loja.codlojaqr || ''}" required></div>
-        <div class="form-group md:col-span-2"><label>Endere√ßo Completo:</label><input type="text" id="add_endereco_completo" value="${loja.endereco_completo || ''}" placeholder="Rua, N√∫mero, Bairro, CEP" required></div>
+        <div class="form-group"><label>CÛdigo QR:</label><input type="text" id="add_codlojaqr" value="${loja.codlojaqr || ''}" required></div>
+        <div class="form-group md:col-span-2"><label>EndereÁo Completo:</label><input type="text" id="add_endereco_completo" value="${loja.endereco_completo || ''}" placeholder="Rua, N˙mero, Bairro, CEP" required></div>
         <div class="form-group"><label>Latitude:</label><input type="number" id="add_latitude" step="0.000001" value="${loja.latitude || ''}" placeholder="-15.601400"></div>
         <div class="form-group"><label>Longitude:</label><input type="number" id="add_longitude" step="0.000001" value="${loja.longitude || ''}" placeholder="-56.097900"></div>
         <div class="form-group"><label>Status:</label><select id="add_ativo"><option value="true" ${loja.ativo ? 'selected' : ''}>Ativa</option><option value="false" ${!loja.ativo ? 'selected' : ''}>Inativa</option></select></div>
         <div class="text-center mt-4 md:col-span-2">
-            <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">üìç Usar Localiza√ß√£o Atual</button>
-            <button type="button" class="btn btn-primary" onclick="geocodeAddress()">üåç Buscar por Endere√ßo</button>
+            <button type="button" class="btn btn-secondary mr-2" onclick="getCurrentLocation()">?? Usar LocalizaÁ„o Atual</button>
+            <button type="button" class="btn btn-primary" onclick="geocodeAddress()">?? Buscar por EndereÁo</button>
         </div>
     `;
 
@@ -1638,11 +1635,11 @@ async function editLoja(lojaId) {
 }
 
 async function deleteLoja(lojaId) {
-    const confirmed = await showYesNoModal('Deseja excluir esta loja? Esta a√ß√£o n√£o pode ser desfeita.');
+    const confirmed = await showYesNoModal('Deseja excluir esta loja? Esta aÁ„o n„o pode ser desfeita.');
     if (confirmed) {
         try {
             await supabaseRequest(`lojas?id=eq.${lojaId}`, 'DELETE');
-            showNotification('Loja exclu√≠da com sucesso!', 'success');
+            showNotification('Loja excluÌda com sucesso!', 'success');
             await loadSelectData();
             await renderLojasConfig();
         } catch (error) {
@@ -1654,11 +1651,11 @@ async function deleteLoja(lojaId) {
 function showLojaMap(lojaId) {
     const loja = lojas.find(l => l.id === lojaId);
     if (!loja || !loja.latitude || !loja.longitude) {
-        showNotification('Coordenadas da loja n√£o definidas', 'error');
+        showNotification('Coordenadas da loja n„o definidas', 'error');
         return;
     }
 
-    document.getElementById('mapModalTitle').textContent = `Localiza√ß√£o - ${loja.nome}`;
+    document.getElementById('mapModalTitle').textContent = `LocalizaÁ„o - ${loja.nome}`;
     document.getElementById('mapModal').style.display = 'flex';
 
     setTimeout(() => {
@@ -1674,12 +1671,12 @@ function initSingleLojaMap(lat, lng, loja) {
     mapInstance = L.map('map').setView([lat, lng], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '¬© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
 
     const lojaIcon = L.divIcon({
         className: 'custom-marker',
-        html: `<div style="background: #EF4444; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">üè™ ${loja.codigo}</div>`,
+        html: `<div style="background: #EF4444; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">?? ${loja.codigo}</div>`,
         iconSize: [100, 40],
         iconAnchor: [50, 20]
     });
@@ -1689,9 +1686,9 @@ function initSingleLojaMap(lat, lng, loja) {
         .bindPopup(`
             <div style="text-align: center;">
                 <h3><strong>${loja.nome}</strong></h3>
-                <p><strong>C√≥digo:</strong> ${loja.codigo}</p>
+                <p><strong>CÛdigo:</strong> ${loja.codigo}</p>
                 <p><strong>Cidade:</strong> ${loja.cidade}</p>
-                ${loja.endereco_completo ? `<p><strong>Endere√ßo:</strong> ${loja.endereco_completo}</p>` : ''}
+                ${loja.endereco_completo ? `<p><strong>EndereÁo:</strong> ${loja.endereco_completo}</p>` : ''}
                 <p><strong>Coordenadas:</strong><br>${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
             </div>
         `).openPopup();
@@ -1701,7 +1698,7 @@ async function geocodeAddress() {
     const endereco = document.getElementById('add_endereco_completo').value.trim();
 
     if (!endereco) {
-        showNotification('Digite um endere√ßo para buscar as coordenadas', 'error');
+        showNotification('Digite um endereÁo para buscar as coordenadas', 'error');
         return;
     }
 
@@ -1717,11 +1714,11 @@ async function geocodeAddress() {
             document.getElementById('add_longitude').value = parseFloat(result.lon).toFixed(6);
             showNotification(`Coordenadas encontradas: ${result.display_name}`, 'success');
         } else {
-            showNotification('Endere√ßo n√£o encontrado. Verifique o endere√ßo ou use coordenadas manuais.', 'error');
+            showNotification('EndereÁo n„o encontrado. Verifique o endereÁo ou use coordenadas manuais.', 'error');
         }
     } catch (error) {
         showNotification('Erro ao buscar coordenadas. Tente novamente ou use coordenadas manuais.', 'error');
-        console.error('Erro na geocodifica√ß√£o:', error);
+        console.error('Erro na geocodificaÁ„o:', error);
     }
 }
 
@@ -1740,25 +1737,25 @@ function initAllLojasMap() {
         mapInstance.remove();
     }
 
-    // Ponto de partida din√¢mico da filial
+    // Ponto de partida din‚mico da filial
     const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
 
     mapInstance = L.map('map').setView(cdCoords, 11);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '¬© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance);
 
     const cdIcon = L.divIcon({
         className: 'custom-marker',
-        html: '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">üè≠ CD</div>',
+        html: '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">?? CD</div>',
         iconSize: [60, 30],
         iconAnchor: [30, 15]
     });
 
     L.marker(cdCoords, { icon: cdIcon })
         .addTo(mapInstance)
-        .bindPopup(`<h3><strong>Centro de Distribui√ß√£o</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
+        .bindPopup(`<h3><strong>Centro de DistribuiÁ„o</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
 
     const bounds = L.latLngBounds();
     bounds.extend(cdCoords);
@@ -1781,7 +1778,7 @@ function initAllLojasMap() {
 
             const lojaIcon = L.divIcon({
                 className: 'custom-marker',
-                html: `<div style="background: ${cor}; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">üè™ ${loja.codigo}</div>`,
+                html: `<div style="background: ${cor}; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">?? ${loja.codigo}</div>`,
                 iconSize: [60, 25],
                 iconAnchor: [30, 12]
             });
@@ -1791,9 +1788,9 @@ function initAllLojasMap() {
                 .bindPopup(`
                     <div style="text-align: center;">
                         <h3><strong>${loja.nome}</strong></h3>
-                        <p><strong>C√≥digo:</strong> ${loja.codigo}</p>
+                        <p><strong>CÛdigo:</strong> ${loja.codigo}</p>
                         <p><strong>Cidade:</strong> ${loja.cidade}</p>
-                        ${loja.endereco_completo ? `<p><strong>Endere√ßo:</strong><br>${loja.endereco_completo}</p>` : ''}
+                        ${loja.endereco_completo ? `<p><strong>EndereÁo:</strong><br>${loja.endereco_completo}</p>` : ''}
                         <p><strong>Coordenadas:</strong><br>${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
                     </div>
                 `);
@@ -1817,7 +1814,7 @@ function initAllLojasMap() {
 
         let alertText = '';
         if (lojasSemGPS > 0) {
-            alertText = `<p style="color: #F59E0B; font-weight: bold; margin-top: 8px;">‚ö†Ô∏è ${lojasSemGPS} loja(s) sem coordenadas definidas</p>`;
+            alertText = `<p style="color: #F59E0B; font-weight: bold; margin-top: 8px;">?? ${lojasSemGPS} loja(s) sem coordenadas definidas</p>`;
         }
 
         div.innerHTML = `
@@ -1829,9 +1826,9 @@ function initAllLojasMap() {
                 ${alertText}
                 <hr style="margin: 8px 0;">
                 <p style="font-size: 10px; color: #666;">
-                    üî¥ Lojas Fort<br>
-                    üîµ Lojas Comper<br> 
-                    üü¢ Centro de Distribui√ß√£o
+                    ?? Lojas Fort<br>
+                    ?? Lojas Comper<br> 
+                    ?? Centro de DistribuiÁ„o
                 </p>
             </div>
         `;
@@ -1843,14 +1840,14 @@ function initAllLojasMap() {
 function calculateRouteToLoja(lojaId) {
     const loja = lojas.find(l => l.id === lojaId);
     if (!loja || !loja.latitude || !loja.longitude) {
-        showNotification('Coordenadas da loja n√£o definidas', 'error');
+        showNotification('Coordenadas da loja n„o definidas', 'error');
         return;
     }
 
     closeMapModal();
 
     setTimeout(() => {
-        document.getElementById('mapModalTitle').textContent = `Rota: CD ‚Üí ${loja.nome}`;
+        document.getElementById('mapModalTitle').textContent = `Rota: CD ? ${loja.nome}`;
         document.getElementById('mapModal').style.display = 'flex';
 
         setTimeout(() => {
@@ -1860,12 +1857,12 @@ function calculateRouteToLoja(lojaId) {
 }
 
 
-// Novas fun√ß√µes para geolocaliza√ß√£o da filial
+// Novas funÁıes para geolocalizaÁ„o da filial
 async function geocodeAddressFilial() {
     const endereco = document.getElementById('add_endereco_cd').value.trim();
 
     if (!endereco) {
-        showNotification('Digite um endere√ßo para buscar as coordenadas', 'error');
+        showNotification('Digite um endereÁo para buscar as coordenadas', 'error');
         return;
     }
 
@@ -1881,11 +1878,11 @@ async function geocodeAddressFilial() {
             document.getElementById('add_longitude_cd').value = parseFloat(result.lon).toFixed(6);
             showNotification(`Coordenadas encontradas: ${result.display_name}`, 'success');
         } else {
-            showNotification('Endere√ßo n√£o encontrado. Verifique o endere√ßo.', 'error');
+            showNotification('EndereÁo n„o encontrado. Verifique o endereÁo.', 'error');
         }
     } catch (error) {
         showNotification('Erro ao buscar coordenadas. Tente novamente.', 'error');
-        console.error('Erro na geocodifica√ß√£o:', error);
+        console.error('Erro na geocodificaÁ„o:', error);
     }
 }
 
@@ -1895,19 +1892,19 @@ function getCurrentLocationFilial() {
             (position) => {
                 document.getElementById('add_latitude_cd').value = position.coords.latitude.toFixed(6);
                 document.getElementById('add_longitude_cd').value = position.coords.longitude.toFixed(6);
-                showNotification('Localiza√ß√£o atual capturada!', 'success');
+                showNotification('LocalizaÁ„o atual capturada!', 'success');
             },
             (error) => {
-                showNotification('Erro ao obter localiza√ß√£o: ' + error.message, 'error');
+                showNotification('Erro ao obter localizaÁ„o: ' + error.message, 'error');
             }
         );
     } else {
-        showNotification('Geolocaliza√ß√£o n√£o suportada pelo navegador.', 'error');
+        showNotification('GeolocalizaÁ„o n„o suportada pelo navegador.', 'error');
     }
 }
 
 
-// SUBSTITUIR A VERS√ÉO EXISTENTE DE getRouteFromAPI
+// SUBSTITUIR A VERS√O EXISTENTE DE getRouteFromAPI
 async function getRouteFromAPI(waypoints) {
     if (!waypoints || waypoints.length < 2) {
         return null;
@@ -1920,8 +1917,8 @@ async function getRouteFromAPI(waypoints) {
         const response = await fetch(url);
 
         if (response.status === 429) {
-            // Limite de requisi√ß√µes. Lan√ßar erro para que o allSettled capture.
-            throw new Error('Limite de requisi√ß√µes OSRM (429)');
+            // Limite de requisiÁıes. LanÁar erro para que o allSettled capture.
+            throw new Error('Limite de requisiÁıes OSRM (429)');
         }
 
         if (!response.ok) {
@@ -1939,24 +1936,24 @@ async function getRouteFromAPI(waypoints) {
                 coordinates: route.geometry.coordinates.map(c => [c[1], c[0]])
             };
         }
-        // Rota n√£o encontrada
+        // Rota n„o encontrada
         return null;
     } catch (error) {
-        // üö® FIX CR√çTICO: Tratamento de erro de rede (Failed to fetch/Timeout) üö®
-        console.error('Falha cr√≠tica de rede/conex√£o OSRM:', error);
-        // Lan√ßa o erro para que o Promise.allSettled capture como 'rejected' e o fluxo continue.
-        throw new Error('Falha de conex√£o OSRM: A rota n√£o p√¥de ser calculada.');
+        // ?? FIX CRÕTICO: Tratamento de erro de rede (Failed to fetch/Timeout) ??
+        console.error('Falha crÌtica de rede/conex„o OSRM:', error);
+        // LanÁa o erro para que o Promise.allSettled capture como 'rejected' e o fluxo continue.
+        throw new Error('Falha de conex„o OSRM: A rota n„o pÙde ser calculada.');
     }
 }
 
 
-// NOVO C√ìDIGO: Fun√ß√£o para Snap-to-Road (Map Matching)
+// NOVO C”DIGO: FunÁ„o para Snap-to-Road (Map Matching)
 async function getMapMatchedRoute(coordinates) {
     if (coordinates.length < 2) return null;
 
     // Converte a lista de objetos LatLng em strings "lng,lat;lng,lat"
     const coordsString = coordinates.map(p => `${p.lng},${p.lat}`).join(';');
-    // Usa o endpoint Map Matching do OSRM para ajustar a rota √†s vias
+    // Usa o endpoint Map Matching do OSRM para ajustar a rota ‡s vias
     const url = `https://router.project-osrm.org/match/v1/driving/${coordsString}?geometries=geojson&steps=false&tidy=true`;
 
     try {
@@ -1965,27 +1962,27 @@ async function getMapMatchedRoute(coordinates) {
 
         const data = await response.json();
         if (data.matchings && data.matchings.length > 0) {
-            // Retorna as coordenadas ajustadas √† rua
+            // Retorna as coordenadas ajustadas ‡ rua
             return data.matchings[0].geometry.coordinates.map(c => [c[1], c[0]]);
         }
         return null;
     } catch (error) {
         console.error('Falha no Map Matching OSRM:', error);
-        throw new Error('Falha no Map Matching: Servidor OSRM inst√°vel.');
+        throw new Error('Falha no Map Matching: Servidor OSRM inst·vel.');
     }
 }
-// NOVO: Fun√ß√£o auxiliar para o Drag and Drop
+// NOVO: FunÁ„o auxiliar para o Drag and Drop
 function getDragAfterElement(container, y) {
-    // Retorna todos os elementos arrast√°veis que N√ÉO est√£o sendo arrastados
+    // Retorna todos os elementos arrast·veis que N√O est„o sendo arrastados
     const draggableElements = [...container.querySelectorAll('li[draggable="true"]:not(.dragging)')];
 
-    // Encontra o elemento mais pr√≥ximo do ponto Y do cursor
+    // Encontra o elemento mais prÛximo do ponto Y do cursor
     return draggableElements.reduce((closest, child) => {
         const box = child.getBoundingClientRect();
-        // Calcula a dist√¢ncia do meio do elemento at√© o cursor Y
+        // Calcula a dist‚ncia do meio do elemento atÈ o cursor Y
         const offset = y - box.top - box.height / 2;
 
-        // Se a dist√¢ncia for negativa e mais pr√≥xima do zero (acima do meio do elemento)
+        // Se a dist‚ncia for negativa e mais prÛxima do zero (acima do meio do elemento)
         if (offset < 0 && offset > closest.offset) {
             return { offset: offset, element: child };
         } else {
@@ -2004,16 +2001,16 @@ export async function openOrdemCarregamentoModal(expeditionId) {
     modal.style.display = 'flex';
 
     try {
-        // Busca os itens da expedi√ß√£o e os dados das lojas associadas
+        // Busca os itens da expediÁ„o e os dados das lojas associadas
         const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}&select=*,lojas(codigo,nome)`);
 
         if (!items || items.length === 0) {
-            showNotification('Nenhum item encontrado para esta expedi√ß√£o.', 'error');
+            showNotification('Nenhum item encontrado para esta expediÁ„o.', 'error');
             closeOrdemCarregamentoModal();
             return;
         }
 
-        // Popula a lista com os itens arrast√°veis
+        // Popula a lista com os itens arrast·veis
         list.innerHTML = items.map(item => `
             <li draggable="true" data-item-id="${item.id}" class="flex items-center">
                 <i data-feather="menu" class="drag-handle"></i>
@@ -2024,7 +2021,7 @@ export async function openOrdemCarregamentoModal(expeditionId) {
             </li>
         `).join('');
 
-        feather.replace(); // Renderiza os √≠cones (como o de arrastar)
+        feather.replace(); // Renderiza os Ìcones (como o de arrastar)
 
         // Adiciona os event listeners de drag-and-drop
         const draggables = list.querySelectorAll('li[draggable="true"]');
@@ -2050,7 +2047,7 @@ export async function openOrdemCarregamentoModal(expeditionId) {
         });
 
     } catch (error) {
-        showNotification(`Erro ao carregar itens da expedi√ß√£o: ${error.message}`, 'error');
+        showNotification(`Erro ao carregar itens da expediÁ„o: ${error.message}`, 'error');
         closeOrdemCarregamentoModal();
     }
 }
@@ -2062,7 +2059,7 @@ function closeOrdemCarregamentoModal() {
     document.getElementById('ordemLojasList').innerHTML = '';
 }
 
-// SUBSTITUA A FUN√á√ÉO saveOrdemCarregamento COMPLETA
+// SUBSTITUA A FUN«√O saveOrdemCarregamento COMPLETA
 async function saveOrdemCarregamento() {
     const expeditionId = document.getElementById('ordemExpeditionId').value;
     const orderedItems = document.querySelectorAll('#ordemLojasList li');
@@ -2072,7 +2069,7 @@ async function saveOrdemCarregamento() {
         return;
     }
 
-    // Cria um array de objetos para a atualiza√ß√£o
+    // Cria um array de objetos para a atualizaÁ„o
     const updates = Array.from(orderedItems).map((item, index) => {
         return {
             id: item.dataset.itemId,
@@ -2081,15 +2078,15 @@ async function saveOrdemCarregamento() {
     });
 
     try {
-        // Cria uma lista de promessas de atualiza√ß√£o, uma para cada item
+        // Cria uma lista de promessas de atualizaÁ„o, uma para cada item
         const updatePromises = updates.map(update => {
             const endpoint = `expedition_items?id=eq.${update.id}`; // Especifica o ID do item
             const payload = { ordem_entrega: update.ordem_entrega }; // Envia apenas o dado a ser atualizado
-            // üö® FIX CR√çTICO: Passa 'false' para n√£o tentar injetar 'filial' no payload do item
+            // ?? FIX CRÕTICO: Passa 'false' para n„o tentar injetar 'filial' no payload do item
             return supabaseRequest(endpoint, 'PATCH', payload, false);
         });
 
-        // Executa todas as atualiza√ß√µes
+        // Executa todas as atualizaÁıes
         await Promise.all(updatePromises);
 
         showNotification('Ordem de carregamento salva com sucesso!', 'success');
@@ -2100,13 +2097,13 @@ async function saveOrdemCarregamento() {
         loadTransportList();
         await loadSelectData();
     } catch (error) {
-        // A mensagem de erro agora vir√° do supabaseRequest, que j√° √© detalhada
+        // A mensagem de erro agora vir· do supabaseRequest, que j· È detalhada
         // Apenas para garantir, logamos o erro completo no console.
         console.error("Erro completo ao salvar ordem:", error);
         showNotification(`Erro ao salvar ordem de carregamento: ${error.message}`, 'error');
     }
 }
-// --- NOVAS FUN√á√ïES DE RENDERIZA√á√ÉO PARA CONFIGURA√á√ïES ---
+// --- NOVAS FUN«’ES DE RENDERIZA«√O PARA CONFIGURA«’ES ---
 
 async function renderFiliaisConfig() {
     const tbody = document.getElementById('filiaisConfigBody');
@@ -2119,7 +2116,7 @@ async function renderFiliaisConfig() {
             <tr>
                 <td class="font-medium">${filial.nome}</td>
                 <td>${filial.descricao || 'N/A'}</td>
-                <td class="max-w-xs truncate" title="${filial.endereco_cd || 'N√£o informado'}">${filial.endereco_cd || 'N√£o informado'}</td>
+                <td class="max-w-xs truncate" title="${filial.endereco_cd || 'N„o informado'}">${filial.endereco_cd || 'N„o informado'}</td>
                 <td><span class="status-badge ${filial.ativo ? 'status-disponivel' : 'status-cancelado'}">${filial.ativo ? 'Ativa' : 'Inativa'}</span></td>
                 <td>
                     <div class="flex gap-1">
@@ -2163,7 +2160,7 @@ async function renderDocasConfig() {
 async function renderLideresConfig() {
     const tbody = document.getElementById('lideresConfigBody');
     if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="4" class="loading"><div class="spinner"></div>Carregando l√≠deres...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="loading"><div class="spinner"></div>Carregando lÌderes...</td></tr>`;
 
     try {
         const lideresData = await supabaseRequest('lideres?order=nome');
@@ -2181,7 +2178,7 @@ async function renderLideresConfig() {
             </tr>
         `).join('');
     } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="4" class="alert alert-error">Erro ao carregar l√≠deres: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="alert alert-error">Erro ao carregar lÌderes: ${error.message}</td></tr>`;
     }
 }
 
@@ -2211,17 +2208,17 @@ function renderPontosInteresseConfig() {
     `).join('');
 }
 
-// SUBSTITUIR A VERS√ÉO EXISTENTE DE renderAcessosConfig (Cerca da linha 3290)
+// SUBSTITUIR A VERS√O EXISTENTE DE renderAcessosConfig (Cerca da linha 3290)
 async function renderAcessosConfig() {
     const tbody = document.getElementById('acessosConfigBody');
     if (!tbody) return;
 
     if (!masterUserPermission) {
-        tbody.innerHTML = '<tr><td colspan="3" class="alert alert-error">Acesso negado. Apenas usu√°rios MASTER podem gerenciar acessos e permiss√µes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" class="alert alert-error">Acesso negado. Apenas usu·rios MASTER podem gerenciar acessos e permissıes.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = `<tr><td colspan="3" class="loading"><div class="spinner"></div>Carregando usu√°rios e grupos...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="loading"><div class="spinner"></div>Carregando usu·rios e grupos...</td></tr>`;
 
     try {
         // 1. Carregar Grupos de Acesso
@@ -2237,7 +2234,7 @@ async function renderAcessosConfig() {
                     <td><span class="status-badge status-disponivel">GRUPO</span></td>
                     <td>
                         <div class="flex gap-1">
-                            <button class="btn btn-primary btn-small" onclick="managePermissionsModal('${grupo.id}', '${grupo.nome}', 'grupo')">Permiss√µes</button>
+                            <button class="btn btn-primary btn-small" onclick="managePermissionsModal('${grupo.id}', '${grupo.nome}', 'grupo')">Permissıes</button>
                             <button class="btn btn-warning btn-small" onclick="showAddForm('grupo', ${grupoJson})">Editar</button>
                             <button class="btn btn-danger btn-small" onclick="deleteGroup('${grupo.id}')">Excluir</button>
                         </div>
@@ -2246,9 +2243,9 @@ async function renderAcessosConfig() {
             `;
         });
 
-        // 2. Carregar Usu√°rios Individuais
+        // 2. Carregar Usu·rios Individuais
         const acessosData = await supabaseRequest('acessos?select=id,nome,grupo_id(nome)&order=nome', 'GET', null, false);
-        let acessosHtml = '<tr><td colspan="3" class="font-bold text-center bg-gray-200">USU√ÅRIOS INDIVIDUAIS</td></tr>';
+        let acessosHtml = '<tr><td colspan="3" class="font-bold text-center bg-gray-200">USU¡RIOS INDIVIDUAIS</td></tr>';
 
         acessosData.forEach(acesso => {
             const grupoNome = acesso.grupo_id && typeof acesso.grupo_id === 'object' && acesso.grupo_id.nome
@@ -2261,7 +2258,7 @@ async function renderAcessosConfig() {
                     <td><span class="status-badge status-em_uso">${grupoNome}</span></td>
                     <td>
                         <div class="flex gap-1">
-                            <button class="btn btn-primary btn-small" onclick="managePermissionsModal('${acesso.id}', '${acesso.nome}', 'usuario')">Permiss√µes</button>
+                            <button class="btn btn-primary btn-small" onclick="managePermissionsModal('${acesso.id}', '${acesso.nome}', 'usuario')">Permissıes</button>
                             <button class="btn btn-warning btn-small" onclick="editAcesso('${acesso.nome}')">Editar</button>
                             <button class="btn btn-danger btn-small" onclick="deleteAcesso('${acesso.nome}')">Excluir</button>
                         </div>
@@ -2277,7 +2274,7 @@ async function renderAcessosConfig() {
     }
 }
 
-// Expor fun√ß√µes para global
+// Expor funÁıes para global
 window.loadConfiguracoes = loadConfiguracoes;
 window.checkPassword = checkPassword;
 window.showAlert = showAlert;
