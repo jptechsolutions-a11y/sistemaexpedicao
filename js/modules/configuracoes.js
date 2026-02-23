@@ -1,7 +1,8 @@
 ﻿import { supabaseRequest } from '../api.js';
 import { getState, setState } from '../state.js';
 import { loadUserPermissions } from '../auth.js';
-import { getStatusLabel, getPermittedSubTabs, showSubTab, showYesNoModal } from '../utils.js';
+import { getStatusLabel, getPermittedSubTabs, showSubTab } from '../utils.js';
+import { showYesNoModal } from './motoristas.js';
 import { showNotification } from '../ui.js';
 
 const getGlobal = (key) => typeof window !== 'undefined' ? window[key] : getState()[key];

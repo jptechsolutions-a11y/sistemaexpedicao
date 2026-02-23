@@ -437,7 +437,7 @@ async function selectFilial(filial) {
                 const homeAutoRefreshCheckbox = document.getElementById('homeAutoRefresh');
                 if (homeAutoRefreshCheckbox) {
                     homeAutoRefreshCheckbox.checked = true;
-                    toggleHomeAutoRefresh();
+                    window.toggleHomeAutoRefresh();
                 }
             }, 2000);
         }
