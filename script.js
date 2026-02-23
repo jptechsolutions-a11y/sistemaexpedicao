@@ -23,6 +23,7 @@ let userPermissions = [];
 let masterUserPermission = false;
 let gruposAcesso = [];
 let allIdentificacaoExpeditions = []; // Guarda a lista completa para o filtro
+const subTabViewIds = new Set(['faturamento', 'operacao']);
 
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
@@ -428,7 +429,7 @@ async function selectFilial(filial) {
         // garantimos que o conteúdo da aba principal (que agora é o container de sub-abas)
         // ainda mostre alguma mensagem se necessário.
 
-        showView(firstPermittedViewId, firstNavItem);
+        if (window.showView) window.showView(firstPermittedViewId, firstNavItem);
 
         // Configura o refresh automático da Home (se for a primeira aba permitida)
         if (firstPermittedViewId === 'home') {
@@ -2970,7 +2971,7 @@ async function forceRefresh() {
 
     // Chamamos showView novamente para recarregar os dados da aba ativa
     // Passamos o elemento ativo para que o showView não mude o foco
-    showView(activeViewId, activeNavItem);
+    if (window.showView) window.showView(activeViewId, activeNavItem);
 
     showNotification('Dados atualizados com sucesso!', 'success');
 }
