@@ -1995,7 +1995,7 @@ function getDragAfterElement(container, y) {
 
 // ... O resto do seu script.js continua aqui
 
-async function openOrdemCarregamentoModal(expeditionId) {
+export async function openOrdemCarregamentoModal(expeditionId) {
     const modal = document.getElementById('ordemCarregamentoModal');
     const list = document.getElementById('ordemLojasList');
     document.getElementById('ordemExpeditionId').value = expeditionId;
