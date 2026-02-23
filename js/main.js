@@ -1,5 +1,8 @@
 ﻿import { getState, setState } from './state.js';
+window.setState = setState;
 import { loadUserPermissions, hasPermission } from './auth.js';
+window.loadUserPermissions = loadUserPermissions;
+window.hasPermission = hasPermission;
 import { supabaseRequest } from './api.js';
 import { showNotification } from './ui.js';
 
@@ -58,7 +61,7 @@ window.showView = function (viewId, element) {
         if (checkPermission !== alternativePermission && hasPermission(alternativePermission)) {
             // Pass Permitido
         } else {
-            showNotification('VocÃª nÃ£o tem permissÃ£o para acessar esta aba.', 'error');
+            showNotification('Você não tem permissão para acessar esta aba.', 'error');
             return;
         }
     }

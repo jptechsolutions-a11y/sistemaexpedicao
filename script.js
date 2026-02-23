@@ -29,85 +29,18 @@ const subTabViewIds = new Set(['faturamento', 'operacao']);
 
 // SUBSTITUIR A VERSÃO EXISTENTE DE loadUserPermissions
 async function loadUserPermissions(userId, grupoId) {
-    masterUserPermission = false;
-    let finalPermissionsSet = new Set();
-
-    // 1. CHECAGEM DE GRUPO E CARREGAMENTO DE PERMISSÕES
-    if (grupoId) {
-        try {
-            // Carrega o nome do grupo e todas as permissões do grupo em paralelo
-            // O último 'false' garante que o filtro de filial NÃO seja aplicado (Correto para permissões)
-            const [grupo, permissoesGrupo] = await Promise.all([
-                supabaseRequest(`grupos_acesso?id=eq.${grupoId}&select=nome`, 'GET', null, false),
-                supabaseRequest(`permissoes_grupo?grupo_id=eq.${grupoId}&select=permissao`, 'GET', null, false)
-            ]);
-
-            // LOG PARA DIAGNÓSTICO
-            console.log("Permissões do Grupo lidas do BD (Bruto):", permissoesGrupo);
-
-            // MASTER BYPASS: Se for MASTER, define o bypass e retorna
-            if (grupo && grupo.length > 0 && grupo[0].nome === 'MASTER') {
-                masterUserPermission = true;
-                // Adiciona um conjunto básico de permissões para garantir o fluxo de UI
-                userPermissions = ['gerenciar_permissoes', 'acesso_configuracoes', 'acesso_configuracoes_acessos', 'acesso_home'];
-                const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
-                todasFiliais.forEach(f => userPermissions.push(`acesso_filial_${f.nome}`));
-                return;
-            }
-
-            // CARREGA PERMISSÕES DE GRUPOS NORMAIS E SANEIA
-            if (permissoesGrupo && Array.isArray(permissoesGrupo)) {
-                // Saneamento: remove espaços e transforma em minúsculas
-                permissoesGrupo.forEach(p => finalPermissionsSet.add(p.permissao.trim().toLowerCase()));
-            }
-        } catch (e) {
-            console.error("ERRO CRÍTICO: Falha ao carregar permissoes_grupo ou grupo_acesso. Possível falha de RLS.", e);
-        }
+    if (window.loadUserPermissions) {
+        await window.loadUserPermissions(userId, grupoId);
+    } else {
+        console.error("ERRO: loadUserPermissions module não carregado no window");
     }
-
-    // 🚨 FIX CRÍTICO: Adiciona acesso_home implicitamente para garantir a navegação.
-    // O problema da tela vazia é resolvido por esta injeção.
-    if (!masterUserPermission) {
-        finalPermissionsSet.add('acesso_home');
-    }
-
-    // 2. IMPLICAR PERMISSÕES PAI A PARTIR DE SUB-PERMISSÕES
-    // Garante que se tem 'acesso_faturamento_ativo', também terá 'acesso_faturamento'.
-    const explicitPermissions = Array.from(finalPermissionsSet);
-    explicitPermissions.forEach(p => {
-        const parts = p.split('_');
-        if (parts.length > 2 && parts[0] === 'acesso') {
-            finalPermissionsSet.add(`${parts[0]}_${parts[1]}`);
-        }
-    });
-
-    // 3. Checagem do Master por Permissão
-    if (finalPermissionsSet.has('gerenciar_permissoes')) {
-        masterUserPermission = true;
-        try {
-            const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
-            todasFiliais.forEach(f => finalPermissionsSet.add(`acesso_filial_${f.nome}`));
-        } catch (e) {
-            console.error("ERRO MASTER: Falha ao adicionar filiais.", e);
-        }
-    }
-
-    userPermissions = Array.from(finalPermissionsSet);
-
-    // LOG FINAL
-    console.log("Permissões FINAIS (Saneadas e Implícitas):", userPermissions);
 }
 
 function hasPermission(permission) {
-    if (masterUserPermission) {
-        return true;
+    if (window.hasPermission) {
+        return window.hasPermission(permission);
     }
-
-    // 🚨 FIX CRÍTICO: Garante que a permissão procurada está sempre saneada.
-    const requiredPermission = permission.trim().toLowerCase();
-
-    // O array userPermissions já é populado com .trim().toLowerCase() na loadUserPermissions
-    return userPermissions.includes(requiredPermission);
+    return false;
 }
 
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
@@ -2991,8 +2924,10 @@ async function logout() {
     localStorage.removeItem('jp_expedicao_user');
     currentUser = null;
     selectedFilial = null;
-    userPermissions = [];
-    masterUserPermission = false;
+    if (window.setState) {
+        window.setState('userPermissions', []);
+        window.setState('masterUserPermission', false);
+    }
 
     // 3. Esconde toda a view main do sistema (onde ficam as abas)
     const mainSystem = document.getElementById('mainSystem');
@@ -3021,8 +2956,10 @@ window.logout = logout;
 window.selectFilial = selectFilial;
 window.determineFilialAccess = determineFilialAccess;
 window.loadFiliais = loadFiliais;
-userPermissions = [];
-masterUserPermission = false;
+if (window.setState) {
+    window.setState('userPermissions', []);
+    window.setState('masterUserPermission', false);
+}
 
 // 2. Limpa timers
 if (rastreioTimer) clearInterval(rastreioTimer);
