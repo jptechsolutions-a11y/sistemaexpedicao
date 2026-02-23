@@ -2980,29 +2980,66 @@ async function forceRefresh() {
 /**
  * Desloga o usuário e volta para a tela de autenticação inicial.
  */
-function logOut() {
-    // 1. Limpa o estado global
-    selectedFilial = null;
+async function logout() {
+    // 1. Limpa timers
+    Object.values(activeTimers).forEach(clearInterval);
+    activeTimers = {};
+    if (rastreioTimer) clearInterval(rastreioTimer);
+    if (homeMapTimer) clearInterval(homeMapTimer);
+
+    // 2. Limpa cache e variáveis
+    localStorage.removeItem('jp_expedicao_user');
     currentUser = null;
+    selectedFilial = null;
     userPermissions = [];
     masterUserPermission = false;
 
-    // 2. Limpa timers
-    if (rastreioTimer) clearInterval(rastreioTimer);
-    if (homeMapTimer) clearInterval(homeMapTimer);
-    Object.values(activeTimers).forEach(clearInterval);
-    activeTimers = {};
+    // 3. Esconde toda a view main do sistema (onde ficam as abas)
+    const mainSystem = document.getElementById('mainSystem');
+    if (mainSystem) mainSystem.style.display = 'none';
 
-    // 3. Oculta telas do sistema
-    document.getElementById('mainSystem').style.display = 'none';
-    document.getElementById('filialSelectionContainer').style.display = 'none';
+    // 4. Se tiver a aba "home", a esconde, pois estava causando flicker
+    const homeView = document.getElementById('home');
+    if (homeView) {
+        homeView.classList.remove('active');
+        homeView.style.display = 'none';
+    }
 
-    // 4. Exibe a tela de login inicial
-    document.getElementById('initialAuthContainer').style.display = 'flex';
-    document.getElementById('initialLoginForm').reset();
-    document.getElementById('initialLoginAlert').innerHTML = '';
+    const filialSelectionContainer = document.getElementById('filialSelectionContainer');
+    if (filialSelectionContainer) filialSelectionContainer.style.display = 'none';
 
-    showNotification('Sessão encerrada.', 'info');
+    // 5. Mostra container de Auth
+    const authContainer = document.getElementById('initialAuthContainer');
+    if (authContainer) {
+        authContainer.style.display = 'block';
+        setTimeout(() => authContainer.classList.add('visible'), 50);
+    }
+}
+
+window.forceRefresh = forceRefresh;
+window.logout = logout;
+window.selectFilial = selectFilial;
+window.determineFilialAccess = determineFilialAccess;
+window.loadFiliais = loadFiliais;
+userPermissions = [];
+masterUserPermission = false;
+
+// 2. Limpa timers
+if (rastreioTimer) clearInterval(rastreioTimer);
+if (homeMapTimer) clearInterval(homeMapTimer);
+Object.values(activeTimers).forEach(clearInterval);
+activeTimers = {};
+
+// 3. Oculta telas do sistema
+document.getElementById('mainSystem').style.display = 'none';
+document.getElementById('filialSelectionContainer').style.display = 'none';
+
+// 4. Exibe a tela de login inicial
+document.getElementById('initialAuthContainer').style.display = 'flex';
+document.getElementById('initialLoginForm').reset();
+document.getElementById('initialLoginAlert').innerHTML = '';
+
+showNotification('Sessão encerrada.', 'info');
 }
 
 
