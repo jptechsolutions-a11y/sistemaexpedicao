@@ -1226,10 +1226,15 @@ async function loadSelectData() {
             supabaseRequest('lideres?ativo=eq.true&order=nome')
         ]);
         lojas = lojasData || [];
+        window.lojas = lojas;
         docas = docasData || [];
+        window.docas = docas;
         veiculos = veiculosData || [];
+        window.veiculos = veiculos;
         motoristas = motoristasData || [];
+        window.motoristas = motoristas;
         lideres = lideresData || [];
+        window.lideres = lideres;
         populateSelects();
     } catch (error) {
         console.error("Erro ao carregar dados dos selects:", error);
@@ -2641,174 +2646,130 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
         const hoje = new Date();
         const dataFormatada = hoje.toLocaleDateString('pt-BR');
 
-        // Remove qualquer div de impressão anterior
-        const existingPrintDiv = document.getElementById('printIdentificationDiv');
-        if (existingPrintDiv) {
-            existingPrintDiv.remove();
-        }
-
-        // Cria o container de impressão
-        const printDiv = document.createElement('div');
-        printDiv.id = 'printIdentificationDiv';
-
-        let etiquetasHtml = `
-            <style>
-                @media print {
-                    * {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        box-sizing: border-box !important;
-                        -webkit-print-color-adjust: exact !important;
-                        color-adjust: exact !important;
-                    }
-
-                    @page {
-                        size: A4 landscape;
-                        margin: 0;
-                    }
-
-                    body * {
-                        visibility: hidden !important;
-                    }
-
-                    #printIdentificationDiv,
-                    #printIdentificationDiv * {
-                        visibility: visible !important;
-                    }
-
-                    #printIdentificationDiv {
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 100% !important;
-                        height: 100% !important;
-                        overflow: visible !important;
-                        z-index: 9999 !important;
-                    }
-
-                    .etiqueta-page {
-                        width: 297mm !important;
-                        height: 210mm !important;
-                        display: flex !important;
-                        align-items: center !important;
-                        justify-content: center !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        background: white !important;
-                        position: relative !important;
-                        box-sizing: border-box !important;
-                        page-break-after: always !important;
-                        page-break-inside: avoid !important;
-                    }
-
-                    .etiqueta-page:last-child {
-                        page-break-after: auto !important;
-                    }
-
-                    .etiqueta-container {
-                        text-align: center !important;
-                        font-family: Arial, sans-serif !important;
-                        width: 100% !important;
-                        height: 100% !important;
-                        display: flex !important;
-                        flex-direction: column !important;
-                        justify-content: center !important;
-                        align-items: center !important;
-                        padding: 5mm !important;
-                        box-sizing: border-box !important;
-                    }
-
-                    .etiqueta-quadro {
-                        border: 3px solid #999 !important;
-                        padding: 20mm 15mm !important;
-                        background: white !important;
-                        width: 100% !important;
-                        height: 100% !important;
-                        display: flex !important;
-                        flex-direction: column !important;
-                        align-items: center !important;
-                        justify-content: center !important;
-                        border-radius: 20px !important;
-                        box-shadow: inset 0 0 0 2px #ccc !important;
-                        box-sizing: border-box !important;
-                    }
-
-                    .etiqueta-numero {
-                        font-size: 100px !important;
-                        font-weight: 900 !important;
-                        color: #000 !important;
-                        margin: 0 !important;
-                        line-height: 0.9 !important;
-                        letter-spacing: 3px !important;
-                        text-transform: uppercase !important;
-                    }
-
-                    .etiqueta-info {
-                        font-size: 76px !important;
-                        font-weight: 700 !important;
-                        color: #333 !important;
-                        margin: 0 !important;
-                        line-height: 1.1 !important;
-                        letter-spacing: 3px !important;
-                        text-transform: uppercase !important;
-                    }
-
-                    .etiqueta-data {
-                        font-size: 60px !important;
-                        font-weight: 700 !important;
-                        color: #000 !important;
-                        margin: 0 !important;
-                        line-height: 1 !important;
-                        letter-spacing: 3px !important;
-                    }
-
-                    .etiqueta-contador {
-                        font-size: 110px !important;
-                        font-weight: 900 !important;
-                        color: #000 !important;
-                        border: 3px solid #999 !important;
-                        padding: 25px 50px !important;
-                        margin: 0 !important;
-                        line-height: 1 !important;
-                        display: inline-block !important;
-                        border-radius: 15px !important;
-                        background: #f0f0f0 !important;
-                        letter-spacing: 4px !important;
-                        box-shadow: inset 0 0 0 2px #ccc !important;
-                        margin-bottom: 25px !important;
-                    }
-
-                    .etiqueta-lojas {
-                        font-size: 42px !important;
-                        font-weight: 700 !important;
-                        color: #000 !important;
-                        margin: 0 !important;
-                        line-height: 1.2 !important;
-                        text-align: center !important;
-                        max-width: 100% !important;
-                        word-wrap: break-word !important;
-                        text-transform: uppercase !important;
-                        letter-spacing: 2px !important;
-                    }
-
-                    hr.etiqueta-divider {
-                        border: none !important;
-                        border-top: 2px solid #999 !important;
-                        width: 90% !important;
-                        margin: 25px auto !important;
-                        opacity: 1 !important;
-                    }
-                }
-
-                @media screen {
-                    #printIdentificationDiv {
-                        display: none;
-                    }
-                }
-            </style>
+        // CSS isolado para o iframe
+        const styleText = `
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+            @page {
+                size: A4 landscape;
+                margin: 0;
+            }
+            body { background: white; }
+            .etiqueta-page {
+                width: 297mm;
+                height: 210mm;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0;
+                padding: 0;
+                background: white;
+                position: relative;
+                box-sizing: border-box;
+                page-break-after: always;
+                page-break-inside: avoid;
+            }
+            .etiqueta-page:last-child {
+                page-break-after: auto;
+            }
+            .etiqueta-container {
+                text-align: center;
+                font-family: Arial, sans-serif;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 5mm;
+                box-sizing: border-box;
+            }
+            .etiqueta-quadro {
+                border: 3px solid #999;
+                padding: 20mm 15mm;
+                background: white;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                border-radius: 20px;
+                box-shadow: inset 0 0 0 2px #ccc;
+                box-sizing: border-box;
+            }
+            .etiqueta-numero {
+                font-size: 100px;
+                font-weight: 900;
+                color: #000;
+                margin: 0;
+                line-height: 0.9;
+                letter-spacing: 3px;
+                text-transform: uppercase;
+            }
+            .etiqueta-info {
+                font-size: 76px;
+                font-weight: 700;
+                color: #333;
+                margin: 0;
+                line-height: 1.1;
+                letter-spacing: 3px;
+                text-transform: uppercase;
+            }
+            .etiqueta-data {
+                font-size: 60px;
+                font-weight: 700;
+                color: #000;
+                margin: 0;
+                line-height: 1;
+                letter-spacing: 3px;
+            }
+            .etiqueta-contador {
+                font-size: 110px;
+                font-weight: 900;
+                color: #000;
+                border: 3px solid #999;
+                padding: 25px 50px;
+                margin: 0;
+                line-height: 1;
+                display: inline-block;
+                border-radius: 15px;
+                background: #f0f0f0;
+                letter-spacing: 4px;
+                box-shadow: inset 0 0 0 2px #ccc;
+                margin-bottom: 25px;
+            }
+            .etiqueta-lojas {
+                font-size: 42px;
+                font-weight: 700;
+                color: #000;
+                margin: 0;
+                line-height: 1.2;
+                text-align: center;
+                max-width: 100%;
+                word-wrap: break-word;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+            }
+            hr.etiqueta-divider {
+                border: none;
+                border-top: 2px solid #999;
+                width: 90%;
+                margin: 25px auto;
+                opacity: 1;
+            }
+            .text-xs { font-size: 0.75rem; }
+            .text-gray-500 { color: #6b7280; }
+            .mt-4 { margin-top: 1rem; }
         `;
 
         const filial = selectedFilial;
+        let etiquetasHtmlBody = '';
 
         // Para cada item/loja da expedição, gerar suas etiquetas separadamente
         for (const item of items) {
@@ -2821,7 +2782,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
 
             // Criar etiquetas para esta loja específica
             for (let i = 1; i <= totalItensLoja; i++) {
-                etiquetasHtml += `
+                etiquetasHtmlBody += `
                     <div class="etiqueta-page">
                         <div class="etiqueta-container">
                             <div class="etiqueta-quadro">
@@ -2844,19 +2805,32 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
             }
         }
 
-        printDiv.innerHTML = etiquetasHtml;
-        document.body.appendChild(printDiv);
+        if (!etiquetasHtmlBody) {
+            showNotification('Não há etiquetas para imprimir (quantidades zeradas ou lojas não encontradas).', 'error');
+            return;
+        }
 
         showNotification(lojaId ? `Preparando impressão para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressão de todas as etiquetas.', 'info');
 
-        // Imprime
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
+        iframe.contentDocument.write('<html><head><title>Imprimir Etiquetas</title>');
+        iframe.contentDocument.write('<style>' + styleText + '</style>');
+        iframe.contentDocument.write('</head><body>');
+        iframe.contentDocument.write(etiquetasHtmlBody);
+        iframe.contentDocument.write('</body></html>');
+        iframe.contentDocument.close();
+
+        // Aguarda conteúdo carregar, foca e imprime
         setTimeout(() => {
-            window.print();
-            // Remove o div após a impressão
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+
+            // Cleanup
             setTimeout(() => {
-                if (document.getElementById('printIdentificationDiv')) {
-                    document.getElementById('printIdentificationDiv').remove();
-                }
+                if (document.body.contains(iframe)) document.body.removeChild(iframe);
             }, 2000);
         }, 500);
 

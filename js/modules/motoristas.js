@@ -1,4 +1,4 @@
-import { getState, setState } from '../state.js';
+﻿import { getState, setState } from '../state.js';
 import { supabaseRequest } from '../api.js';
 import { showNotification } from '../ui.js';
 import { getStatusLabel, minutesToHHMM } from '../utils.js';
@@ -74,7 +74,7 @@ export async function renderMotoristasStatusList() {
 
     let html = `
         <div class="stats-grid">
-            <div class="stat-card"><div class="stat-number">${dispCount}</div><div class="stat-label">Disponíveis</div></div>
+            <div class="stat-card"><div class="stat-number">${dispCount}</div><div class="stat-label">DisponÃ­veis</div></div>
             <div class="stat-card" style="background: var(--secondary-gradient);"><div class="stat-number">${ativoCount}</div><div class="stat-label">Em Atividade</div></div>
             <div class="stat-card" style="background: var(--accent-gradient);"><div class="stat-number">${retornandoCount}</div><div class="stat-label">Retornando</div></div>
             <div class="stat-card" style="background: linear-gradient(135deg, #7209B7, #A663CC);"><div class="stat-number">${motoristas.filter(m => m.status === 'folga').length}</div><div class="stat-label">Em Folga</div></div>
@@ -114,7 +114,7 @@ export function renderMotoristasListHtml(motoristasData) {
         }
 
         const veiculoPlacaNoNome = m.veiculoPlaca && m.veiculoPlaca !== 'N/A' ?
-            `<span class="${placaClass}" title="Veículo: ${m.veiculoPlaca}">${m.veiculoPlaca}</span>` : '';
+            `<span class="${placaClass}" title="VeÃ­culo: ${m.veiculoPlaca}">${m.veiculoPlaca}</span>` : '';
 
         if ((m.displayStatus === 'retornando_cd' || m.displayStatus === 'retornando_com_imobilizado') && m.veiculoId) {
             actionButton = `<button class="btn btn-primary btn-small" onclick="marcarRetornoCD('${m.id}', '${m.veiculoId}')">Cheguei no CD</button>`;
@@ -169,7 +169,7 @@ export async function consultarExpedicoesPorPlaca() {
 
         renderExpedicoesMotorista(expeditionsWithItems);
     } catch (error) {
-        resultsContainer.innerHTML = `<div class="alert alert-error">Erro ao consultar expedições.</div>`;
+        resultsContainer.innerHTML = `<div class="alert alert-error">Erro ao consultar expediÃ§Ãµes.</div>`;
     }
 }
 
@@ -181,7 +181,7 @@ export function renderExpedicoesMotorista(expeditions) {
     }
 
     if (expeditions.length === 0) {
-        container.innerHTML = `<div class="alert alert-success mt-4">Nenhuma expedição ativa encontrada para esta placa.</div>`;
+        container.innerHTML = `<div class="alert alert-success mt-4">Nenhuma expediÃ§Ã£o ativa encontrada para esta placa.</div>`;
         return;
     }
 
@@ -222,7 +222,7 @@ export function renderPainelDescarga(exp) {
         let actionButton = '', statusDescargaLabel = '', statusColor = '';
 
         if (item.status_descarga === 'pendente' && emTransito) {
-            statusDescargaLabel = 'Próxima Entrega'; statusColor = 'text-blue-600';
+            statusDescargaLabel = 'PrÃ³xima Entrega'; statusColor = 'text-blue-600';
             actionButton = `<button class="btn btn-success" onclick="window.openQrModal('iniciar_descarga', '${item.id}', '${loja?.codlojaqr || ''}', '${exp.id}')">Iniciar Descarga</button>`;
             emTransito = false;
         } else if (item.status_descarga === 'pendente' && !emTransito) {
@@ -250,7 +250,7 @@ export function renderPainelDescarga(exp) {
 export async function showYesNoModal(message) {
     return new Promise((resolve) => {
         const modal = document.getElementById('qrModal');
-        document.getElementById('qrModalTitle').textContent = "Confirmação";
+        document.getElementById('qrModalTitle').textContent = "ConfirmaÃ§Ã£o";
         document.getElementById('qrModalMessage').innerHTML = message;
         document.getElementById('qr-reader').style.display = 'none';
 
@@ -264,7 +264,7 @@ export async function showYesNoModal(message) {
         const cancelBtn = modal.querySelector('.btn-danger');
         const newCancelBtn = cancelBtn.cloneNode(true);
         cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-        newCancelBtn.textContent = 'Não';
+        newCancelBtn.textContent = 'NÃ£o';
         newCancelBtn.onclick = () => { window.closeQrModal(); resolve(false); };
 
         modal.style.display = 'flex';
@@ -284,7 +284,7 @@ export async function marcarRetornoCD(motoristaId, veiculoId) {
         } else {
             novoStatusMotorista = 'disponivel';
             novoStatusVeiculo = 'disponivel';
-            msg = 'Retorno ao CD registrado. Motorista e veículo disponíveis!';
+            msg = 'Retorno ao CD registrado. Motorista e veÃ­culo disponÃ­veis!';
         }
 
         await Promise.all([
@@ -306,7 +306,7 @@ export async function finalizarDescargaImobilizado(motoristaId, veiculoId) {
             supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'PATCH', { status: 'disponivel' }, false),
             supabaseRequest(`veiculos?id=eq.${veiculoId}`, 'PATCH', { status: 'disponivel' }, false)
         ]);
-        showNotification('Descarga de imobilizado finalizada. Motorista e veículo disponíveis!', 'success');
+        showNotification('Descarga de imobilizado finalizada. Motorista e veÃ­culo disponÃ­veis!', 'success');
 
         if (window.loadSelectData) await window.loadSelectData();
         await renderMotoristasStatusList();
@@ -404,9 +404,9 @@ export async function generateMotoristaReports() {
         renderMotoristaTable(motoristasData);
 
     } catch (error) {
-        console.error('Erro ao gerar relatório de motoristas:', error);
+        console.error('Erro ao gerar relatÃ³rio de motoristas:', error);
         document.getElementById('motoristaReportSummary').innerHTML =
-            `<div class="alert alert-error">Erro ao carregar relatório: ${error.message}</div>`;
+            `<div class="alert alert-error">Erro ao carregar relatÃ³rio: ${error.message}</div>`;
     }
 }
 
@@ -414,7 +414,7 @@ export function renderMotoristaReportSummary(motoristasData, totalExpedicoes) {
     const summaryContainer = document.getElementById('motoristaReportSummary');
 
     if (motoristasData.length === 0) {
-        summaryContainer.innerHTML = '<div class="alert alert-info">Nenhum dado encontrado para o período selecionado.</div>';
+        summaryContainer.innerHTML = '<div class="alert alert-info">Nenhum dado encontrado para o perÃ­odo selecionado.</div>';
         summaryContainer.style.display = 'block';
         return;
     }
@@ -443,7 +443,7 @@ export function renderMotoristaReportSummary(motoristasData, totalExpedicoes) {
         </div>
         <div class="stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49);">
             <div class="stat-number">${mediaEntregasPorMotorista}</div>
-            <div class="stat-label">Média Entregas/Motorista</div>
+            <div class="stat-label">MÃ©dia Entregas/Motorista</div>
         </div>
     `;
     summaryContainer.style.display = 'grid';
@@ -524,7 +524,7 @@ export function renderMotoristaTable(motoristasData) {
     const container = document.getElementById('motoristaTableContainer');
 
     if (motoristasData.length === 0) {
-        container.innerHTML = '<div class="alert alert-info p-4">Nenhum dado encontrado para o período selecionado.</div>';
+        container.innerHTML = '<div class="alert alert-info p-4">Nenhum dado encontrado para o perÃ­odo selecionado.</div>';
         return;
     }
 
@@ -539,8 +539,8 @@ export function renderMotoristaTable(motoristasData) {
                     <th class="text-left p-3">Entregas</th>
                     <th class="text-left p-3">Entregas/Viagem</th>
                     <th class="text-left p-3">Total Pallets</th>
-                    <th class="text-left p-3">Tempo Médio Viagem</th>
-                    <th class="text-left p-3">Ocupação Média</th>
+                    <th class="text-left p-3">Tempo MÃ©dio Viagem</th>
+                    <th class="text-left p-3">OcupaÃ§Ã£o MÃ©dia</th>
                 </tr>
             </thead>
             <tbody>
@@ -548,10 +548,10 @@ export function renderMotoristaTable(motoristasData) {
 
     motoristasData.forEach((motorista, index) => {
         let rankingIcon = '';
-        if (index === 0) rankingIcon = '🥇';
-        else if (index === 1) rankingIcon = '🥈';
-        else if (index === 2) rankingIcon = '🥉';
-        else rankingIcon = `${index + 1}º`;
+        if (index === 0) rankingIcon = 'ðŸ¥‡';
+        else if (index === 1) rankingIcon = 'ðŸ¥ˆ';
+        else if (index === 2) rankingIcon = 'ðŸ¥‰';
+        else rankingIcon = `${index + 1}Âº`;
 
         tableHtml += `
             <tr class="hover:bg-gray-50 border-b">
@@ -639,3 +639,4 @@ window.finalizarDescargaImobilizado = finalizarDescargaImobilizado;
 window.generateMotoristaReports = generateMotoristaReports;
 window.applyMotoristaStatusFilter = applyMotoristaStatusFilter;
 window.renderMotoristasStatusList = renderMotoristasStatusList;
+

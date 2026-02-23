@@ -1,4 +1,4 @@
-import { supabaseRequest } from '../api.js';
+ï»¿import { supabaseRequest } from '../api.js';
 import { getState } from '../state.js';
 import { showNotification } from '../ui.js';
 import { minutesToHHMM } from '../utils.js';
@@ -13,9 +13,9 @@ async function loadHomeData() {
     const dataFimInput = document.getElementById('homeDataFim');
     const searchInput = document.getElementById('homeSearchInput');
 
-    // Verifica se os elementos existem antes de tentar usá-los
+    // Verifica se os elementos existem antes de tentar usÃ¡-los
     if (!dataInicioInput || !dataFimInput || !searchInput) {
-        console.error("Erro: Elementos da página inicial não encontrados. A função loadHomeData não pode ser executada.");
+        console.error("Erro: Elementos da pÃ¡gina inicial nÃ£o encontrados. A funÃ§Ã£o loadHomeData nÃ£o pode ser executada.");
         return;
     }
 
@@ -209,7 +209,7 @@ async function loadHomeData() {
             const data = {
                 labels: ['PERLOG', 'JJS'],
                 datasets: [{
-                    label: 'Nº de Viagens',
+                    label: 'NÂº de Viagens',
                     data: [perlogCount, jjsCount],
                     backgroundColor: ['#0077B6', '#00D4AA'],
                     borderColor: '#fff',
@@ -302,11 +302,11 @@ async function loadHomeData() {
             label: 'Entregas',
             data: top5.map(m => m.entregas),
             backgroundColor: [
-                'rgba(255, 215, 0, 0.8)',    // Ouro - 1º lugar
-                'rgba(192, 192, 192, 0.8)',  // Prata - 2º lugar
-                'rgba(205, 127, 50, 0.8)',   // Bronze - 3º lugar
-                'rgba(0, 212, 170, 0.8)',    // Turquesa - 4º
-                'rgba(0, 119, 182, 0.8)'     // Azul - 5º
+                'rgba(255, 215, 0, 0.8)',    // Ouro - 1Âº lugar
+                'rgba(192, 192, 192, 0.8)',  // Prata - 2Âº lugar
+                'rgba(205, 127, 50, 0.8)',   // Bronze - 3Âº lugar
+                'rgba(0, 212, 170, 0.8)',    // Turquesa - 4Âº
+                'rgba(0, 119, 182, 0.8)'     // Azul - 5Âº
             ],
             borderColor: [
                 'rgba(255, 215, 0, 1)',
@@ -330,7 +330,7 @@ async function loadHomeData() {
                 display: false 
             },
             tooltip: {
-                enabled: true, // ?? Habilita apenas o tooltip padrão
+                enabled: true, // ?? Habilita apenas o tooltip padrÃ£o
                 backgroundColor: 'rgba(0, 0, 0, 0.8)',
                 padding: 12,
                 titleFont: {
@@ -355,7 +355,7 @@ async function loadHomeData() {
                 },
                 anchor: 'center',
                 align: 'center',
-                formatter: (value) => value // Mostra apenas o número
+                formatter: (value) => value // Mostra apenas o nÃºmero
             }
         },
         scales: {
@@ -423,7 +423,7 @@ async function loadHomeData() {
             const data = {
                 labels: lojasData.map(l => l.nome),
                 datasets: [{
-                    label: 'Tempo Médio em Loja',
+                    label: 'Tempo MÃ©dio em Loja',
                     data: lojasData.map(l => l.tempoMedio),
                     backgroundColor: backgroundColors,
                     borderColor: borderColors,
@@ -448,7 +448,7 @@ async function loadHomeData() {
                         callbacks: {
                             label: function(context) {
                                 const loja = lojasData[context.dataIndex];
-                                return [ `Tempo Médio: ${minutesToHHMM(context.raw)}`, `Total de Entregas: ${loja.entregas}` ];
+                                return [ `Tempo MÃ©dio: ${minutesToHHMM(context.raw)}`, `Total de Entregas: ${loja.entregas}` ];
                             }
                         }
                     }
@@ -482,7 +482,7 @@ async function loadHomeData() {
             `).join('');
         }
 
-        // --- FUNÇÕES DO MAPA DA HOME ---
+        // --- FUNÃ‡Ã•ES DO MAPA DA HOME ---
 async function initHomeMap() {
     // Destruir mapa existente se houver
     if (homeMapInstance) {
@@ -490,10 +490,10 @@ async function initHomeMap() {
         homeMapInstance = null;
     }
     
-    // Aguardar o elemento estar disponível
+    // Aguardar o elemento estar disponÃ­vel
     const mapElement = document.getElementById('homeMap');
     if (!mapElement) {
-        console.warn('Elemento do mapa da home não encontrado');
+        console.warn('Elemento do mapa da home nÃ£o encontrado');
         return;
     }
     
@@ -506,7 +506,7 @@ async function initHomeMap() {
         
         // Adicionar camada do mapa
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+            attribution: 'Â© OpenStreetMap contributors'
         }).addTo(homeMapInstance);
         
         // Carregar dados do rastreio para o mapa
@@ -552,13 +552,13 @@ async function loadHomeMapData() {
         
         L.marker(cdCoords, { icon: cdIcon })
             .addTo(homeMapInstance)
-            .bindPopup(`<h3><strong>Centro de Distribuição</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
+            .bindPopup(`<h3><strong>Centro de DistribuiÃ§Ã£o</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
         
         // Carregar dados de rastreio atuais
         const expeditionsEmRota = await supabaseRequest('expeditions?status=eq.saiu_para_entrega&order=data_saida_entrega.desc');
         const motoristasRetornando = await supabaseRequest('motoristas?status=in.(retornando_cd,retornando_com_imobilizado)');
         
-        // Buscar localizações GPS
+        // Buscar localizaÃ§Ãµes GPS
         let locations = [];
         if (expeditionsEmRota.length > 0) {
             const expeditionIds = expeditionsEmRota.map(exp => exp.id);
@@ -576,7 +576,7 @@ async function loadHomeMapData() {
         const bounds = L.latLngBounds();
         bounds.extend(cdCoords);
         
-        // Adicionar veículos em rota
+        // Adicionar veÃ­culos em rota
         expeditionsEmRota.forEach(exp => {
             const location = locations.find(loc => loc.expedition_id === exp.id);
             if (location && location.latitude && location.longitude) {
@@ -586,12 +586,12 @@ async function loadHomeMapData() {
                 const motorista = motoristas.find(m => m.id === exp.motorista_id);
                 const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
                 
-                // Determinar status do veículo para cor
-                let color = '#F59E0B'; // laranja para em trânsito
-                let statusText = 'Em Trânsito';
+                // Determinar status do veÃ­culo para cor
+                let color = '#F59E0B'; // laranja para em trÃ¢nsito
+                let statusText = 'Em TrÃ¢nsito';
                 
-                // Verificar se está descarregando (lógica simplificada)
-                // Na implementação real, você pode verificar o status atual das entregas
+                // Verificar se estÃ¡ descarregando (lÃ³gica simplificada)
+                // Na implementaÃ§Ã£o real, vocÃª pode verificar o status atual das entregas
                 
                 const vehicleIcon = L.divIcon({
                     className: 'custom-marker',
@@ -607,7 +607,7 @@ async function loadHomeMapData() {
                             <h4><strong>${veiculo?.placa || 'N/A'}</strong></h4>
                             <p><strong>Motorista:</strong> ${motorista?.nome || 'N/A'}</p>
                             <p><strong>Status:</strong> <span style="color: ${color};">${statusText}</span></p>
-                            <p><strong>Última atualização:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
+                            <p><strong>Ãšltima atualizaÃ§Ã£o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
                         </div>
                     `);
                 
@@ -615,7 +615,7 @@ async function loadHomeMapData() {
             }
         });
         
-        // Adicionar veículos retornando
+        // Adicionar veÃ­culos retornando
         motoristasRetornando.forEach(motorista => {
             const location = returningLocations.find(loc => loc.motorista_id === motorista.id);
             if (location && location.latitude && location.longitude) {
@@ -639,7 +639,7 @@ async function loadHomeMapData() {
                             <h4><strong>${veiculo?.placa || 'N/A'}</strong></h4>
                             <p><strong>Motorista:</strong> ${motorista.nome}</p>
                             <p><strong>Status:</strong> <span style="color: ${color};">Retornando</span></p>
-                            <p><strong>Última atualização:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
+                            <p><strong>Ãšltima atualizaÃ§Ã£o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
                         </div>
                     `);
                 
@@ -653,7 +653,7 @@ async function loadHomeMapData() {
                 const lat = parseFloat(loja.latitude);
                 const lng = parseFloat(loja.longitude);
                 
-                let cor = '#10B981'; // verde padrão
+                let cor = '#10B981'; // verde padrÃ£o
                 if (loja.nome.toLowerCase().includes('fort')) cor = '#EF4444'; // vermelho
                 else if (loja.nome.toLowerCase().includes('comper')) cor = '#0077B6'; // azul
                 
@@ -666,7 +666,7 @@ async function loadHomeMapData() {
                 
                 L.marker([lat, lng], { icon: lojaIcon })
                     .addTo(homeMapInstance)
-                    .bindPopup(`<strong>${loja.nome}</strong><br>Código: ${loja.codigo}`);
+                    .bindPopup(`<strong>${loja.nome}</strong><br>CÃ³digo: ${loja.codigo}`);
                 
                 bounds.extend([lat, lng]);
             }
@@ -728,12 +728,12 @@ function updateHomeLastRefreshTime() {
     const now = new Date();
     const element = document.getElementById('homeLastUpdate');
     if (element) {
-        element.textContent = `Última atualização: ${now.toLocaleTimeString('pt-BR')}`;
+        element.textContent = `Ãšltima atualizaÃ§Ã£o: ${now.toLocaleTimeString('pt-BR')}`;
     }
 }
 
 function showHomeMapFullscreen() {
-    document.getElementById('mapModalTitle').textContent = 'Visão Geral em Tempo Real - Tela Cheia';
+    document.getElementById('mapModalTitle').textContent = 'VisÃ£o Geral em Tempo Real - Tela Cheia';
     document.getElementById('mapModal').style.display = 'flex';
     
     setTimeout(async () => {
@@ -745,10 +745,10 @@ function showHomeMapFullscreen() {
         mapInstance = L.map('map').setView(cdCoords, 11);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+            attribution: 'Â© OpenStreetMap contributors'
         }).addTo(mapInstance);
         
-        // Reutilizar a mesma lógica do mapa da home
+        // Reutilizar a mesma lÃ³gica do mapa da home
         await loadHomeMapDataForFullscreen();
     }, 100);
 }
@@ -768,7 +768,7 @@ async function loadHomeMapDataForFullscreen() {
         
         L.marker(cdCoords, { icon: cdIcon })
             .addTo(mapInstance)
-            .bindPopup(`<h3><strong>Centro de Distribuição</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
+            .bindPopup(`<h3><strong>Centro de DistribuiÃ§Ã£o</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
         
         const bounds = L.latLngBounds();
         bounds.extend(cdCoords);
@@ -777,7 +777,7 @@ async function loadHomeMapDataForFullscreen() {
         const expeditionsEmRota = await supabaseRequest('expeditions?status=eq.saiu_para_entrega&order=data_saida_entrega.desc');
         const motoristasRetornando = await supabaseRequest('motoristas?status=in.(retornando_cd,retornando_com_imobilizado)');
         
-        // Buscar localizações GPS
+        // Buscar localizaÃ§Ãµes GPS
         let locations = [];
         if (expeditionsEmRota.length > 0) {
             const expeditionIds = expeditionsEmRota.map(exp => exp.id);
@@ -792,7 +792,7 @@ async function loadHomeMapDataForFullscreen() {
             returningLocations = await supabaseRequest(query, 'GET', null, false);
         }
         
-        // Adicionar veículos em rota (ícones maiores para fullscreen)
+        // Adicionar veÃ­culos em rota (Ã­cones maiores para fullscreen)
         expeditionsEmRota.forEach(exp => {
             const location = locations.find(loc => loc.expedition_id === exp.id);
             if (location && location.latitude && location.longitude) {
@@ -802,8 +802,8 @@ async function loadHomeMapDataForFullscreen() {
                 const motorista = motoristas.find(m => m.id === exp.motorista_id);
                 const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
                 
-                let color = '#F59E0B'; // laranja para em trânsito
-                let statusText = 'Em Trânsito';
+                let color = '#F59E0B'; // laranja para em trÃ¢nsito
+                let statusText = 'Em TrÃ¢nsito';
                 
                 const vehicleIcon = L.divIcon({
                     className: 'custom-marker',
@@ -820,7 +820,7 @@ async function loadHomeMapDataForFullscreen() {
                             <p><strong>Motorista:</strong> ${motorista?.nome || 'N/A'}</p>
                             <p><strong>Status:</strong> <span style="color: ${color}; font-weight: bold;">${statusText}</span></p>
                             <p><strong>Velocidade:</strong> ${location.velocidade || 0} km/h</p>
-                            <p><strong>Última atualização:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
+                            <p><strong>Ãšltima atualizaÃ§Ã£o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
                         </div>
                     `);
                 
@@ -828,7 +828,7 @@ async function loadHomeMapDataForFullscreen() {
             }
         });
         
-        // Adicionar veículos retornando
+        // Adicionar veÃ­culos retornando
         motoristasRetornando.forEach(motorista => {
             const location = returningLocations.find(loc => loc.motorista_id === motorista.id);
             if (location && location.latitude && location.longitude) {
@@ -853,7 +853,7 @@ async function loadHomeMapDataForFullscreen() {
                             <p><strong>Motorista:</strong> ${motorista.nome}</p>
                             <p><strong>Status:</strong> <span style="color: ${color}; font-weight: bold;">Retornando</span></p>
                             <p><strong>Velocidade:</strong> ${location.velocidade || 0} km/h</p>
-                            <p><strong>Última atualização:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
+                            <p><strong>Ãšltima atualizaÃ§Ã£o:</strong><br>${new Date(location.data_gps).toLocaleString('pt-BR')}</p>
                         </div>
                     `);
                 
@@ -861,7 +861,7 @@ async function loadHomeMapDataForFullscreen() {
             }
         });
         
-        // Adicionar lojas (ícones maiores)
+        // Adicionar lojas (Ã­cones maiores)
         lojas.forEach(loja => {
             if (loja.latitude && loja.longitude && loja.ativo) {
                 const lat = parseFloat(loja.latitude);
@@ -883,9 +883,9 @@ async function loadHomeMapDataForFullscreen() {
                     .bindPopup(`
                         <div style="text-align: center;">
                             <h4><strong>${loja.nome}</strong></h4>
-                            <p><strong>Código:</strong> ${loja.codigo}</p>
+                            <p><strong>CÃ³digo:</strong> ${loja.codigo}</p>
                             <p><strong>Cidade:</strong> ${loja.cidade}</p>
-                            ${loja.endereco_completo ? `<p><strong>Endereço:</strong><br>${loja.endereco_completo}</p>` : ''}
+                            ${loja.endereco_completo ? `<p><strong>EndereÃ§o:</strong><br>${loja.endereco_completo}</p>` : ''}
                         </div>
                     `);
                 
@@ -927,3 +927,4 @@ window.loadHomeData = loadHomeData;
 window.initHomeMap = typeof initHomeMap !== 'undefined' ? initHomeMap : null;
 window.toggleHomeAutoRefresh = typeof toggleHomeAutoRefresh !== 'undefined' ? toggleHomeAutoRefresh : null;
 window.showHomeMapFullscreen = typeof showHomeMapFullscreen !== 'undefined' ? showHomeMapFullscreen : null;
+

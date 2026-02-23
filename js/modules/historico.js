@@ -1,4 +1,4 @@
-import { getState } from '../state.js';
+﻿import { getState } from '../state.js';
 import { supabaseRequest } from '../api.js';
 import { showNotification } from '../ui.js';
 import { minutesToHHMM } from '../utils.js';
@@ -17,7 +17,7 @@ export async function loadHistorico() {
     }
 
     const container = document.getElementById('historicoList');
-    container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando histórico...</div>`;
+    container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando histÃ³rico...</div>`;
     try {
         const expeditions = await supabaseRequest('expeditions?status=eq.entregue&order=data_hora.desc&limit=1000');
         const items = await supabaseRequest('expedition_items');
@@ -51,7 +51,7 @@ export async function loadHistorico() {
 
         applyHistoricoFilters();
     } catch (error) {
-        container.innerHTML = `<div class="alert alert-error">Erro ao carregar histórico: ${error.message}</div>`;
+        container.innerHTML = `<div class="alert alert-error">Erro ao carregar histÃ³rico: ${error.message}</div>`;
     }
 }
 
@@ -147,7 +147,7 @@ export function renderHistorico(data) {
                         </div>
                         ${tempoTransitoMin > 0 ? `
                             <div class="text-xs text-gray-500 mt-1 pl-4">
-                                ↳ T. Desloc.: ${minutesToHHMM(tempoTransitoMin)}
+                                â†³ T. Desloc.: ${minutesToHHMM(tempoTransitoMin)}
                             </div>
                         ` : ''}
                     </div>
@@ -166,7 +166,7 @@ export function renderHistorico(data) {
                    <div>
                         <h3 class="text-xl font-bold text-gray-800">${new Date(exp.data_hora).toLocaleDateString('pt-BR')} - ${exp.veiculo_placa}</h3>
                         <p class="text-sm text-gray-600">Motorista: <span class="font-semibold">${exp.motorista_nome}</span></p>
-                        ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">📦 Cargas: ${exp.numeros_carga.join(', ')}</p>` : ''}
+                        ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">ðŸ“¦ Cargas: ${exp.numeros_carga.join(', ')}</p>` : ''}
                     </div>
                     <div class="text-right">
                         <span class="status-badge status-entregue">ENTREGUE</span>
@@ -184,7 +184,7 @@ export function renderHistorico(data) {
                     </div>
                     <div class="p-3 bg-gray-50 rounded-lg text-center">
                         <div class="text-2xl font-bold ${ocupacaoColor}">${ocupacaoPerc}%</div>
-                        <div class="text-xs text-gray-500">Ocupação</div>
+                        <div class="text-xs text-gray-500">OcupaÃ§Ã£o</div>
                     </div>
                     <div class="p-3 bg-gray-50 rounded-lg text-center">
                         <div class="text-2xl font-bold text-green-600">${minutesToHHMM(totalTempoEmLoja)}</div>
@@ -192,13 +192,13 @@ export function renderHistorico(data) {
                     </div>
                     <div class="p-3 bg-gray-50 rounded-lg text-center">
                         <div class="text-2xl font-bold text-orange-600">${minutesToHHMM(totalTempoEmTransito)}</div>
-                        <div class="text-xs text-gray-500">T. Trânsito Total</div>
+                        <div class="text-xs text-gray-500">T. TrÃ¢nsito Total</div>
                     </div>
                 </div>
 
-                <h4 class="font-bold text-gray-700 mb-2 border-t pt-3">Tempos de Pátio e Faturamento</h4>
+                <h4 class="font-bold text-gray-700 mb-2 border-t pt-3">Tempos de PÃ¡tio e Faturamento</h4>
                 <div class="grid grid-cols-3 gap-2 text-xs text-center mb-4">
-                    <div class="time-display" style="background:#e0e7ff; border-left-color:#3730a3;"><strong>T. Alocação:</strong> ${tempos.alocacao}</div>
+                    <div class="time-display" style="background:#e0e7ff; border-left-color:#3730a3;"><strong>T. AlocaÃ§Ã£o:</strong> ${tempos.alocacao}</div>
                     <div class="time-display" style="background:#cffafe; border-left-color:#0e7490;"><strong>T. Carga:</strong> ${tempos.carregamento}</div>
                     <div class="time-display" style="background:#d1fae5; border-left-color:#065f46;"><strong>T. Faturamento:</strong> ${tempos.faturamento}</div>
                 </div>
@@ -213,12 +213,12 @@ export function renderHistorico(data) {
 }
 
 export async function deleteHistoricoExpedition(expeditionId) {
-    const confirmed = await (window.showYesNoModal ? window.showYesNoModal('Deseja excluir permanentemente esta expedição do histórico?') : confirm('Deseja excluir permanentemente?'));
+    const confirmed = await (window.showYesNoModal ? window.showYesNoModal('Deseja excluir permanentemente esta expediÃ§Ã£o do histÃ³rico?') : confirm('Deseja excluir permanentemente?'));
     if (confirmed) {
         try {
             await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`, 'DELETE', null, false);
             await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'DELETE', null, false);
-            showNotification('Registro do histórico excluído!', 'success');
+            showNotification('Registro do histÃ³rico excluÃ­do!', 'success');
             loadHistorico();
         } catch (error) {
             showNotification(`Erro ao excluir: ${error.message}`, 'error');
@@ -231,7 +231,7 @@ export function generateHistoricoIndicators(data) {
     const volumeStatsContainer = document.getElementById('indicadoresVolumeStats');
 
     if (data.length === 0) {
-        if (timeSummaryContainer) timeSummaryContainer.innerHTML = '<div class="alert alert-info md:col-span-5">Sem dados de expedições concluídas para o período selecionado.</div>';
+        if (timeSummaryContainer) timeSummaryContainer.innerHTML = '<div class="alert alert-info md:col-span-5">Sem dados de expediÃ§Ãµes concluÃ­das para o perÃ­odo selecionado.</div>';
         if (volumeStatsContainer) volumeStatsContainer.innerHTML = '';
         destroyChart('lojasRankingChart');
         destroyChart('entregasChart');
@@ -343,7 +343,7 @@ export function generateHistoricoIndicators(data) {
         volumeStatsContainer.innerHTML = `
             <div class="stat-card" style="background: linear-gradient(135deg, #00D4AA, #00B4D8);">
                 <div class="stat-number">${totalViagens}</div>
-                <div class="stat-label">Viagens Concluídas</div>
+                <div class="stat-label">Viagens ConcluÃ­das</div>
             </div>
             <div class="stat-card" style="background: linear-gradient(135deg, #00B4D8, #0077B6);">
                 <div class="stat-number">${totalEntregas}</div>
@@ -359,7 +359,7 @@ export function generateHistoricoIndicators(data) {
             </div>
             <div class="stat-card" style="background: linear-gradient(135deg, #DC143C, #D62828);">
                 <div class="stat-number">${mediaOcupacao.toFixed(1)}%</div>
-                <div class="stat-label">Ocupação Média</div>
+                <div class="stat-label">OcupaÃ§Ã£o MÃ©dia</div>
             </div>
             <div class="stat-card" style="background: linear-gradient(135deg, #3B82F6, #1D4ED8);">
                 <div class="stat-number">${lojasAtendidas.size}</div>
@@ -371,16 +371,16 @@ export function generateHistoricoIndicators(data) {
     if (timeSummaryContainer) {
         timeSummaryContainer.innerHTML = `
             <div class="bg-white p-4 rounded-xl shadow-lg border-t-4 border-blue-600 historico-time-card" data-aos="fade-up">
-                <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">⏱️Tempo Interno </h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">â±ï¸Tempo Interno </h3>
                 <div class="time-stat-card" style="background: linear-gradient(135deg, #0077B6, #00B4D8); margin-bottom: 15px;">
                     <div class="stat-number text-3xl">${minutesToHHMM(mediaTempoInternoTotal)}</div>
-                    <div class="stat-label">TEMPO TOTAL PÁTIO</div>
+                    <div class="stat-label">TEMPO TOTAL PÃTIO</div>
                 </div>
                 
                 <div class="text-sm space-y-2">
-                    <div class="flex justify-between border-b pb-1"><span>Ociosidade (Lanç. → Aloc.)</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaAlocar)}</span></div>
-                    <div class="flex justify-between border-b pb-1"><span>Chegada Doca (Aloc. → Cheg.)</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaChegadaDoca)}</span></div>
-                    <div class="flex justify-between border-b pb-1"><span>Carregamento (Cheg. → Saída)</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaCarregamento)}</span></div>
+                    <div class="flex justify-between border-b pb-1"><span>Ociosidade (LanÃ§. â†’ Aloc.)</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaAlocar)}</span></div>
+                    <div class="flex justify-between border-b pb-1"><span>Chegada Doca (Aloc. â†’ Cheg.)</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaChegadaDoca)}</span></div>
+                    <div class="flex justify-between border-b pb-1"><span>Carregamento (Cheg. â†’ SaÃ­da)</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaCarregamento)}</span></div>
                     <div class="flex justify-between pb-1"><span>T.M. Faturamento</span><span class="font-bold text-blue-600">${minutesToHHMM(mediaFaturamento)}</span></div>
                 </div>
             </div>
@@ -402,7 +402,7 @@ export function generateHistoricoIndicators(data) {
             </div>
 
             <div class="bg-white p-4 rounded-xl shadow-lg border-t-4 border-orange-600 historico-time-card" data-aos="fade-up" data-aos-delay="300">
-                <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Trânsito</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">TrÃ¢nsito</h3>
                 <div class="time-stat-card" style="background: linear-gradient(135deg, #F77F00, #FCBF49); height: 100%;">
                     <div class="stat-number text-5xl">${minutesToHHMM(mediaEmTransito)}</div>
                     <div class="stat-label text-xl">TEMPO DE TRANSITO</div>
@@ -454,7 +454,7 @@ export function renderTotalEntregasLojaChart(lojasData) {
             tooltip: {
                 callbacks: {
                     label: function (context) {
-                        return `Saídas: ${context.raw}`;
+                        return `SaÃ­das: ${context.raw}`;
                     }
                 }
             }
@@ -554,7 +554,7 @@ export function renderLojasRankingChart(lojasData) {
 
     renderChart('lojasRankingChart', 'bar', {
         labels: ranking.map(l => l.nome),
-        datasets: [{ label: 'Tempo Médio (min)', data: ranking.map(l => l.tempoMedio), backgroundColor: backgroundColors }]
+        datasets: [{ label: 'Tempo MÃ©dio (min)', data: ranking.map(l => l.tempoMedio), backgroundColor: backgroundColors }]
     }, {
         indexAxis: 'y',
         plugins: {
@@ -567,7 +567,7 @@ export function renderLojasRankingChart(lojasData) {
             tooltip: {
                 callbacks: {
                     label: function (context) {
-                        return `Tempo Médio: ${minutesToHHMM(context.raw)}`;
+                        return `Tempo MÃ©dio: ${minutesToHHMM(context.raw)}`;
                     }
                 }
             }
@@ -583,7 +583,7 @@ export function renderEntregasChart(fort, comper) {
     renderChart('entregasChart', 'pie', {
         labels: ['Lojas Fort', 'Lojas Comper'],
         datasets: [{
-            label: 'Nº de Entregas',
+            label: 'NÂº de Entregas',
             data: [fort, comper],
             backgroundColor: ['rgba(214, 40, 40, 0.7)', 'rgba(0, 119, 182, 0.7)']
         }]
@@ -630,7 +630,7 @@ export async function showDetalhesExpedicao(expeditionId) {
         const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`, 'GET', null, false);
 
         if (!expedition || expedition.length === 0) {
-            content.innerHTML = '<div class="alert alert-error">Expedição não encontrada.</div>';
+            content.innerHTML = '<div class="alert alert-error">ExpediÃ§Ã£o nÃ£o encontrada.</div>';
             return;
         }
 
@@ -689,7 +689,7 @@ export async function showDetalhesExpedicao(expeditionId) {
                     <div class="planilha-value" style="font-size: 14px; font-weight: bold; color: #2d5aa0;">${item.rolltrainers || 0}</div>
                 </div>
                 <div class="planilha-row" style="margin-bottom: 6px;">
-                    <div class="planilha-cell" style="width: 120px;">INÍCIO CARREG.:</div>
+                    <div class="planilha-cell" style="width: 120px;">INÃCIO CARREG.:</div>
                     <div class="planilha-value">${exp.data_chegada_veiculo ? new Date(exp.data_chegada_veiculo).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
                 </div>
                 <div class="planilha-row" style="margin-bottom: 6px;">
@@ -702,7 +702,7 @@ export async function showDetalhesExpedicao(expeditionId) {
         ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `
             <div style="margin: 10px;">
                 <div class="planilha-header" style="background: #f0f0f0; color: #333; padding: 6px; font-size: 12px;">
-                    NÚMEROS DE CARGA
+                    NÃšMEROS DE CARGA
                 </div>
                 <div class="planilha-value" style="padding: 8px; font-size: 12px; font-weight: bold;">
                     ${exp.numeros_carga.join(', ')}
@@ -713,12 +713,12 @@ export async function showDetalhesExpedicao(expeditionId) {
         ${item.data_inicio_descarga || item.data_fim_descarga ? `
             <div style="margin: 10px;">
                 <div class="planilha-header" style="background: #e8f4f8; color: #333; padding: 6px; font-size: 12px;">
-                    HORÁRIOS DE ENTREGA
+                    HORÃRIOS DE ENTREGA
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
                     <div class="planilha-cell" style="padding: 8px;">CHEGADA NA LOJA:</div>
                     <div class="planilha-value" style="padding: 8px;">${item.data_inicio_descarga ? new Date(item.data_inicio_descarga).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
-                    <div class="planilha-cell" style="padding: 8px;">SAÍDA DA LOJA:</div>
+                    <div class="planilha-cell" style="padding: 8px;">SAÃDA DA LOJA:</div>
                     <div class="planilha-value" style="padding: 8px;">${item.data_fim_descarga ? new Date(item.data_fim_descarga).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
                 </div>
             </div>
@@ -729,8 +729,8 @@ export async function showDetalhesExpedicao(expeditionId) {
         } else {
             planilhaHTML = `
                 <div class="planilha-controle">
-                    <div class="planilha-header">DETALHES DA EXPEDIÇÃO</div>
-                    <div class="alert alert-info">Nenhuma loja encontrada para esta expedição.</div>
+                    <div class="planilha-header">DETALHES DA EXPEDIÃ‡ÃƒO</div>
+                    <div class="alert alert-info">Nenhuma loja encontrada para esta expediÃ§Ã£o.</div>
                 </div>
             `;
         }
@@ -738,7 +738,7 @@ export async function showDetalhesExpedicao(expeditionId) {
         content.innerHTML = planilhaHTML;
 
     } catch (error) {
-        content.innerHTML = '<div class="alert alert-error">Erro ao carregar detalhes da expedição.</div>';
+        content.innerHTML = '<div class="alert alert-error">Erro ao carregar detalhes da expediÃ§Ã£o.</div>';
     }
 }
 
@@ -759,3 +759,4 @@ window.generateHistoricoIndicators = generateHistoricoIndicators;
 window.showDetalhesExpedicao = showDetalhesExpedicao;
 window.closeDetalhesModal = closeDetalhesModal;
 window.imprimirDetalhes = imprimirDetalhes;
+

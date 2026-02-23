@@ -1,10 +1,10 @@
-import { getState, setState } from '../state.js';
+﻿import { getState, setState } from '../state.js';
 import { supabaseRequest } from '../api.js';
 import { showNotification } from '../ui.js';
 import { getStatusLabel, minutesToHHMM } from '../utils.js';
 
 export async function loadFaturamento() {
-    // Busca e aplica a lógica para auto-abrir a única sub-aba permitida
+    // Busca e aplica a lÃ³gica para auto-abrir a Ãºnica sub-aba permitida
     const permittedFaturamentoTabs = window.getPermittedSubTabs ? window.getPermittedSubTabs('faturamento') : ['faturamentoAtivo', 'historicoFaturamento'];
 
     if (permittedFaturamentoTabs.length > 0) {
@@ -23,7 +23,7 @@ export function renderFaturamentoList(expeditionsList) {
     const container = document.getElementById('faturamentoList');
 
     if (expeditionsList.length === 0) {
-        container.innerHTML = '<div class="alert alert-success">Nenhuma expedição pendente de faturamento!</div>';
+        container.innerHTML = '<div class="alert alert-success">Nenhuma expediÃ§Ã£o pendente de faturamento!</div>';
         return;
     }
 
@@ -34,26 +34,26 @@ export function renderFaturamentoList(expeditionsList) {
         let actionButtons = '', statusInfo = '';
 
         if (exp.status === 'faturado' && exp.data_saida_veiculo) {
-            statusInfo = `<div class="text-green-600 font-semibold mb-2">✅ Carregado e Faturado</div>`;
-            actionButtons = `<button class="btn btn-warning" onclick="marcarSaiuEntrega('${exp.id}')">Marcar Saída</button>`;
+            statusInfo = `<div class="text-green-600 font-semibold mb-2">âœ… Carregado e Faturado</div>`;
+            actionButtons = `<button class="btn btn-warning" onclick="marcarSaiuEntrega('${exp.id}')">Marcar SaÃ­da</button>`;
         }
         else if (exp.status === 'faturado' && !exp.data_saida_veiculo) {
-            statusInfo = `<div class="text-blue-600 font-semibold mb-2">✅ Faturado (Aguardando Fim do Carregamento)</div>`;
-            actionButtons = `<button class="btn btn-secondary" disabled title="Finalize o carregamento na tela de Motoristas para liberar a saída">Aguardando Carregamento</button>`;
+            statusInfo = `<div class="text-blue-600 font-semibold mb-2">âœ… Faturado (Aguardando Fim do Carregamento)</div>`;
+            actionButtons = `<button class="btn btn-secondary" disabled title="Finalize o carregamento na tela de Motoristas para liberar a saÃ­da">Aguardando Carregamento</button>`;
         }
         else if (exp.status === 'carregado' || exp.status === 'aguardando_faturamento') {
-            statusInfo = `<div class="text-blue-600 font-semibold mb-2">🚚 Carregado (Aguardando Faturamento)</div>`;
+            statusInfo = `<div class="text-blue-600 font-semibold mb-2">ðŸšš Carregado (Aguardando Faturamento)</div>`;
             actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento</button>`;
         }
         else if (exp.status === 'faturamento_iniciado' || exp.status === 'em_carregamento_faturando') {
             const iniciadoEm = exp.data_inicio_faturamento ? new Date(exp.data_inicio_faturamento) : null;
             const tempoFaturamento = iniciadoEm ? Math.round((new Date() - iniciadoEm) / 60000) : 0;
             const faturandoTexto = exp.status === 'em_carregamento_faturando' ? 'Carregando e Faturando' : 'Faturamento em andamento';
-            statusInfo = `<div class="text-yellow-600 font-semibold mb-2">📄 ${faturandoTexto} há ${minutesToHHMM(tempoFaturamento)}</div>`;
+            statusInfo = `<div class="text-yellow-600 font-semibold mb-2">ðŸ“„ ${faturandoTexto} hÃ¡ ${minutesToHHMM(tempoFaturamento)}</div>`;
             actionButtons = `<button class="btn btn-primary" onclick="finalizarFaturamento('${exp.id}')">Finalizar Faturamento</button>`;
         }
         else if (exp.status === 'em_carregamento') {
-            statusInfo = `<div class="text-gray-600 font-semibold mb-2">🚚 Carregando...</div>`;
+            statusInfo = `<div class="text-gray-600 font-semibold mb-2">ðŸšš Carregando...</div>`;
             actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento (Antecipado)</button>`;
         }
 
@@ -61,7 +61,7 @@ export function renderFaturamentoList(expeditionsList) {
             <div class="faturamento-card">
                <h3 class="text-lg font-bold text-gray-800">${exp.lojas_count} loja${exp.lojas_count > 1 ? 's' : ''} - ${exp.veiculo_placa || 'N/A'}</h3>
                 <p class="text-sm text-gray-500 mb-2">${exp.lojas_info}</p>
-                ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mb-2 inline-block">📦 Cargas: ${exp.numeros_carga.join(', ')}</p>` : ''}
+                ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mb-2 inline-block">ðŸ“¦ Cargas: ${exp.numeros_carga.join(', ')}</p>` : ''}
                 ${statusInfo}
                 <div class="time-display">
                     <strong>Tempo de Espera/Carregamento:</strong> ${minutesToHHMM(tempoEspera)}
@@ -70,7 +70,7 @@ export function renderFaturamentoList(expeditionsList) {
                     <p><strong>Pallets:</strong> ${exp.total_pallets}</p>
                     <p><strong>RollTrainers:</strong> ${exp.total_rolltrainers}</p>
                     <p><strong>Motorista:</strong> ${exp.motorista_nome || 'N/A'}</p>
-                    <p><strong>Líder:</strong> ${exp.lider_nome || 'N/A'}</p>
+                    <p><strong>LÃ­der:</strong> ${exp.lider_nome || 'N/A'}</p>
                 </div>
                 <div class="text-center mt-4">
                     ${actionButtons}
@@ -115,10 +115,10 @@ export async function iniciarFaturamento(expeditionId) {
         } else if (currentStatus === 'carregado' || currentStatus === 'aguardando_faturamento') {
             newStatus = 'faturamento_iniciado';
         } else if (currentStatus === 'em_carregamento_faturando' || currentStatus === 'faturamento_iniciado') {
-            showNotification('Faturamento já está em andamento!', 'info');
+            showNotification('Faturamento jÃ¡ estÃ¡ em andamento!', 'info');
             return;
         } else {
-            showNotification(`Não é possível iniciar faturamento no status atual: ${getStatusLabel(currentStatus)}`, 'error');
+            showNotification(`NÃ£o Ã© possÃ­vel iniciar faturamento no status atual: ${getStatusLabel(currentStatus)}`, 'error');
             return;
         }
 
@@ -146,10 +146,10 @@ export async function finalizarFaturamento(expeditionId) {
 export async function marcarSaiuEntrega(expeditionId) {
     try {
         await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', { status: 'saiu_para_entrega', data_saida_entrega: new Date().toISOString() });
-        showNotification('Expedição marcada como saiu para entrega!', 'success');
+        showNotification('ExpediÃ§Ã£o marcada como saiu para entrega!', 'success');
         loadFaturamento();
     } catch (error) {
-        showNotification('Erro ao marcar saída: ' + error.message, 'error');
+        showNotification('Erro ao marcar saÃ­da: ' + error.message, 'error');
     }
 }
 
@@ -159,7 +159,7 @@ export async function loadHistoricoFaturamento() {
     const searchTerm = document.getElementById('historicoFaturamentoSearch').value.toLowerCase();
 
     const tbody = document.getElementById('historicoFaturamentoBody');
-    tbody.innerHTML = `<tr><td colspan="9" class="loading"><div class="spinner"></div>Carregando histórico...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="loading"><div class="spinner"></div>Carregando histÃ³rico...</td></tr>`;
 
     try {
         let query = 'expeditions?status=in.(saiu_para_entrega,entregue)&data_inicio_faturamento=not.is.null&data_fim_faturamento=not.is.null&order=data_fim_faturamento.desc';
@@ -221,8 +221,8 @@ export async function loadHistoricoFaturamento() {
         renderHistoricoFaturamentoTable(expeditionsWithItems);
 
     } catch (error) {
-        console.error('Erro ao carregar histórico de faturamento:', error);
-        tbody.innerHTML = `<tr><td colspan="9" class="alert alert-error">Erro ao carregar histórico: ${error.message}</td></tr>`;
+        console.error('Erro ao carregar histÃ³rico de faturamento:', error);
+        tbody.innerHTML = `<tr><td colspan="9" class="alert alert-error">Erro ao carregar histÃ³rico: ${error.message}</td></tr>`;
         updateHistoricoFaturamentoStats([]);
     }
 }
@@ -271,7 +271,7 @@ export function renderHistoricoFaturamentoTable(expeditions) {
 
         let lojasInfo = exp.lojas_info.join('<br>');
         if (exp.numeros_carga && exp.numeros_carga.length > 0) {
-            lojasInfo += `<br><span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">📦 Cargas: ${exp.numeros_carga.join(', ')}</span>`;
+            lojasInfo += `<br><span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">ðŸ“¦ Cargas: ${exp.numeros_carga.join(', ')}</span>`;
         }
 
         let tempoColor = 'text-green-600';
@@ -315,7 +315,7 @@ export async function loadFaturamentoData(subTabName = 'faturamentoAtivo') {
     if (!container) return;
 
     if (subTabName === 'faturamentoAtivo') {
-        container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expedições...</div>`;
+        container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expediÃ§Ãµes...</div>`;
 
         try {
             const expeditions = await supabaseRequest("expeditions?status=in.(em_carregamento,carregado,aguardando_faturamento,faturamento_iniciado,faturado,em_carregamento_faturando)&order=data_hora.asc");
@@ -357,3 +357,4 @@ window.finalizarFaturamento = finalizarFaturamento;
 window.marcarSaiuEntrega = marcarSaiuEntrega;
 window.clearHistoricoFaturamentoFilters = clearHistoricoFaturamentoFilters;
 window.loadHistoricoFaturamento = loadHistoricoFaturamento;
+

@@ -1,25 +1,25 @@
-import { supabaseRequest } from '../api.js';
+ï»¿import { supabaseRequest } from '../api.js';
 import { getState, setState } from '../state.js';
 import { getStatusLabel, minutesToHHMM } from '../utils.js';
-async function loadAcompanhamento() {
+export async function loadAcompanhamento() {
     const permittedAcompanhamentoTabs = getPermittedSubTabs('acompanhamento');
-    
+
     if (permittedAcompanhamentoTabs.length > 0) {
         const initialSubTab = permittedAcompanhamentoTabs.length === 1 ? permittedAcompanhamentoTabs[0] : 'expedicoesEmAndamento';
         const initialElement = document.querySelector(`#acompanhamento .sub-tabs button[onclick*="'${initialSubTab}'"]`);
         showSubTab('acompanhamento', initialSubTab, initialElement);
     }
-    
-    // O restante da lógica de carregamento de dados (expeditions, items) permanece aqui
+
+    // O restante da lÃ³gica de carregamento de dados (expeditions, items) permanece aqui
     setDefaultDateFilters();
     const tbody = document.getElementById('acompanhamentoBody');
-    tbody.innerHTML = `<tr><td colspan="12" class="loading"><div class="spinner"></div>Carregando expedições...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="loading"><div class="spinner"></div>Carregando expediÃ§Ãµes...</td></tr>`;
 
     try {
         const expeditions = await supabaseRequest('expeditions?status=not.eq.entregue&order=data_hora.desc');
         const items = await supabaseRequest('expedition_items');
-        // ... (o resto da lógica de loadAcompanhamento, que popula allExpeditions, etc., deve permanecer)
-        
+        // ... (o resto da lÃ³gica de loadAcompanhamento, que popula allExpeditions, etc., deve permanecer)
+
         window.allExpeditions = expeditions.map(exp => {
             const expItems = items.filter(item => item.expedition_id === exp.id);
             const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
@@ -30,84 +30,84 @@ async function loadAcompanhamento() {
                 total_pallets: expItems.reduce((s, i) => s + (i.pallets || 0), 0),
                 total_rolltrainers: expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0),
                 lojas_count: expItems.length,
-                
-                // AJUSTE 1: Mostrar apenas o CÓDIGO da loja, separado por vírgula
+
+                // AJUSTE 1: Mostrar apenas o CÃ“DIGO da loja, separado por vÃ­rgula
                 lojas_info: expItems.map(item => {
                     const loja = lojas.find(l => l.id === item.loja_id);
-                    return loja ? `${loja.codigo}` : 'N/A'; // Apenas o código
-                }).join(', '), // MUDANÇA AQUI: de '<br>' para ', '
-                
+                    return loja ? `${loja.codigo}` : 'N/A'; // Apenas o cÃ³digo
+                }).join(', '), // MUDANÃ‡A AQUI: de '<br>' para ', '
+
                 doca_nome: docas.find(d => d.id === exp.doca_id)?.nome || 'N/A',
                 lider_nome: lideres.find(l => l.id === exp.lider_id)?.nome || 'N/A',
                 veiculo_placa: veiculo?.placa,
-                
-                // AJUSTE 2: Resumir o nome do motorista (Primeiro e Último nome)
+
+                // AJUSTE 2: Resumir o nome do motorista (Primeiro e Ãšltimo nome)
                 motorista_nome: ((nomeCompleto) => {
                     if (!nomeCompleto) return '-';
                     const partes = nomeCompleto.trim().split(' ');
                     if (partes.length > 1) {
-                        return `${partes[0]} ${partes[partes.length - 1]}`; // Primeiro e último nome
+                        return `${partes[0]} ${partes[partes.length - 1]}`; // Primeiro e Ãºltimo nome
                     }
-                    return nomeCompleto; // Retorna o nome se for único
+                    return nomeCompleto; // Retorna o nome se for Ãºnico
                 })(motoristas.find(m => m.id === exp.motorista_id)?.nome),
-                
+
                 ocupacao: veiculo && veiculo.capacidade_pallets > 0 ? (totalCarga / veiculo.capacidade_pallets) * 100 : 0
             };
         });
-        
+
         populateStatusFilter();
         applyFilters();
 
         populateRastreioFilters();
-    } catch(error) {
+    } catch (error) {
         tbody.innerHTML = `<tr><td colspan="12" class="alert alert-error">Erro ao carregar dados: ${error.message}</td></tr>`;
     }
 }
-        
-        function populateStatusFilter() {
-            const filtroStatus = document.getElementById('filtroStatus');
-            const statuses = [...new Set(allExpeditions.map(e => e.status))];
-            filtroStatus.innerHTML = '<option value="">Todos</option>';
-            statuses.forEach(s => {
-                filtroStatus.innerHTML += `<option value="${s}">${getStatusLabel(s)}</option>`;
-            });
+
+function populateStatusFilter() {
+    const filtroStatus = document.getElementById('filtroStatus');
+    const statuses = [...new Set(allExpeditions.map(e => e.status))];
+    filtroStatus.innerHTML = '<option value="">Todos</option>';
+    statuses.forEach(s => {
+        filtroStatus.innerHTML += `<option value="${s}">${getStatusLabel(s)}</option>`;
+    });
+}
+
+function applyFilters() {
+    const dataInicio = document.getElementById('filtroDataInicio').value;
+    const dataFim = document.getElementById('filtroDataFim').value;
+    const status = document.getElementById('filtroStatus').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+    window.filteredExpeditions = allExpeditions.filter(exp => {
+        const expDate = new Date(exp.data_hora).toISOString().split('T')[0];
+        if (dataInicio && expDate < dataInicio) return false;
+        if (dataFim && expDate > dataFim) return false;
+        if (status && exp.status !== status) return false;
+        if (searchTerm) {
+            const numerosCargaSearch = exp.numeros_carga ? exp.numeros_carga.join(' ') : '';
+            const searchable = [exp.lojas_info, exp.doca_nome, exp.lider_nome, exp.veiculo_placa, exp.motorista_nome, numerosCargaSearch].join(' ').toLowerCase();
+            if (!searchable.includes(searchTerm)) return false;
         }
-        
-        function applyFilters() {
-            const dataInicio = document.getElementById('filtroDataInicio').value;
-            const dataFim = document.getElementById('filtroDataFim').value;
-            const status = document.getElementById('filtroStatus').value;
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        return true;
+    });
 
-            window.filteredExpeditions = allExpeditions.filter(exp => {
-                const expDate = new Date(exp.data_hora).toISOString().split('T')[0];
-                if (dataInicio && expDate < dataInicio) return false;
-                if (dataFim && expDate > dataFim) return false;
-                if (status && exp.status !== status) return false;
-                if (searchTerm) {
-                    const numerosCargaSearch = exp.numeros_carga ? exp.numeros_carga.join(' ') : '';
-                    const searchable = [exp.lojas_info, exp.doca_nome, exp.lider_nome, exp.veiculo_placa, exp.motorista_nome, numerosCargaSearch].join(' ').toLowerCase();
-                    if (!searchable.includes(searchTerm)) return false;
-                }
-                return true;
-            });
+    updateStats(filteredExpeditions);
+    updateTimeStats(filteredExpeditions);
+    renderAcompanhamentoTable(filteredExpeditions);
+}
 
-            updateStats(filteredExpeditions);
-            updateTimeStats(filteredExpeditions);
-            renderAcompanhamentoTable(filteredExpeditions);
-        }
+function clearFilters() {
+    document.getElementById('filtroDataInicio').value = '';
+    document.getElementById('filtroDataFim').value = '';
+    document.getElementById('filtroStatus').value = '';
+    document.getElementById('searchInput').value = '';
+    setDefaultDateFilters();
+    applyFilters();
+}
 
-        function clearFilters() {
-            document.getElementById('filtroDataInicio').value = '';
-            document.getElementById('filtroDataFim').value = '';
-            document.getElementById('filtroStatus').value = '';
-            document.getElementById('searchInput').value = '';
-            setDefaultDateFilters();
-            applyFilters();
-        }
-
-        function setDefaultDateFilters() {
-    // Cria um formatador específico para obter ano, mês e dia no fuso de Brasília
+function setDefaultDateFilters() {
+    // Cria um formatador especÃ­fico para obter ano, mÃªs e dia no fuso de BrasÃ­lia
     const formatter = new Intl.DateTimeFormat('pt-BR', {
         timeZone: 'America/Sao_Paulo',
         year: 'numeric',
@@ -115,7 +115,7 @@ async function loadAcompanhamento() {
         day: '2-digit'
     });
 
-    // Obtém as partes da data atual formatadas para Brasília
+    // ObtÃ©m as partes da data atual formatadas para BrasÃ­lia
     const parts = formatter.formatToParts(new Date());
     let year, month, day;
     parts.forEach(part => {
@@ -136,54 +136,54 @@ async function loadAcompanhamento() {
 
 }
 
-        function updateStats(data) {
-            document.getElementById('totalExpedicoes').textContent = data.length;
-            document.getElementById('pendentesCount').textContent = data.filter(d => d.status === 'pendente' || d.status === 'aguardando_agrupamento').length;
-            document.getElementById('emAndamentoCount').textContent = data.filter(d => !['pendente', 'aguardando_agrupamento', 'entregue', 'cancelado'].includes(d.status)).length;
-        }
+function updateStats(data) {
+    document.getElementById('totalExpedicoes').textContent = data.length;
+    document.getElementById('pendentesCount').textContent = data.filter(d => d.status === 'pendente' || d.status === 'aguardando_agrupamento').length;
+    document.getElementById('emAndamentoCount').textContent = data.filter(d => !['pendente', 'aguardando_agrupamento', 'entregue', 'cancelado'].includes(d.status)).length;
+}
 
-        function updateTimeStats(data) {
-            const calcularMedia = (arr) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-            const temposAlocacao = data.filter(e => e.data_alocacao_veiculo).map(e => (new Date(e.data_alocacao_veiculo) - new Date(e.data_hora)) / 60000);
-            const temposChegada = data.filter(e => e.data_chegada_veiculo).map(e => (new Date(e.data_chegada_veiculo) - new Date(e.data_hora)) / 60000);
-            const temposCarregamento = data.filter(e => e.data_chegada_veiculo && e.data_saida_veiculo).map(e => (new Date(e.data_saida_veiculo) - new Date(e.data_chegada_veiculo)) / 60000);
-            const temposTotal = data.filter(e => e.data_saida_veiculo).map(e => (new Date(e.data_saida_veiculo) - new Date(e.data_hora)) / 60000);
+function updateTimeStats(data) {
+    const calcularMedia = (arr) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const temposAlocacao = data.filter(e => e.data_alocacao_veiculo).map(e => (new Date(e.data_alocacao_veiculo) - new Date(e.data_hora)) / 60000);
+    const temposChegada = data.filter(e => e.data_chegada_veiculo).map(e => (new Date(e.data_chegada_veiculo) - new Date(e.data_hora)) / 60000);
+    const temposCarregamento = data.filter(e => e.data_chegada_veiculo && e.data_saida_veiculo).map(e => (new Date(e.data_saida_veiculo) - new Date(e.data_chegada_veiculo)) / 60000);
+    const temposTotal = data.filter(e => e.data_saida_veiculo).map(e => (new Date(e.data_saida_veiculo) - new Date(e.data_hora)) / 60000);
 
-            document.getElementById('tempoMedioAlocar').textContent = minutesToHHMM(calcularMedia(temposAlocacao));
-            document.getElementById('tempoMedioChegada').textContent = minutesToHHMM(calcularMedia(temposChegada));
-            document.getElementById('tempoMedioCarregamento').textContent = minutesToHHMM(calcularMedia(temposCarregamento));
-            document.getElementById('tempoMedioTotal').textContent = minutesToHHMM(calcularMedia(temposTotal));
-        }
-        
-       // SUBSTITUA A FUNÇÃO renderAcompanhamentoTable (aprox. linha 2970)
+    document.getElementById('tempoMedioAlocar').textContent = minutesToHHMM(calcularMedia(temposAlocacao));
+    document.getElementById('tempoMedioChegada').textContent = minutesToHHMM(calcularMedia(temposChegada));
+    document.getElementById('tempoMedioCarregamento').textContent = minutesToHHMM(calcularMedia(temposCarregamento));
+    document.getElementById('tempoMedioTotal').textContent = minutesToHHMM(calcularMedia(temposTotal));
+}
+
+// SUBSTITUA A FUNÃ‡ÃƒO renderAcompanhamentoTable (aprox. linha 2970)
 function renderAcompanhamentoTable(expeditions) {
     const tbody = document.getElementById('acompanhamentoBody');
     if (expeditions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" class="text-center py-8 text-gray-500">Nenhuma expedição encontrada para os filtros selecionados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center py-8 text-gray-500">Nenhuma expediÃ§Ã£o encontrada para os filtros selecionados.</td></tr>';
         return;
     }
 
     tbody.innerHTML = expeditions.map(exp => {
         const ocupacaoPerc = Math.round(exp.ocupacao || 0);
         let barColor = 'progress-green';
-        
+
         if (ocupacaoPerc > 90) barColor = 'progress-orange';
         if (ocupacaoPerc > 100) barColor = 'progress-red';
-        
+
         const tempos = {
             alocar: exp.data_alocacao_veiculo ? minutesToHHMM((new Date(exp.data_alocacao_veiculo) - new Date(exp.data_hora)) / 60000) : '-',
             chegada: exp.data_chegada_veiculo ? minutesToHHMM((new Date(exp.data_chegada_veiculo) - new Date(exp.data_hora)) / 60000) : '-',
             carreg: (exp.data_chegada_veiculo && exp.data_saida_veiculo) ? minutesToHHMM((new Date(exp.data_saida_veiculo) - new Date(exp.data_chegada_veiculo)) / 60000) : '-'
         };
-        
+
         const canEdit = exp.status !== 'saiu_para_entrega' && exp.status !== 'entregue';
-        const editButton = canEdit ? 
+        const editButton = canEdit ?
             `<button class="btn btn-warning btn-small" onclick="openEditModal('${exp.id}')">Editar</button>` :
-            `<button class="btn btn-secondary btn-small" disabled title="Não pode editar após saída para entrega">Editar</button>`;
+            `<button class="btn btn-secondary btn-small" disabled title="NÃ£o pode editar apÃ³s saÃ­da para entrega">Editar</button>`;
         const deleteButton = canEdit ?
             `<button class="btn btn-danger btn-small" onclick="deleteExpedition('${exp.id}')">Excluir</button>` :
-            `<button class="btn btn-secondary btn-small" disabled title="Não pode excluir após saída para entrega">Excluir</button>`;
-            
+            `<button class="btn btn-secondary btn-small" disabled title="NÃ£o pode excluir apÃ³s saÃ­da para entrega">Excluir</button>`;
+
         return `
             <tr class="hover:bg-gray-50 text-sm">
                 
@@ -215,8 +215,8 @@ function renderAcompanhamentoTable(expeditions) {
         `;
     }).join('');
 }
-        
-        async function loadFrotaData() {
+
+async function loadFrotaData() {
     if (!selectedFilial) {
         document.getElementById('ociosidadeBody').innerHTML = '<tr><td colspan="5" class="alert alert-error">Selecione uma filial primeiro!</td></tr>';
         return;
@@ -226,7 +226,7 @@ function renderAcompanhamentoTable(expeditions) {
     tbody.innerHTML = `<tr><td colspan="5" class="loading"><div class="spinner"></div>Calculando ociosidade...</td></tr>`;
 
     try {
-        // 1. Definir Período de Análise
+        // 1. Definir PerÃ­odo de AnÃ¡lise
         const hoje = new Date();
         const dataInicio = document.getElementById('frotaFiltroDataInicio').value || new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString().split('T')[0];
         const dataFimInput = document.getElementById('frotaFiltroDataFim').value || hoje.toISOString().split('T')[0];
@@ -234,16 +234,16 @@ function renderAcompanhamentoTable(expeditions) {
         const startOfAnalysis = new Date(dataInicio + 'T00:00:00.000Z');
         const endOfAnalysis = new Date(dataFimInput + 'T23:59:59.999Z');
 
-        // 2. Buscar histórico de status relevante
+        // 2. Buscar histÃ³rico de status relevante
         const startQuery = new Date(startOfAnalysis);
         startQuery.setDate(startQuery.getDate() - 1); // Pega um dia antes para garantir o status inicial
-        
-        // NOVO: A requisição agora busca o histórico de status de veículos da filial
+
+        // NOVO: A requisiÃ§Ã£o agora busca o histÃ³rico de status de veÃ­culos da filial
         const statusHistory = await supabaseRequest(`veiculos_status_historico?created_at=gte.${startQuery.toISOString()}&created_at=lte.${endOfAnalysis.toISOString()}&order=created_at.asc`, 'GET', null, false);
 
         const ociosidadeData = [];
 
-        // NOVO: Filtrar veículos que NÃO estão em 'manutencao' e pertencem à filial
+        // NOVO: Filtrar veÃ­culos que NÃƒO estÃ£o em 'manutencao' e pertencem Ã  filial
         const veiculosFiltrados = veiculos.filter(v => v.filial === selectedFilial.nome && v.status !== 'manutencao');
 
         for (const veiculo of veiculosFiltrados) {
@@ -252,25 +252,25 @@ function renderAcompanhamentoTable(expeditions) {
             const lastStatusBeforePeriod = veiculoHistory
                 .filter(h => new Date(h.created_at) < startOfAnalysis)
                 .pop();
-            
+
             let statusAtual = lastStatusBeforePeriod ? lastStatusBeforePeriod.status_novo : (veiculo.status || 'disponivel');
             let ultimoTimestamp = startOfAnalysis;
             let tempoOciosoTotal = 0;
             let inicioOciosidadeAtual = statusAtual === 'disponivel' ? startOfAnalysis : null;
 
             const historyInPeriod = veiculoHistory.filter(h => new Date(h.created_at) >= startOfAnalysis);
-            
+
             historyInPeriod.forEach(evento => {
                 const tempoEvento = new Date(evento.created_at);
-                
+
                 if (statusAtual === 'disponivel') {
-                    // Soma o tempo ocioso acumulado entre a última ação e este evento
+                    // Soma o tempo ocioso acumulado entre a Ãºltima aÃ§Ã£o e este evento
                     tempoOciosoTotal += (tempoEvento - ultimoTimestamp);
                 }
 
                 statusAtual = evento.status_novo;
                 ultimoTimestamp = tempoEvento;
-                
+
                 if (statusAtual === 'disponivel') {
                     if (!inicioOciosidadeAtual) inicioOciosidadeAtual = tempoEvento;
                 } else {
@@ -278,41 +278,41 @@ function renderAcompanhamentoTable(expeditions) {
                 }
             });
 
-            // Considera o tempo ocioso até o momento atual (endOfAnalysis)
+            // Considera o tempo ocioso atÃ© o momento atual (endOfAnalysis)
             if (statusAtual === 'disponivel') {
                 tempoOciosoTotal += (endOfAnalysis - ultimoTimestamp);
             }
 
-            // NOVO CÓDIGO: Calcula o tempo ocioso 'agora'
+            // NOVO CÃ“DIGO: Calcula o tempo ocioso 'agora'
             let tempoOciosoAtual = 0;
             if (veiculo.status === 'disponivel') {
-                // Tenta achar a última mudança para 'disponivel' dentro do período
+                // Tenta achar a Ãºltima mudanÃ§a para 'disponivel' dentro do perÃ­odo
                 const lastIdleChange = veiculoHistory
                     .filter(h => h.status_novo === 'disponivel' && new Date(h.created_at) >= startOfAnalysis)
                     .pop();
-                
+
                 // Se achou, calcula o tempo entre o evento e o tempo atual (agora)
                 const inicioIdle = lastIdleChange ? new Date(lastIdleChange.created_at) : (inicioOciosidadeAtual || new Date());
-                tempoOciosoAtual = (new Date() - inicioIdle) / 60000; // Tempo em minutos até o 'agora'
+                tempoOciosoAtual = (new Date() - inicioIdle) / 60000; // Tempo em minutos atÃ© o 'agora'
             }
 
 
             ociosidadeData.push({
                 placa: veiculo.placa,
                 status: veiculo.status,
-                idleTime: tempoOciosoTotal / 60000, // Tempo Ocioso Total no Período (em minutos)
-                idleSince: veiculo.status === 'disponivel' ? inicioOciosidadeAtual : null, // Início da Ociosidade no Período
-                lastAction: ultimoTimestamp, // Último evento de status no período (ou inicio da análise)
+                idleTime: tempoOciosoTotal / 60000, // Tempo Ocioso Total no PerÃ­odo (em minutos)
+                idleSince: veiculo.status === 'disponivel' ? inicioOciosidadeAtual : null, // InÃ­cio da Ociosidade no PerÃ­odo
+                lastAction: ultimoTimestamp, // Ãšltimo evento de status no perÃ­odo (ou inicio da anÃ¡lise)
                 // NOVO: Adiciona o tempo ocioso atual (do status 'disponivel')
-                currentIdleTime: tempoOciosoAtual 
+                currentIdleTime: tempoOciosoAtual
             });
         }
-        
+
         const mediaOciosidade = ociosidadeData.length > 0 ? ociosidadeData.reduce((sum, v) => sum + v.idleTime, 0) / ociosidadeData.length : 0;
         document.getElementById('totalOciosidade').textContent = minutesToHHMM(mediaOciosidade);
         document.getElementById('frotaAtiva').textContent = veiculosFiltrados.filter(v => v.status !== 'disponivel' && v.status !== 'folga').length;
         document.getElementById('frotaOciosa').textContent = veiculosFiltrados.filter(v => v.status === 'disponivel').length;
-        
+
         // Ordena pela ociosidade ATUAL (currentIdleTime)
         renderOciosidadeTable(ociosidadeData.sort((a, b) => b.currentIdleTime - a.currentIdleTime));
 
@@ -321,32 +321,32 @@ function renderAcompanhamentoTable(expeditions) {
         tbody.innerHTML = `<tr><td colspan="5" class="alert alert-error">Erro ao calcular ociosidade: ${error.message}</td></tr>`;
     }
 }
-        
-        function renderOciosidadeTable(data) {
+
+function renderOciosidadeTable(data) {
     const tbody = document.getElementById('ociosidadeBody');
     if (!tbody) return;
 
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">Nenhum veículo ativo (excluindo manutenção) encontrado para o período.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">Nenhum veÃ­culo ativo (excluindo manutenÃ§Ã£o) encontrado para o perÃ­odo.</td></tr>';
         return;
     }
 
     tbody.innerHTML = data.map(v => {
         // NOVO: Exibe o tempo ocioso APENAS se o status for 'disponivel'
         const tempoOciosoDisplay = v.status === 'disponivel' && v.currentIdleTime > 0 ? minutesToHHMM(v.currentIdleTime) : '-';
-        // A coluna 'Início Ociosidade' é o inicio da contagem atual (se disponível), senão é o tempo total da análise
+        // A coluna 'InÃ­cio Ociosidade' Ã© o inicio da contagem atual (se disponÃ­vel), senÃ£o Ã© o tempo total da anÃ¡lise
         const ociosoDesdeDisplay = v.status === 'disponivel' && v.idleSince ? new Date(v.idleSince).toLocaleTimeString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
-        // NOVO: A coluna 'Última Ação' agora exibe o último timestamp de mudança de status (mesmo que não seja ocioso)
-        const ultimaAcaoDisplay = v.lastAction && new Date(v.lastAction).getTime() > new Date(document.getElementById('frotaFiltroDataInicio').value + 'T00:00:00.000Z').getTime() ? 
-            new Date(v.lastAction).toLocaleTimeString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : 
-            'N/A'; // Não exibe se for o timestamp do início da análise
-        
+        // NOVO: A coluna 'Ãšltima AÃ§Ã£o' agora exibe o Ãºltimo timestamp de mudanÃ§a de status (mesmo que nÃ£o seja ocioso)
+        const ultimaAcaoDisplay = v.lastAction && new Date(v.lastAction).getTime() > new Date(document.getElementById('frotaFiltroDataInicio').value + 'T00:00:00.000Z').getTime() ?
+            new Date(v.lastAction).toLocaleTimeString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) :
+            'N/A'; // NÃ£o exibe se for o timestamp do inÃ­cio da anÃ¡lise
+
         // Define a cor da linha com base no tempo ocioso atual
         let rowClass = '';
         if (v.status === 'disponivel') {
-             if (v.currentIdleTime > 120) rowClass = 'bg-red-100'; // > 2h ocioso
-             else if (v.currentIdleTime > 60) rowClass = 'bg-orange-100'; // > 1h ocioso
-             else if (v.currentIdleTime > 0) rowClass = 'bg-green-100'; // < 1h ocioso
+            if (v.currentIdleTime > 120) rowClass = 'bg-red-100'; // > 2h ocioso
+            else if (v.currentIdleTime > 60) rowClass = 'bg-orange-100'; // > 1h ocioso
+            else if (v.currentIdleTime > 0) rowClass = 'bg-green-100'; // < 1h ocioso
         }
 
         return `
@@ -376,15 +376,15 @@ function populateRastreioFilters() {
 
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
-// SUBSTITUIR A FUNÇÃO loadRastreioData COMPLETA
-// SUBSTITUIR A FUNÇÃO loadRastreioData COMPLETA (aprox. linha 3866)
+// SUBSTITUIR A FUNÃ‡ÃƒO loadRastreioData COMPLETA
+// SUBSTITUIR A FUNÃ‡ÃƒO loadRastreioData COMPLETA (aprox. linha 3866)
 async function loadRastreioData() {
     try {
         console.log("Iniciando carregamento dos dados de rastreio...");
-        // Garante que o status de retorno seja tratado (para Veículos e Motoristas)
+        // Garante que o status de retorno seja tratado (para VeÃ­culos e Motoristas)
         const expeditionsEmRota = await supabaseRequest('expeditions?status=eq.saiu_para_entrega&order=data_saida_entrega.desc');
         const items = await supabaseRequest('expedition_items');
-        
+
         let locations = [];
         if (expeditionsEmRota.length > 0) {
             const expeditionIds = expeditionsEmRota.map(exp => exp.id);
@@ -397,7 +397,7 @@ async function loadRastreioData() {
             const motorista = motoristas.find(m => m.id === exp.motorista_id);
             const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
             const currentLocation = locations.find(loc => loc.expedition_id === exp.id);
-            
+
             if (!currentLocation || !currentLocation.latitude || !currentLocation.longitude) {
                 return null;
             }
@@ -443,41 +443,41 @@ async function loadRastreioData() {
 
             const tempoSaida = new Date(exp.data_saida_entrega);
             const tempoDecorrido = (new Date() - tempoSaida) / 60000;
-            
-            // ?? CÁLCULO DE DISTÂNCIA E TEMPO DA ROTA COMPLETA ??
+
+            // ?? CÃLCULO DE DISTÃ‚NCIA E TEMPO DA ROTA COMPLETA ??
             let distanciaTotalKm = 0;
             let tempoTotalRota = 0;
             let eta = new Date();
-            
+
             try {
                 // Construir waypoints para a rota completa
                 const waypoints = [
                     { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd }
                 ];
-                
+
                 itemsOrdenados.forEach(item => {
                     const loja = lojas.find(l => l.id === item.loja_id);
                     if (loja && loja.latitude && loja.longitude) {
-                        waypoints.push({ 
-                            lat: parseFloat(loja.latitude), 
-                            lng: parseFloat(loja.longitude) 
+                        waypoints.push({
+                            lat: parseFloat(loja.latitude),
+                            lng: parseFloat(loja.longitude)
                         });
                     }
                 });
-                
-                // Se há pelo menos 2 pontos, calcular a rota
+
+                // Se hÃ¡ pelo menos 2 pontos, calcular a rota
                 if (waypoints.length >= 2) {
                     const rotaCompleta = await getRouteFromAPI(waypoints);
-                    
+
                     if (rotaCompleta) {
                         distanciaTotalKm = rotaCompleta.distance / 1000; // Converter metros para km
                         tempoTotalRota = rotaCompleta.duration / 60; // Converter segundos para minutos
                     } else {
-                        // Fallback: calcular distância em linha reta
+                        // Fallback: calcular distÃ¢ncia em linha reta
                         let distanciaEstimada = 0;
                         for (let i = 1; i < waypoints.length; i++) {
                             distanciaEstimada += calculateDistance(
-                                waypoints[i-1].lat, waypoints[i-1].lng,
+                                waypoints[i - 1].lat, waypoints[i - 1].lng,
                                 waypoints[i].lat, waypoints[i].lng
                             );
                         }
@@ -485,20 +485,20 @@ async function loadRastreioData() {
                         tempoTotalRota = (distanciaEstimada / 1000) / 40 * 60; // Estimativa a 40km/h
                     }
                 }
-                
-                // Calcular ETA para a próxima loja (se houver)
+
+                // Calcular ETA para a prÃ³xima loja (se houver)
                 if (proximaLoja && proximaLoja.latitude && proximaLoja.longitude) {
                     try {
                         const rotaProximaLoja = await getRouteFromAPI([
                             { lat: parseFloat(currentLocation.latitude), lng: parseFloat(currentLocation.longitude) },
                             { lat: parseFloat(proximaLoja.latitude), lng: parseFloat(proximaLoja.longitude) }
                         ]);
-                        
+
                         if (rotaProximaLoja) {
                             const tempoRestanteMinutos = rotaProximaLoja.duration / 60;
                             eta = new Date(Date.now() + (tempoRestanteMinutos * 60000));
                         } else {
-                            // Fallback: estimar baseado em distância reta
+                            // Fallback: estimar baseado em distÃ¢ncia reta
                             const distReta = calculateDistance(
                                 parseFloat(currentLocation.latitude), parseFloat(currentLocation.longitude),
                                 parseFloat(proximaLoja.latitude), parseFloat(proximaLoja.longitude)
@@ -507,7 +507,7 @@ async function loadRastreioData() {
                             eta = new Date(Date.now() + (tempoEstimado * 60000));
                         }
                     } catch (e) {
-                        console.warn("Falha ao calcular ETA específico:", e);
+                        console.warn("Falha ao calcular ETA especÃ­fico:", e);
                     }
                 }
             } catch (error) {
@@ -517,27 +517,27 @@ async function loadRastreioData() {
                 const waypoints = [
                     { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd }
                 ];
-                
+
                 itemsOrdenados.forEach(item => {
                     const loja = lojas.find(l => l.id === item.loja_id);
                     if (loja && loja.latitude && loja.longitude) {
-                        waypoints.push({ 
-                            lat: parseFloat(loja.latitude), 
-                            lng: parseFloat(loja.longitude) 
+                        waypoints.push({
+                            lat: parseFloat(loja.latitude),
+                            lng: parseFloat(loja.longitude)
                         });
                     }
                 });
-                
+
                 for (let i = 1; i < waypoints.length; i++) {
                     distanciaEstimada += calculateDistance(
-                        waypoints[i-1].lat, waypoints[i-1].lng,
+                        waypoints[i - 1].lat, waypoints[i - 1].lng,
                         waypoints[i].lat, waypoints[i].lng
                     );
                 }
                 distanciaTotalKm = distanciaEstimada / 1000;
                 tempoTotalRota = (distanciaEstimada / 1000) / 40 * 60; // Estimativa a 40km/h
             }
-            
+
             return {
                 ...exp,
                 items: expItems,
@@ -568,8 +568,8 @@ async function loadRastreioData() {
         const results = resultsSettled
             .filter(p => p.status === 'fulfilled' && p.value !== null)
             .map(p => p.value);
-        
-        
+
+
         const motoristasRetornando = await supabaseRequest('motoristas?status=in.(retornando_cd,retornando_com_imobilizado)');
         const returningMotoristIds = motoristasRetornando.map(m => m.id);
 
@@ -581,23 +581,23 @@ async function loadRastreioData() {
 
         const promessasRetorno = motoristasRetornando.map(async m => {
             const currentLocation = returningLocations.find(loc => loc.motorista_id === m.id);
-            
+
             const lastExpedition = await supabaseRequest(`expeditions?motorista_id=eq.${m.id}&select=veiculo_id&order=data_hora.desc&limit=1`, 'GET', null, false);
             const lastVeiculoId = lastExpedition[0]?.veiculo_id;
             const lastVehicle = lastVeiculoId ? veiculos.find(v => v.id === lastVeiculoId) : null;
-            
+
             if (currentLocation && currentLocation.latitude && currentLocation.longitude) {
-                // Calcular distância e tempo de retorno ao CD
+                // Calcular distÃ¢ncia e tempo de retorno ao CD
                 let distanciaTotalKm = 0;
                 let tempoEstimadoMinutos = 0;
                 let eta = new Date();
-                
+
                 try {
                     const rota = await getRouteFromAPI([
                         { lat: parseFloat(currentLocation.latitude), lng: parseFloat(currentLocation.longitude) },
                         { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd }
                     ]);
-                    
+
                     if (rota) {
                         distanciaTotalKm = rota.distance / 1000;
                         tempoEstimadoMinutos = rota.duration / 60;
@@ -622,17 +622,17 @@ async function loadRastreioData() {
                     tempoEstimadoMinutos = (distReta / 1000) / 40 * 60;
                     eta = new Date(Date.now() + (tempoEstimadoMinutos * 60000));
                 }
-                
+
                 return {
                     id: `return-${m.id}`,
                     expedition_id: null,
                     motorista_id: m.id,
                     motorista_nome: m.nome,
-                    veiculo_placa: lastVehicle?.placa || 'N/A', 
+                    veiculo_placa: lastVehicle?.placa || 'N/A',
                     status_rastreio: 'retornando',
                     distancia_total_km: distanciaTotalKm,
                     tempo_total_rota: tempoEstimadoMinutos,
-                    tempo_em_rota: 0, 
+                    tempo_em_rota: 0,
                     entregas_concluidas: 0,
                     total_entregas: 0,
                     items: [],
@@ -656,12 +656,12 @@ async function loadRastreioData() {
         const returningResults = returningResultsSettled
             .filter(p => p.status === 'fulfilled' && p.value !== null)
             .map(p => p.value);
-            
+
         window.rastreioData = results;
         rastreioData.push(...returningResults);
-        
+
         window.rastreioData = rastreioData.filter(Boolean);
-        
+
         updateRastreioStats();
         applyRastreioFilters();
         updateLastRefreshTime();
@@ -675,9 +675,9 @@ function updateRastreioStats() {
     const veiculosEmRota = rastreioData.length;
     const entregasAndamento = rastreioData.filter(r => r.status_rastreio === 'em_descarga').length;
     const proximasEntregas = rastreioData.reduce((sum, r) => sum + (r.total_entregas - r.entregas_concluidas), 0);
-    const tempoMedioRota = rastreioData.length > 0 ? 
+    const tempoMedioRota = rastreioData.length > 0 ?
         rastreioData.reduce((sum, r) => sum + r.tempo_em_rota, 0) / rastreioData.length : 0;
-    
+
     document.getElementById('veiculosEmRota').textContent = veiculosEmRota;
     document.getElementById('entregasAndamento').textContent = entregasAndamento;
     document.getElementById('proximasEntregas').textContent = proximasEntregas;
@@ -687,13 +687,13 @@ function updateRastreioStats() {
 function applyRastreioFilters() {
     const motoristaFilter = document.getElementById('rastreioFiltroMotorista')?.value;
     const statusFilter = document.getElementById('rastreioFiltroStatus')?.value;
-    
+
     let filteredData = rastreioData;
-    
+
     if (motoristaFilter) {
         filteredData = filteredData.filter(r => r.motorista_id === motoristaFilter);
     }
-    
+
     if (statusFilter) {
         if (statusFilter === 'saiu_para_entrega') {
             filteredData = filteredData.filter(r => r.status_rastreio === 'em_transito');
@@ -703,43 +703,43 @@ function applyRastreioFilters() {
             filteredData = filteredData.filter(r => r.status_rastreio === 'retornando');
         }
     }
-    
-    console.log('Dados filtrados para exibição:', filteredData.length); // DEBUG
+
+    console.log('Dados filtrados para exibiÃ§Ã£o:', filteredData.length); // DEBUG
     renderRastreioList(filteredData);
 }
 
-// SUBSTITUIR A FUNÇÃO renderRastreioList COMPLETA (Aprox. linha 3901)
+// SUBSTITUIR A FUNÃ‡ÃƒO renderRastreioList COMPLETA (Aprox. linha 3901)
 function renderRastreioList(data) {
     const container = document.getElementById('rastreioList');
-    
+
     // Filtra explicitamente qualquer nulo ou undefined que possa ter entrado
-    const safeData = data.filter(Boolean); 
-    
+    const safeData = data.filter(Boolean);
+
     if (safeData.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">Nenhum veículo em rota no momento.</div>';
+        container.innerHTML = '<div class="alert alert-info">Nenhum veÃ­culo em rota no momento.</div>';
         return;
     }
-    
-    container.innerHTML = safeData.map(rastreio => { 
+
+    container.innerHTML = safeData.map(rastreio => {
         let statusInfo = '';
         let locationInfo = '';
         let nextActionInfo = '';
-        
-        // ?? NOVO CÓDIGO: Verifica se o status é de retorno para desabilitar o botão de trajeto ??
+
+        // ?? NOVO CÃ“DIGO: Verifica se o status Ã© de retorno para desabilitar o botÃ£o de trajeto ??
         const isReturning = rastreio.status_rastreio === 'retornando';
         const trajectoryButton = isReturning ?
-            `<button class="btn btn-secondary btn-small" disabled title="Trajeto de retorno não disponível">Ver Trajeto</button>` :
+            `<button class="btn btn-secondary btn-small" disabled title="Trajeto de retorno nÃ£o disponÃ­vel">Ver Trajeto</button>` :
             `<button class="btn btn-warning btn-small" onclick="showTrajectoryMap('${rastreio.id}', '${rastreio.veiculo_placa}')">Ver Trajeto</button>`;
 
 
         if (rastreio.status_rastreio === 'em_transito') {
-            statusInfo = `<div class="flex items-center gap-2 text-blue-600"><div class="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div><span class="font-semibold">Em Trânsito</span></div>`;
-            locationInfo = `<div class="text-sm text-gray-600">Próxima parada: <strong>${rastreio.proxima_loja?.nome || 'N/A'}</strong></div>`;
-            nextActionInfo = `<div class="text-xs text-gray-500">ETA: ${rastreio.eta.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</div>`;
+            statusInfo = `<div class="flex items-center gap-2 text-blue-600"><div class="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div><span class="font-semibold">Em TrÃ¢nsito</span></div>`;
+            locationInfo = `<div class="text-sm text-gray-600">PrÃ³xima parada: <strong>${rastreio.proxima_loja?.nome || 'N/A'}</strong></div>`;
+            nextActionInfo = `<div class="text-xs text-gray-500">ETA: ${rastreio.eta.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>`;
         } else if (rastreio.status_rastreio === 'em_descarga') {
             statusInfo = `<div class="flex items-center gap-2 text-orange-600"><div class="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div><span class="font-semibold">Descarregando</span></div>`;
             locationInfo = `<div class="text-sm text-gray-600">Local atual: <strong>${rastreio.loja_atual?.nome || 'N/A'}</strong></div>`;
-            
+
             const item = rastreio.items.find(i => i.status_descarga === 'em_descarga');
             if (item && item.data_inicio_descarga) {
                 const tempoDescarga = Math.round((new Date() - new Date(item.data_inicio_descarga)) / 60000);
@@ -747,32 +747,32 @@ function renderRastreioList(data) {
             }
         } else if (rastreio.status_rastreio === 'retornando') {
             statusInfo = `<div class="flex items-center gap-2 text-green-600"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold">Retornando ao CD</span></div>`;
-            locationInfo = `<div class="text-sm text-gray-600">Todas as entregas concluídas</div>`;
-            nextActionInfo = `<div class="text-xs text-gray-500">ETA CD: ${rastreio.eta.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</div>`;
+            locationInfo = `<div class="text-sm text-gray-600">Todas as entregas concluÃ­das</div>`;
+            nextActionInfo = `<div class="text-xs text-gray-500">ETA CD: ${rastreio.eta.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>`;
         }
-        
-        // Calcular tempo desde a última atualização
-        const tempoUltimaAtualizacao = rastreio.last_update ? 
+
+        // Calcular tempo desde a Ãºltima atualizaÃ§Ã£o
+        const tempoUltimaAtualizacao = rastreio.last_update ?
             Math.round((new Date() - rastreio.last_update) / 60000) : null;
 
-        // Informações de proximidade
+        // InformaÃ§Ãµes de proximidade
         let proximityInfo = '';
         if (rastreio.pontos_proximos && Array.isArray(rastreio.pontos_proximos) && rastreio.pontos_proximos.length > 0) {
             proximityInfo = `
                 <div class="proximity-alert">
                     <div class="text-sm font-medium">
-                        <span class="proximity-icon">??</span>Pontos Próximos:
+                        <span class="proximity-icon">??</span>Pontos PrÃ³ximos:
                     </div>
                     ${rastreio.pontos_proximos.map(p => {
-                        let icon = '';
-                        if (p.ponto.tipo === 'CD') icon = '??';
-                        else if (p.ponto.tipo === 'LOJA') icon = '??';
-                        else if (p.ponto.tipo === 'POSTO') icon = '?';
-                        else if (p.ponto.tipo === 'CASA') icon = '??';
-                        else icon = '??';
-                        
-                        return `<div class="text-xs mt-1">${icon} ${p.ponto.nome} - ${p.distancia}m</div>`;
-                    }).join('')}
+                let icon = '';
+                if (p.ponto.tipo === 'CD') icon = '??';
+                else if (p.ponto.tipo === 'LOJA') icon = '??';
+                else if (p.ponto.tipo === 'POSTO') icon = '?';
+                else if (p.ponto.tipo === 'CASA') icon = '??';
+                else icon = '??';
+
+                return `<div class="text-xs mt-1">${icon} ${p.ponto.nome} - ${p.distancia}m</div>`;
+            }).join('')}
                 </div>
             `;
         }
@@ -782,13 +782,13 @@ function renderRastreioList(data) {
                 <div class="flex justify-between items-start mb-4">
                     <div>
                         <h3 class="text-lg font-bold text-gray-800">${rastreio.veiculo_placa} - ${rastreio.motorista_nome}</h3>
-                        <p class="text-sm text-gray-500">Saiu às ${new Date(rastreio.data_saida_entrega).toLocaleTimeString('pt-BR')}</p>
-                        ${tempoUltimaAtualizacao !== null ? `<p class="text-xs text-gray-400">Última localização: ${tempoUltimaAtualizacao < 1 ? 'agora' : tempoUltimaAtualizacao + 'min atrás'}</p>` : ''}
+                        <p class="text-sm text-gray-500">Saiu Ã s ${new Date(rastreio.data_saida_entrega).toLocaleTimeString('pt-BR')}</p>
+                        ${tempoUltimaAtualizacao !== null ? `<p class="text-xs text-gray-400">Ãšltima localizaÃ§Ã£o: ${tempoUltimaAtualizacao < 1 ? 'agora' : tempoUltimaAtualizacao + 'min atrÃ¡s'}</p>` : ''}
                     </div>
                     <div class="text-right">
                         ${statusInfo}
                         <div class="text-xs text-gray-500 mt-1">Velocidade: ${rastreio.velocidade_media} km/h</div>
-                        ${rastreio.accuracy > 0 ? `<div class="text-xs text-gray-400">Precisão: ${rastreio.accuracy}m</div>` : ''}
+                        ${rastreio.accuracy > 0 ? `<div class="text-xs text-gray-400">PrecisÃ£o: ${rastreio.accuracy}m</div>` : ''}
                     </div>
                 </div>
 
@@ -831,7 +831,7 @@ ${proximityInfo}
                         ${nextActionInfo}
                     </div>
                     <div class="text-right">
-                        <div class="text-xs text-gray-500">Posição GPS</div>
+                        <div class="text-xs text-gray-500">PosiÃ§Ã£o GPS</div>
                         <div class="text-sm font-mono text-gray-600">${rastreio.coordenadas.lat.toFixed(6)}, ${rastreio.coordenadas.lng.toFixed(6)}</div>
                         <div class="flex gap-2 mt-2">
     <button class="btn btn-primary btn-small" onclick="showLocationMap('${rastreio.id}', ${rastreio.coordenadas.lat}, ${rastreio.coordenadas.lng}, '${rastreio.veiculo_placa}')">
@@ -849,19 +849,19 @@ ${proximityInfo}
                     <h4 class="font-semibold text-gray-700 mb-2">Roteiro de Entregas</h4>
                     <div class="space-y-1">
                         ${rastreio.items.map((item, index) => {
-                            const loja = lojas.find(l => l.id === item.loja_id);
-                            let iconStatus = '';
-                            if (item.status_descarga === 'descarregado') iconStatus = '?';
-                            else if (item.status_descarga === 'em_descarga') iconStatus = '??';
-                            else iconStatus = '?';
-                            
-                            
-return `<div class="flex items-center text-sm ...">
+            const loja = lojas.find(l => l.id === item.loja_id);
+            let iconStatus = '';
+            if (item.status_descarga === 'descarregado') iconStatus = '?';
+            else if (item.status_descarga === 'em_descarga') iconStatus = '??';
+            else iconStatus = '?';
+
+
+            return `<div class="flex items-center text-sm ...">
     <span class="mr-2">${iconStatus}</span>
     <span>${index + 1}. ${loja?.codigo || 'N/A'} - ${loja?.nome || 'N/A'}</span>
     ${item.data_fim_descarga ? `<span class="ml-auto text-xs">${new Date(item.data_fim_descarga).toLocaleTimeString('pt-BR')}</span>` : ''}
 </div>`;
-                        }).join('')}
+        }).join('')}
                     </div>
                 </div>
             </div>
@@ -870,14 +870,14 @@ return `<div class="flex items-center text-sm ...">
 }
 
 function showLocationMap(expeditionId, lat, lng) {
-    // Em uma implementação real, isso abriria um mapa (Google Maps, OpenStreetMap, etc.)
+    // Em uma implementaÃ§Ã£o real, isso abriria um mapa (Google Maps, OpenStreetMap, etc.)
     const mapUrl = `https://www.google.com/maps?q=${lat},${lng}&z=15`;
     window.open(mapUrl, '_blank');
 }
 
 function toggleAutoRefresh() {
     const autoRefresh = document.getElementById('autoRefreshRastreio').checked;
-    
+
     if (autoRefresh) {
         // Atualizar a cada 15 segundos para dados em tempo real
         window.rastreioTimer = setInterval(() => {
@@ -895,11 +895,11 @@ function toggleAutoRefresh() {
 
 function updateLastRefreshTime() {
     const now = new Date();
-    document.getElementById('lastUpdateRastreio').textContent = 
-        `Última atualização: ${now.toLocaleTimeString('pt-BR')}`;
+    document.getElementById('lastUpdateRastreio').textContent =
+        `Ãšltima atualizaÃ§Ã£o: ${now.toLocaleTimeString('pt-BR')}`;
 }
 
-// Expor funções para o escopo global (para o HTML e outros módulos não modernizados)
+// Expor funÃ§Ãµes para o escopo global (para o HTML e outros mÃ³dulos nÃ£o modernizados)
 window.loadAcompanhamento = loadAcompanhamento;
 window.populateStatusFilter = populateStatusFilter;
 window.applyFilters = applyFilters;
@@ -918,3 +918,4 @@ window.renderRastreioList = renderRastreioList;
 window.showLocationMap = showLocationMap;
 window.toggleAutoRefresh = toggleAutoRefresh;
 window.updateLastRefreshTime = updateLastRefreshTime;
+

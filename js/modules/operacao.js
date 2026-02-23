@@ -1,4 +1,4 @@
-import { getState, setState } from '../state.js';
+﻿import { getState, setState } from '../state.js';
 import { supabaseRequest } from '../api.js';
 import { showNotification } from '../ui.js';
 import { getStatusLabel, minutesToHHMM } from '../utils.js';
@@ -12,22 +12,22 @@ export async function openQrModal(action, mainId, code, secondaryId = null) {
     modalState = { action, mainId, secondaryId, expectedCode: code, scannedValue: null };
     const modal = document.getElementById('qrModal');
     document.getElementById('qrModalTitle').textContent = `Escanear QR Code`;
-    document.getElementById('qrModalMessage').textContent = `Aponte a câmera para o QR Code do local (código: ${code}).`;
+    document.getElementById('qrModalMessage').textContent = `Aponte a cÃ¢mera para o QR Code do local (cÃ³digo: ${code}).`;
     modal.style.display = 'flex';
 
     if (html5QrCodeScanner) await stopScannerSafely();
-    // Verifica se Html5Qrcode está disponível publicamente
+    // Verifica se Html5Qrcode estÃ¡ disponÃ­vel publicamente
     if (typeof Html5Qrcode !== 'undefined') {
         html5QrCodeScanner = new Html5Qrcode("qr-reader");
         try {
             await html5QrCodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, () => { });
             scannerIsRunning = true;
         } catch (err) {
-            document.getElementById('qr-reader').innerHTML = '<p class="text-red-500">Erro ao iniciar câmera. Use a inserção manual.</p>';
+            document.getElementById('qr-reader').innerHTML = '<p class="text-red-500">Erro ao iniciar cÃ¢mera. Use a inserÃ§Ã£o manual.</p>';
             document.getElementById('manualInputContainer').style.display = 'block';
         }
     } else {
-        document.getElementById('qr-reader').innerHTML = '<p class="text-red-500">Biblioteca de QR Code não carregada.</p>';
+        document.getElementById('qr-reader').innerHTML = '<p class="text-red-500">Biblioteca de QR Code nÃ£o carregada.</p>';
         document.getElementById('manualInputContainer').style.display = 'block';
     }
 }
@@ -73,7 +73,7 @@ export async function finishLoading(expeditionId) {
     try {
         const [currentExp] = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=status`);
         if (!currentExp) {
-            throw new Error('Expedição não encontrada.');
+            throw new Error('ExpediÃ§Ã£o nÃ£o encontrada.');
         }
 
         const updateData = {
@@ -137,7 +137,7 @@ export async function finalizarDescarga(itemId) {
                 await supabaseRequest(`veiculos?id=eq.${veiculoId}`, 'PATCH', { status: novoStatus }, false);
             }
 
-            showNotification(`Última entrega finalizada! Viagem concluída.`, 'success');
+            showNotification(`Ãšltima entrega finalizada! Viagem concluÃ­da.`, 'success');
         } else {
             showNotification('Descarga da loja finalizada!', 'success');
         }
@@ -159,7 +159,7 @@ export async function loadOperacao() {
 export async function loadIdentificacaoExpedicoes() {
     const container = document.getElementById('expedicoesParaIdentificacao');
     const filterSelect = document.getElementById('identificacaoLojaFilter');
-    container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expedições...</div>`;
+    container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expediÃ§Ãµes...</div>`;
     filterSelect.length = 1;
 
     try {
@@ -167,7 +167,7 @@ export async function loadIdentificacaoExpedicoes() {
         const items = await supabaseRequest('expedition_items');
 
         if (!expeditions || expeditions.length === 0) {
-            container.innerHTML = '<div class="alert alert-success">Nenhuma expedição aguardando identificação!</div>';
+            container.innerHTML = '<div class="alert alert-success">Nenhuma expediÃ§Ã£o aguardando identificaÃ§Ã£o!</div>';
             allIdentificacaoExpeditions = [];
             return;
         }
@@ -220,7 +220,7 @@ export async function loadIdentificacaoExpedicoes() {
         applyIdentificacaoFilter();
 
     } catch (error) {
-        container.innerHTML = `<div class="alert alert-error">Erro ao carregar expedições: ${error.message}</div>`;
+        container.innerHTML = `<div class="alert alert-error">Erro ao carregar expediÃ§Ãµes: ${error.message}</div>`;
         allIdentificacaoExpeditions = [];
     }
 }
@@ -242,7 +242,7 @@ export function renderIdentificacaoExpedicoes(expeditionsToRender) {
     const container = document.getElementById('expedicoesParaIdentificacao');
 
     if (!expeditionsToRender || expeditionsToRender.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">Nenhuma expedição encontrada para o filtro selecionado.</div>';
+        container.innerHTML = '<div class="alert alert-info">Nenhuma expediÃ§Ã£o encontrada para o filtro selecionado.</div>';
         return;
     }
 
@@ -260,17 +260,17 @@ export function renderIdentificacaoExpedicoes(expeditionsToRender) {
                 <div class="flex justify-between items-start mb-4">
                     <div>
                        
-                        <h3 class="text-lg font-bold text-gray-800">Identificação de Expedição</h3>
+                        <h3 class="text-lg font-bold text-gray-800">IdentificaÃ§Ã£o de ExpediÃ§Ã£o</h3>
                         <p class="text-sm text-gray-500">${new Date(exp.data_hora).toLocaleString('pt-BR')}</p>
                         <p class="text-sm text-gray-600 mt-2"><strong>Lojas:</strong> ${lojasInfo}</p>
-                        ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">📦 ${exp.numeros_carga.join(', ')}</p>` : ''}
+                        ${exp.numeros_carga && exp.numeros_carga.length > 0 ? `<p class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">ðŸ“¦ ${exp.numeros_carga.join(', ')}</p>` : ''}
                     </div>
                     <span class="status-badge status-${exp.status}">${getStatusLabel(exp.status)}</span>
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
                     <div><strong>Conferente:</strong> ${exp.lider_nome}</div>
-                    <div><strong>Veículo:</strong> ${exp.veiculo_placa}</div>
+                    <div><strong>VeÃ­culo:</strong> ${exp.veiculo_placa}</div>
                     <div><strong>Motorista:</strong> ${exp.motorista_nome}</div>
                     <div><strong>Total Itens:</strong> ${totalItens}</div>
                 </div>
@@ -290,7 +290,7 @@ export function renderIdentificacaoExpedicoes(expeditionsToRender) {
 
                 <div class="text-center">
                     <button class="btn btn-primary" onclick="window.openImprimirIdentificacaoModal('${exp.id}')">
-                        🖨️ Imprimir Identificação (${totalItens} etiquetas)
+                        ðŸ–¨ï¸ Imprimir IdentificaÃ§Ã£o (${totalItens} etiquetas)
                     </button>
                 </div>
             </div>
@@ -308,7 +308,7 @@ export async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome
         const items = await supabaseRequest(endpoint);
 
         if (!items || items.length === 0) {
-            showNotification(lojaId ? 'Nenhum item encontrado para esta loja.' : 'Nenhum item encontrado para esta expedição.', 'error');
+            showNotification(lojaId ? 'Nenhum item encontrado para esta loja.' : 'Nenhum item encontrado para esta expediÃ§Ã£o.', 'error');
             return;
         }
 
@@ -487,7 +487,7 @@ export async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome
                             <div class="etiqueta-quadro">
                                 <div class="etiqueta-numero">${lojaInfo}</div>
                                 <hr class="etiqueta-divider">
-                                <div class="etiqueta-data">${loja.endereco_completo || 'Endereço não informado'}</div>
+                                <div class="etiqueta-data">${loja.endereco_completo || 'EndereÃ§o nÃ£o informado'}</div>
                                 <hr class="etiqueta-divider">
                                 <div class="etiqueta-contador">${String(i).padStart(2, '0')}/${String(totalItensLoja).padStart(2, '0')}</div>
                                 <hr class="etiqueta-divider">
@@ -507,7 +507,7 @@ export async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome
         printDiv.innerHTML = etiquetasHtml;
         document.body.appendChild(printDiv);
 
-        showNotification(lojaId ? `Preparando impressão para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressão de todas as etiquetas.', 'info');
+        showNotification(lojaId ? `Preparando impressÃ£o para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressÃ£o de todas as etiquetas.', 'info');
 
         setTimeout(() => {
             window.print();
@@ -518,7 +518,7 @@ export async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome
         }, 500);
 
     } catch (error) {
-        showNotification('Erro ao carregar dados para impressão: ' + error.message, 'error');
+        showNotification('Erro ao carregar dados para impressÃ£o: ' + error.message, 'error');
     }
 }
 
@@ -533,3 +533,4 @@ window.loadOperacao = loadOperacao;
 window.loadIdentificacaoExpedicoes = loadIdentificacaoExpedicoes;
 window.applyIdentificacaoFilter = applyIdentificacaoFilter;
 window.imprimirIdentificacao = imprimirIdentificacao;
+

@@ -1,4 +1,4 @@
-import { supabaseRequest } from '../api.js';
+Ôªøimport { supabaseRequest } from '../api.js';
 import { getState } from '../state.js';
 import { showNotification } from '../ui.js';
 import { getPermittedSubTabs, showSubTab, getStatusLabel } from '../utils.js';
@@ -20,11 +20,11 @@ async function lancarCarga() {
     const observacoes = document.getElementById('lancar_observacoes').value;
 
     if (!lojaId || !liderId || !docaId || (isNaN(pallets) && isNaN(rolltrainers))) {
-        showNotification('Preencha Loja, Doca, LÌder e ao menos um tipo de carga!', 'error');
+        showNotification('Preencha Loja, Doca, L√≠der e ao menos um tipo de carga!', 'error');
         return;
     }
     if ((pallets < 0) || (rolltrainers < 0)) {
-        showNotification('As quantidades n„o podem ser negativas.', 'error');
+        showNotification('As quantidades n√£o podem ser negativas.', 'error');
         return;
     }
 
@@ -41,34 +41,34 @@ async function lancarCarga() {
             observacoes: observacoes || null,
             status: 'aguardando_agrupamento',
             numeros_carga: numerosCarga.length > 0 ? numerosCarga : null
-            // filial ser· injetada automaticamente pela funÁ„o supabaseRequest
+            // filial ser√° injetada automaticamente pela fun√ß√£o supabaseRequest
         };
 
-        // 1. Cria a ExpediÁ„o principal COM filtro de filial (true)
+        // 1. Cria a Expedi√ß√£o principal COM filtro de filial (true)
         const expeditionResponse = await supabaseRequest('expeditions', 'POST', expeditionData, true);
 
         if (!expeditionResponse || expeditionResponse.length === 0) {
-            throw new Error("A criaÁ„o da expediÁ„o falhou.");
+            throw new Error("A cria√ß√£o da expedi√ß√£o falhou.");
         }
 
         const newExpeditionId = expeditionResponse[0].id;
 
-        // 2. Cria o item da expediÁ„o SEM enviar campo filial (o trigger cuida)
+        // 2. Cria o item da expedi√ß√£o SEM enviar campo filial (o trigger cuida)
         const itemData = {
             expedition_id: newExpeditionId,
             loja_id: lojaId,
             pallets: pallets || 0,
             rolltrainers: rolltrainers || 0,
             status_descarga: 'pendente'
-            // N√O incluir campo filial aqui - o trigger set_filial_expedition_items cuida disso
+            // N√ÉO incluir campo filial aqui - o trigger set_filial_expedition_items cuida disso
         };
 
-        // IMPORTANTE: N„o precisa passar false, pois a funÁ„o j· sabe que n„o deve enviar filial para expedition_items
+        // IMPORTANTE: N√£o precisa passar false, pois a fun√ß√£o j√° sabe que n√£o deve enviar filial para expedition_items
         await supabaseRequest('expedition_items', 'POST', itemData);
 
         const lojaNome = lojas.find(l => l.id === lojaId)?.nome || 'Loja';
         const cargasInfo = numerosCarga.length > 0 ? ` (Cargas: ${numerosCarga.join(', ')})` : '';
-        showNotification(`ExpediÁ„o para ${lojaNome}${cargasInfo} lanÁada com sucesso!`, 'success');
+        showNotification(`Expedi√ß√£o para ${lojaNome}${cargasInfo} lan√ßada com sucesso!`, 'success');
 
         document.getElementById('expeditionForm').reset();
         document.getElementById('lancar_lojaSelect').focus();
@@ -78,8 +78,8 @@ async function lancarCarga() {
         }
 
     } catch (error) {
-        console.error('Erro ao lanÁar carga:', error);
-        showNotification(`Erro ao lanÁar carga: ${error.message}`, 'error');
+        console.error('Erro ao lan√ßar carga:', error);
+        showNotification(`Erro ao lan√ßar carga: ${error.message}`, 'error');
     }
 }
 
@@ -190,7 +190,7 @@ async function agruparEAlocar() {
     const observacoes = document.getElementById('alocar_observacoes').value;
 
     if (checkboxes.length === 0 || !veiculoId || !motoristaId) {
-        showNotification('Selecione ao menos uma carga, um veÌculo e um motorista!', 'error');
+        showNotification('Selecione ao menos uma carga, um ve√≠culo e um motorista!', 'error');
         return;
     }
 
@@ -210,11 +210,11 @@ async function agruparEAlocar() {
         const docaAlvoId = rankedDocks.find(docaId => docas.find(d => d.id == docaId)?.status === 'disponivel');
 
         if (!docaAlvoId) {
-            showNotification(`Nenhuma das docas de destino est· disponÌvel. Aguarde e tente novamente.`, 'error');
+            showNotification(`Nenhuma das docas de destino est√° dispon√≠vel. Aguarde e tente novamente.`, 'error');
             return;
         }
 
-        // ?? CORRE«√O: AGREGAR N⁄MEROS DE CARGA ??
+        // ?? CORRE√á√ÉO: AGREGAR N√öMEROS DE CARGA ??
         let todosNumerosCarga = [];
         cargasSelecionadas.forEach(c => {
             if (c.numeros_carga) {
@@ -263,7 +263,7 @@ async function agruparEAlocar() {
 
         await Promise.all(updatePromises);
 
-        showNotification('ExpediÁ„o montada! Defina a ordem de carregamento.', 'info');
+        showNotification('Expedi√ß√£o montada! Defina a ordem de carregamento.', 'info');
         document.getElementById('alocar_veiculoSelect').value = '';
         document.getElementById('alocar_motoristaSelect').value = '';
         document.getElementById('alocar_observacoes').value = '';
@@ -276,7 +276,7 @@ async function agruparEAlocar() {
     }
 }
 
-// SUBSTITUIR A FUN«√O loadFaturamento
+// SUBSTITUIR A FUN√á√ÉO loadFaturamento
 
 window.loadTransportList = loadTransportList;
 window.lancarCarga = lancarCarga;
@@ -289,3 +289,4 @@ export {
     atualizarResumoAgrupamento,
     agruparEAlocar
 };
+
