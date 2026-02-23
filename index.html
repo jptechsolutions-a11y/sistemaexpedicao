@@ -141,42 +141,42 @@
             </div>
             <nav class="p-4">
                 <a href="#home" class="nav-item p-3 rounded-lg mb-2 flex items-center cursor-pointer active"
-                    onclick="showView('home', this)" data-permission="acesso_home">
+                    onclick="window.showView('home', this)" data-permission="acesso_home">
                     <i data-feather="home" class="h-5 w-5 mr-3"></i>
                     <span>Home</span>
                 </a>
                 <a href="#operacao" class="nav-item p-3 rounded-lg mb-2 flex items-center cursor-pointer"
-                    onclick="showView('operacao', this)" data-permission="acesso_operacao">
+                    onclick="window.showView('operacao', this)" data-permission="acesso_operacao">
                     <i data-feather="activity" class="h-5 w-5 mr-3"></i>
                     <span>Operação</span>
                 </a>
                 <a href="#transporte" class="nav-item p-3 rounded-lg mb-2 flex items-center cursor-pointer"
-                    onclick="showView('transporte', this)" data-permission="acesso_transporte">
+                    onclick="window.showView('transporte', this)" data-permission="acesso_transporte">
                     <i data-feather="truck" class="h-5 w-5 mr-3"></i>
                     <span>Transporte</span>
                 </a>
                 <a href="#faturamento" class="nav-item p-3 rounded-lg mb-2 flex items-center cursor-pointer"
-                    onclick="showView('faturamento', this)" data-permission="acesso_faturamento">
+                    onclick="window.showView('faturamento', this)" data-permission="acesso_faturamento">
                     <i data-feather="dollar-sign" class="h-5 w-5 mr-3"></i>
                     <span>Faturamento</span>
                 </a>
                 <a href="#motoristas" class="nav-item p-3 rounded-lg mb-2 flex items-center cursor-pointer"
-                    onclick="showView('motoristas', this)" data-permission="acesso_motoristas">
+                    onclick="window.showView('motoristas', this)" data-permission="acesso_motoristas">
                     <i data-feather="users" class="h-5 w-5 mr-3"></i>
                     <span>Motoristas</span>
                 </a>
                 <a href="#acompanhamento" class="nav-item p-3 rounded-lg mb-2 flex items-center cursor-pointer"
-                    onclick="showView('acompanhamento', this)" data-permission="acesso_acompanhamento">
+                    onclick="window.showView('acompanhamento', this)" data-permission="acesso_acompanhamento">
                     <i data-feather="clock" class="h-5 w-5 mr-3"></i>
                     <span>Acompanhamento</span>
                 </a>
                 <a href="#historico" class="nav-item p-3 rounded-lg mb-2 flex items-center cursor-pointer"
-                    onclick="showView('historico', this)" data-permission="acesso_historico">
+                    onclick="window.showView('historico', this)" data-permission="acesso_historico">
                     <i data-feather="archive" class="h-5 w-5 mr-3"></i>
                     <span>Histórico</span>
                 </a>
                 <a href="#configuracoes" class="nav-item p-3 rounded-lg mb-2 flex items-center cursor-pointer"
-                    onclick="showView('configuracoes', this)" data-permission="acesso_configuracoes">
+                    onclick="window.showView('configuracoes', this)" data-permission="acesso_configuracoes">
                     <i data-feather="settings" class="h-5 w-5 mr-3"></i>
                     <span>Configurações</span>
                 </a>
@@ -569,7 +569,7 @@
         const headers = { 'Content-Type': 'application/json' };
     </script>
     <script type="module" src="js/main.js"></script>
-    <script src="script.js?v=2.3"></script>
+    <script src="script.js?v=2.4"></script>
     <div id="notificationContainer"></div>
 
 </body>

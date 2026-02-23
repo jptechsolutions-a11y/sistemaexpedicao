@@ -2432,7 +2432,7 @@ function filterNavigationMenu() {
 
             // 2. Se for uma aba com sub-abas, aplica o filtro de sub-abas (só se a principal já estiver OK)
             if (isPermitted && subTabViewIds.has(viewId)) {
-                const permittedSubTabs = getPermittedSubTabs(viewId);
+                const permittedSubTabs = window.getPermittedSubTabs ? window.getPermittedSubTabs(viewId) : [];
                 if (permittedSubTabs.length === 0) {
                     // Requisito: Esconder aba principal se não houver sub-abas permitidas
                     isPermitted = false;
