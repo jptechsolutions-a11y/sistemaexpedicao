@@ -188,14 +188,14 @@
                 </div>
                 <div id="refreshLink"
                     class="p-3 rounded-lg mt-2 flex items-center text-green-400 cursor-pointer hover:bg-gray-700"
-                    onclick="forceRefresh()">
+                    onclick="window.forceRefresh()">
                     <i data-feather="refresh-cw" class="h-5 w-5 mr-3"></i>
                     <span>Atualizar Dados</span>
                 </div>
 
                 <div id="logoutLink"
                     class="p-3 rounded-lg mt-2 flex items-center text-red-400 cursor-pointer hover:bg-gray-700"
-                    onclick="logOut()">
+                    onclick="window.logout()">
                     <i data-feather="log-out" class="h-5 w-5 mr-3"></i>
                     <span>Sair (Log Out)</span>
                 </div>
@@ -569,9 +569,10 @@
         const headers = { 'Content-Type': 'application/json' };
     </script>
     <script type="module" src="js/main.js"></script>
-    <script src="script.js?v=2.4"></script>
+    <script src="script.js?v=2.5"></script>
     <div id="notificationContainer"></div>
 
 </body>
 
 </html>
+
