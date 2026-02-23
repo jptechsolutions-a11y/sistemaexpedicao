@@ -1,19 +1,19 @@
-﻿ Chart.register(ChartDataLabels);
-      
-        // Variáveis globais (do sistema original)
-        let lojas = [], docas = [], lideres = [], veiculos = [], motoristas = [], filiais = [];
-        let selectedFilial = null;
-        let currentUser = null; // Para controle de acesso
-        let cargasDisponiveis = [];
-        let allExpeditions = [], filteredExpeditions = [];
-        let allHistorico = [], filteredHistorico = [];
-        let chartInstances = {};
-        let html5QrCodeScanner = null;
-        let scannerIsRunning = false;
-        let activeTimers = {};
-        let modalState = { action: null, scannedValue: null, mainId: null, secondaryId: null, expectedCode: null };
-        let editLojaLineCounter = 0;
-        let rastreioTimer = null;
+﻿Chart.register(ChartDataLabels);
+
+// Variáveis globais (do sistema original)
+let lojas = [], docas = [], lideres = [], veiculos = [], motoristas = [], filiais = [];
+let selectedFilial = null;
+let currentUser = null; // Para controle de acesso
+let cargasDisponiveis = [];
+let allExpeditions = [], filteredExpeditions = [];
+let allHistorico = [], filteredHistorico = [];
+let chartInstances = {};
+let html5QrCodeScanner = null;
+let scannerIsRunning = false;
+let activeTimers = {};
+let modalState = { action: null, scannedValue: null, mainId: null, secondaryId: null, expectedCode: null };
+let editLojaLineCounter = 0;
+let rastreioTimer = null;
 let rastreioData = [];
 let pontosInteresse = []; // Pontos fixos no mapa
 let homeMapInstance = null;
@@ -30,46 +30,46 @@ let allIdentificacaoExpeditions = []; // Guarda a lista completa para o filtro
 async function loadUserPermissions(userId, grupoId) {
     masterUserPermission = false;
     let finalPermissionsSet = new Set();
-    
+
     // 1. CHECAGEM DE GRUPO E CARREGAMENTO DE PERMISSÕES
     if (grupoId) {
-         try {
-             // Carrega o nome do grupo e todas as permissões do grupo em paralelo
-             // O último 'false' garante que o filtro de filial NÃO seja aplicado (Correto para permissões)
-             const [grupo, permissoesGrupo] = await Promise.all([
-                 supabaseRequest(`grupos_acesso?id=eq.${grupoId}&select=nome`, 'GET', null, false),
-                 supabaseRequest(`permissoes_grupo?grupo_id=eq.${grupoId}&select=permissao`, 'GET', null, false)
-             ]);
-             
-             // LOG PARA DIAGNÓSTICO
-             console.log("Permissões do Grupo lidas do BD (Bruto):", permissoesGrupo);
+        try {
+            // Carrega o nome do grupo e todas as permissões do grupo em paralelo
+            // O último 'false' garante que o filtro de filial NÃO seja aplicado (Correto para permissões)
+            const [grupo, permissoesGrupo] = await Promise.all([
+                supabaseRequest(`grupos_acesso?id=eq.${grupoId}&select=nome`, 'GET', null, false),
+                supabaseRequest(`permissoes_grupo?grupo_id=eq.${grupoId}&select=permissao`, 'GET', null, false)
+            ]);
 
-             // MASTER BYPASS: Se for MASTER, define o bypass e retorna
-             if (grupo && grupo.length > 0 && grupo[0].nome === 'MASTER') {
-                 masterUserPermission = true;
-                 // Adiciona um conjunto básico de permissões para garantir o fluxo de UI
-                 userPermissions = ['gerenciar_permissoes', 'acesso_configuracoes', 'acesso_configuracoes_acessos', 'acesso_home'];
-                 const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
-                 todasFiliais.forEach(f => userPermissions.push(`acesso_filial_${f.nome}`));
-                 return; 
-             }
+            // LOG PARA DIAGNÓSTICO
+            console.log("Permissões do Grupo lidas do BD (Bruto):", permissoesGrupo);
 
-             // CARREGA PERMISSÕES DE GRUPOS NORMAIS E SANEIA
-             if (permissoesGrupo && Array.isArray(permissoesGrupo)) {
-                 // Saneamento: remove espaços e transforma em minúsculas
-                 permissoesGrupo.forEach(p => finalPermissionsSet.add(p.permissao.trim().toLowerCase()));
-             }
-         } catch (e) {
-             console.error("ERRO CRÍTICO: Falha ao carregar permissoes_grupo ou grupo_acesso. Possível falha de RLS.", e);
-         }
+            // MASTER BYPASS: Se for MASTER, define o bypass e retorna
+            if (grupo && grupo.length > 0 && grupo[0].nome === 'MASTER') {
+                masterUserPermission = true;
+                // Adiciona um conjunto básico de permissões para garantir o fluxo de UI
+                userPermissions = ['gerenciar_permissoes', 'acesso_configuracoes', 'acesso_configuracoes_acessos', 'acesso_home'];
+                const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
+                todasFiliais.forEach(f => userPermissions.push(`acesso_filial_${f.nome}`));
+                return;
+            }
+
+            // CARREGA PERMISSÕES DE GRUPOS NORMAIS E SANEIA
+            if (permissoesGrupo && Array.isArray(permissoesGrupo)) {
+                // Saneamento: remove espaços e transforma em minúsculas
+                permissoesGrupo.forEach(p => finalPermissionsSet.add(p.permissao.trim().toLowerCase()));
+            }
+        } catch (e) {
+            console.error("ERRO CRÍTICO: Falha ao carregar permissoes_grupo ou grupo_acesso. Possível falha de RLS.", e);
+        }
     }
-    
+
     // 🚨 FIX CRÍTICO: Adiciona acesso_home implicitamente para garantir a navegação.
     // O problema da tela vazia é resolvido por esta injeção.
     if (!masterUserPermission) {
         finalPermissionsSet.add('acesso_home');
     }
-    
+
     // 2. IMPLICAR PERMISSÕES PAI A PARTIR DE SUB-PERMISSÕES
     // Garante que se tem 'acesso_faturamento_ativo', também terá 'acesso_faturamento'.
     const explicitPermissions = Array.from(finalPermissionsSet);
@@ -82,17 +82,17 @@ async function loadUserPermissions(userId, grupoId) {
 
     // 3. Checagem do Master por Permissão
     if (finalPermissionsSet.has('gerenciar_permissoes')) {
-         masterUserPermission = true;
-         try {
-             const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
-             todasFiliais.forEach(f => finalPermissionsSet.add(`acesso_filial_${f.nome}`));
-         } catch (e) {
-             console.error("ERRO MASTER: Falha ao adicionar filiais.", e);
-         }
+        masterUserPermission = true;
+        try {
+            const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
+            todasFiliais.forEach(f => finalPermissionsSet.add(`acesso_filial_${f.nome}`));
+        } catch (e) {
+            console.error("ERRO MASTER: Falha ao adicionar filiais.", e);
+        }
     }
-    
+
     userPermissions = Array.from(finalPermissionsSet);
-    
+
     // LOG FINAL
     console.log("Permissões FINAIS (Saneadas e Implícitas):", userPermissions);
 }
@@ -101,10 +101,10 @@ function hasPermission(permission) {
     if (masterUserPermission) {
         return true;
     }
-    
+
     // 🚨 FIX CRÍTICO: Garante que a permissão procurada está sempre saneada.
     const requiredPermission = permission.trim().toLowerCase();
-    
+
     // O array userPermissions já é populado com .trim().toLowerCase() na loadUserPermissions
     return userPermissions.includes(requiredPermission);
 }
@@ -112,28 +112,28 @@ function hasPermission(permission) {
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
 async function supabaseRequest(endpoint, method = 'GET', data = null, includeFilialFilter = true, upsert = false) {
-    
+
     // Separa o endpoint base dos filtros existentes
     const [nomeEndpointBase, filtrosExistentes] = endpoint.split('?', 2);
-    
+
     // Constrói a URL começando com o proxy e o endpoint base
-    let url = `${SUPABASE_PROXY_URL}?endpoint=${nomeEndpointBase}`; 
-    
+    let url = `${SUPABASE_PROXY_URL}?endpoint=${nomeEndpointBase}`;
+
     // 🚨 CORREÇÃO CRÍTICA APLICADA NOVAMENTE: 
     // Adiciona flag de upsert. Esta é uma QUERY PARAMETER do PROXY, não um filtro do Supabase.
     if (method === 'POST' && upsert) {
         url += '&upsert=true';
     }
-    
+
     // Adiciona filtros existentes se houver
     if (filtrosExistentes) {
         url += `&${filtrosExistentes}`;
     }
-    
+
     // 🚨 CORREÇÃO CRÍTICA: expedition_items TEM campo filial mas é preenchido via trigger 🚨
     const tablesWithoutFilialField = [
         'acessos',
-        'grupos_acesso', 
+        'grupos_acesso',
         'permissoes_grupo',
         'permissoes_sistema',
         'gps_tracking',
@@ -141,76 +141,76 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
         'pontos_interesse',
         'filiais'
     ];
-    
+
     // Tabelas que têm campo filial mas não devem receber no payload (trigger cuida)
     const tablesWithTriggerFilial = [
         'expedition_items' // Tem trigger que preenche automaticamente
     ];
-    
+
     // 🚨 FILTRO DE FILIAL EM GET (LEITURA) 🚨
-    if (includeFilialFilter && selectedFilial && method === 'GET' && 
-        !tablesWithoutFilialField.includes(nomeEndpointBase) && 
+    if (includeFilialFilter && selectedFilial && method === 'GET' &&
+        !tablesWithoutFilialField.includes(nomeEndpointBase) &&
         !tablesWithTriggerFilial.includes(nomeEndpointBase)) {
         url += `&filial=eq.${selectedFilial.nome}`;
     }
-    
+
     // Configura as opções da requisição
-    const options = { 
-        method, 
-        headers: { 
+    const options = {
+        method,
+        headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
-        } 
-    }; 
-    
+        }
+    };
+
     // 🚨 PROCESSAMENTO DO PAYLOAD - NÃO ENVIAR FILIAL PARA expedition_items 🚨
-    if (data && (method === 'POST' || method === 'PATCH' || method === 'PUT')) { 
+    if (data && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
         let payload = data;
-        
+
         // Para expedition_items, NUNCA envia o campo filial (o trigger cuida)
         if (nomeEndpointBase === 'expedition_items') {
             if (Array.isArray(payload)) {
                 payload = payload.map(item => {
-                    const cleanItem = {...item};
+                    const cleanItem = { ...item };
                     delete cleanItem.filial; // Remove completamente o campo filial
                     delete cleanItem.nome_filial; // Remove se existir
                     return cleanItem;
                 });
             } else {
-                payload = {...payload};
+                payload = { ...payload };
                 delete payload.filial; // Remove completamente o campo filial
                 delete payload.nome_filial; // Remove se existir
             }
-        } 
+        }
         // Para outras tabelas que precisam de filial, injeta o valor
-        else if (includeFilialFilter && selectedFilial && 
-                 !tablesWithoutFilialField.includes(nomeEndpointBase) && 
-                 !tablesWithTriggerFilial.includes(nomeEndpointBase)) {
+        else if (includeFilialFilter && selectedFilial &&
+            !tablesWithoutFilialField.includes(nomeEndpointBase) &&
+            !tablesWithTriggerFilial.includes(nomeEndpointBase)) {
             if (Array.isArray(data)) {
-                payload = data.map(item => ({ 
-                    ...item, 
-                    filial: selectedFilial.nome 
+                payload = data.map(item => ({
+                    ...item,
+                    filial: selectedFilial.nome
                 }));
             } else {
-                payload = { 
-                    ...data, 
-                    filial: selectedFilial.nome 
-                }; 
+                payload = {
+                    ...data,
+                    filial: selectedFilial.nome
+                };
             }
         }
-        
+
         // Converte o payload para JSON string
         options.body = JSON.stringify(payload);
-        
+
         // Log do payload para debug
         console.log(`[supabaseRequest] Payload sendo enviado para ${nomeEndpointBase}:`, payload);
-    } 
-    
+    }
+
     // Configura header Prefer para retornar dados após operação
     if (method === 'PATCH' || method === 'POST') {
         options.headers.Prefer = 'return=representation';
     }
-    
+
     // Se for upsert, adiciona a preferência específica
     // O PROXY já lida com esta flag, mas é bom ter uma verificação final
     if (method === 'POST' && upsert) {
@@ -224,21 +224,21 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
             hasFilialFilter: includeFilialFilter,
             selectedFilial: selectedFilial?.nome
         });
-        
+
         // Faz a requisição
         const response = await fetch(url, options);
-        
+
         // Tratamento de erros HTTP
         if (!response.ok) {
             const errorText = await response.text();
             let errorMessage = `Erro ${response.status}: ${errorText}`;
-            
+
             try {
                 const errorJson = JSON.parse(errorText);
-                
+
                 if (response.status === 400) {
                     console.error('[supabaseRequest] Erro 400 detalhado:', errorJson);
-                    
+
                     if (errorJson.message && errorJson.message.includes('Tentativa de inserir campo \'filial\'')) {
                         errorMessage = `Erro: O campo filial está sendo enviado incorretamente para ${nomeEndpointBase}`;
                     } else if (errorJson.message && errorJson.message.includes('nome_filial')) {
@@ -257,20 +257,20 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
                 } else {
                     errorMessage = `Erro ${response.status}: ${errorJson.message || errorText}`;
                 }
-            } catch (e) { 
+            } catch (e) {
                 console.error('Erro ao fazer parse da resposta de erro:', e);
             }
-            
+
             throw new Error(errorMessage);
         }
-        
+
         // Processa a resposta bem-sucedida
         const contentType = response.headers.get('content-type');
-        
+
         if (method === 'DELETE' || response.status === 204 || !contentType?.includes('application/json')) {
             return null;
         }
-        
+
         try {
             const responseData = await response.json();
             console.log(`[supabaseRequest] Sucesso:`, {
@@ -282,13 +282,13 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
             console.error('[supabaseRequest] Erro ao fazer parse do JSON:', jsonError);
             return null;
         }
-        
+
     } catch (error) {
         console.error(`[supabaseRequest] Falha na requisição:`, error);
-        
+
         if (typeof showNotification === 'function') {
             let userMessage = 'Erro de comunicação com o servidor.';
-            
+
             if (error.message.includes('401')) {
                 userMessage = 'Erro de autenticação. Faça login novamente.';
             } else if (error.message.includes('400')) {
@@ -296,129 +296,54 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
             } else if (error.message.includes('Failed to fetch')) {
                 userMessage = 'Sem conexão com o servidor.';
             }
-            
+
             showNotification(userMessage, 'error');
         }
-        
+
         throw error;
     }
 }
-        // NOVO: Função de notificação aprimorada
-        function showNotification(message, type = 'info', timeout = 4000) {
-            const container = document.getElementById('notificationContainer');
-            if (!container) return;
+// NOVO: Função de notificação aprimorada
+function showNotification(message, type = 'info', timeout = 4000) {
+    const container = document.getElementById('notificationContainer');
+    if (!container) return;
 
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            
-            let icon = '';
-            let title = '';
-            if (type === 'success') {
-                icon = '<i data-feather="check-circle" class="h-5 w-5 mr-2"></i>';
-                title = 'Sucesso!';
-            } else if (type === 'error') {
-                icon = '<i data-feather="x-circle" class="h-5 w-5 mr-2"></i>';
-                title = 'Erro!';
-            } else if (type === 'info') {
-                icon = '<i data-feather="info" class="h-5 w-5 mr-2"></i>';
-                title = 'Informação';
-            }
-            
-            notification.innerHTML = `
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+
+    let icon = '';
+    let title = '';
+    if (type === 'success') {
+        icon = '<i data-feather="check-circle" class="h-5 w-5 mr-2"></i>';
+        title = 'Sucesso!';
+    } else if (type === 'error') {
+        icon = '<i data-feather="x-circle" class="h-5 w-5 mr-2"></i>';
+        title = 'Erro!';
+    } else if (type === 'info') {
+        icon = '<i data-feather="info" class="h-5 w-5 mr-2"></i>';
+        title = 'Informação';
+    }
+
+    notification.innerHTML = `
                 <div class="notification-header">
                     ${icon}
                     <span>${title}</span>
                 </div>
                 <div class="notification-body">${message}</div>
             `;
-            
-            container.appendChild(notification);
-            feather.replace();
 
-            setTimeout(() => {
-                notification.classList.add('hide');
-                notification.addEventListener('animationend', () => notification.remove());
-            }, timeout);
-        }
+    container.appendChild(notification);
+    feather.replace();
 
-   
-
-// SUBSTITUIR A VERSÃO EXISTENTE DE showView (Aprox. linha 200 no script.js)
-function showView(viewId, element) {
-  
-    const permission = element.dataset.permission; 
-    
-    // 🚨 FIX CRÍTICO: Aplica o mapeamento de permissão para garantir que a checagem dupla funcione 🚨
-    let checkPermission = permission;
-    if (permission && permission.startsWith('acesso_')) {
-        // Tenta checar o termo original do HTML ('acesso_faturamento')
-        checkPermission = permission;
-    } else if (permission) {
-     
-        const mappedPermission = permission.replace('acesso_', 'view_');
-        
-        
-        if (!hasPermission(permission) && hasPermission(mappedPermission)) {
-            checkPermission = mappedPermission;
-        } else {
-            checkPermission = permission; // Volta para o original se o mapeado não ajudar
-        }
-    }
-
-
-    // 1. Verificar permissão usando o termo ajustado/mapeado
-    if (checkPermission && !hasPermission(checkPermission)) {
-        // Para garantir, fazemos a checagem dupla manual novamente:
-        const alternativePermission = checkPermission.startsWith('acesso_') ? 
-            checkPermission.replace('acesso_', 'view_') : 
-            checkPermission; // Se for 'view_', mantém
-
-        if (checkPermission !== alternativePermission && hasPermission(alternativePermission)) {
-             // O usuário tem a permissão 'view_', então o acesso é permitido.
-             // Não fazemos nada e o fluxo continua.
-        } else {
-             // A checagem falhou e não há alternativa válida no array de permissões.
-             showNotification('Você não tem permissão para acessar esta aba.', 'error');
-             return;
-        }
-    }
-
-    // A partir daqui, o acesso está liberado:
-    document.querySelectorAll('.view-content').forEach(view => view.classList.remove('active'));
-    document.getElementById(viewId).classList.add('active');
-
-    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    if(element) element.classList.add('active');
-
-   // Limpa timers antigos ao trocar de view para não sobrecarregar
-    Object.values(activeTimers).forEach(clearInterval);
-    activeTimers = {};
-
-    // Limpa timer específico do rastreio
-    if (rastreioTimer) {
-        clearInterval(rastreioTimer);
-        rastreioTimer = null;
-    }
-
-    // Limpa timer específico do mapa da home
-    if (homeMapTimer) {
-        clearInterval(homeMapTimer);
-        homeMapTimer = null;
-    }
-
-    // Carrega os dados da view selecionada
-    switch(viewId) {
-        case 'home': loadHomeData(); break;
-        case 'transporte': loadTransportList(); break;
-        case 'faturamento': loadFaturamento(); break;
-        case 'motoristas': loadMotoristaTab(); break;
-        case 'acompanhamento': loadAcompanhamento(); break;
-        case 'historico': loadHistorico(); break;
-        case 'configuracoes': loadConfiguracoes(); break;
-        case 'operacao': loadOperacao(); break;
-    }
-    feather.replace(); // Redesenha os ícones
+    setTimeout(() => {
+        notification.classList.add('hide');
+        notification.addEventListener('animationend', () => notification.remove());
+    }, timeout);
 }
+
+
+
+
 
 // NOVO: Função para determinar e aplicar o acesso à filial
 async function determineFilialAccess() {
@@ -442,16 +367,16 @@ async function determineFilialAccess() {
 }
 
 
-       // SUBSTITUIR A VERSÃO EXISTENTE DE loadFiliais
+// SUBSTITUIR A VERSÃO EXISTENTE DE loadFiliais
 async function loadFiliais() {
     try {
         // 1. Carrega TODAS as filiais ativas para cache
         const filiaisData = await supabaseRequest('filiais?select=nome,descricao,ativo,latitude_cd,longitude_cd&ativo=eq.true&order=nome', 'GET', null, false);
         filiais = filiaisData || [];
-        
+
         // 2. Determina quais filiais o usuário pode acessar e decide se redireciona
         await determineFilialAccess();
-        
+
     } catch (error) {
         document.getElementById('filiaisGrid').innerHTML = `<p class="text-red-500">Erro ao carregar dados de filiais.</p>`;
     }
@@ -479,35 +404,35 @@ async function selectFilial(filial) {
         showNotification('Erro ao carregar dados da filial. Verifique as configurações.', 'error');
         return;
     }
-    
+
     document.getElementById('sidebarFilial').textContent = selectedFilial.nome;
-    
+
     // 1. Inicia a transição para a tela principal
     await showMainSystem();
-    
+
     // 2. Carrega todos os dados estáticos e dinâmicos (abas)
     await loadAllTabData();
-    await loadPontosInteresse();
+    if (window.loadPontosInteresse) await window.loadPontosInteresse();
 
     // 🚨 NOVO FIX: Filtra as sub-abas ANTES de filtrar as abas principais 🚨
     filterSubTabs();
-    
+
     // 3. Filtra as abas de navegação e determina qual a primeira a ser mostrada
-    const firstPermittedViewId = filterNavigationMenu(); 
+    const firstPermittedViewId = filterNavigationMenu();
 
     if (firstPermittedViewId) {
         // Mostra a primeira aba permitida
         const firstNavItem = document.querySelector(`.nav-item[href="#${firstPermittedViewId}"]`);
-        
+
         // NOVO AJUSTE: Se a aba principal for carregada, mas todas as sub-abas forem filtradas,
         // garantimos que o conteúdo da aba principal (que agora é o container de sub-abas)
         // ainda mostre alguma mensagem se necessário.
-        
+
         showView(firstPermittedViewId, firstNavItem);
-        
+
         // Configura o refresh automático da Home (se for a primeira aba permitida)
         if (firstPermittedViewId === 'home') {
-             setTimeout(() => {
+            setTimeout(() => {
                 const homeAutoRefreshCheckbox = document.getElementById('homeAutoRefresh');
                 if (homeAutoRefreshCheckbox) {
                     homeAutoRefreshCheckbox.checked = true;
@@ -515,22 +440,22 @@ async function selectFilial(filial) {
                 }
             }, 2000);
         }
-        
+
     } else {
         // Se não houver nenhuma permissão de aba (erro de acesso final)
         document.getElementById('home').classList.add('active'); // Garante que a div está visível
         document.getElementById('home').innerHTML = '<div class="alert alert-error">Seu grupo de acesso não possui permissão para visualizar nenhuma aba. Contate o administrador.</div>';
     }
-    
+
     showNotification(`Bem-vindo à filial: ${selectedFilial.nome}!`, 'success');
-    
+
     // 🚨 CHAMADA FINAL PARA GARANTIR VISIBILIDADE 🚨
     toggleFilialLinkVisibility();
 }
 
 // SUBSTITUIR A FUNÇÃO loadAllTabData COMPLETA
 async function loadAllTabData() {
-            
+
     document.getElementById('operacao').innerHTML = `
 <h1 class="text-3xl font-bold text-gray-800 mb-6">Operação</h1>
 
@@ -603,7 +528,7 @@ async function loadAllTabData() {
     </div>
 </div>
 `;
-            
+
     document.getElementById('transporte').innerHTML = `
         <h1 class="text-3xl font-bold text-gray-800 mb-6">Agrupamento e Alocação de Cargas</h1>
         <div id="availabilityInfo" class="availability-info" style="max-width: 600px; margin: 0 auto 2rem auto;">
@@ -653,7 +578,7 @@ async function loadAllTabData() {
             </div>
         </div>
     `;
-            
+
     document.getElementById('faturamento').innerHTML = `
 <h1 class="text-3xl font-bold text-gray-800 mb-6">Controle de Faturamento</h1>
 
@@ -759,7 +684,7 @@ async function loadAllTabData() {
     </div>
 `;
 
-   document.getElementById('motoristas').innerHTML = `
+    document.getElementById('motoristas').innerHTML = `
         <h1 class="text-3xl font-bold text-gray-800 mb-6">Painel de Motoristas</h1>
         <div class="sub-tabs">
             <button class="sub-tab active" onclick="showSubTab('motoristas', 'statusFrota', this)" data-permission="acesso_motoristas_status">Status da Frota</button>
@@ -985,8 +910,8 @@ async function loadAllTabData() {
     </div>
 </div>
 `;
-            
-   document.getElementById('historico').innerHTML = `
+
+    document.getElementById('historico').innerHTML = `
         <h1 class="text-3xl font-bold text-gray-800 mb-6">Histórico de Entregas</h1>
         <div class="sub-tabs">
             <button class="sub-tab active" onclick="showSubTab('historico', 'listaEntregas', this)" data-permission="acesso_historico_entregas">Entregas</button>
@@ -1089,7 +1014,7 @@ async function loadAllTabData() {
                 </div>
         </div>
     `;
-            
+
     document.getElementById('configuracoes').innerHTML = `
 <h1 class="text-3xl font-bold text-gray-800 mb-6">Configurações</h1>
 <div id="passwordFormContainer" class="transport-card max-w-md mx-auto">
@@ -1337,16 +1262,16 @@ async function loadAllTabData() {
     </div>
 </div>
 `;
-            
+
     // Adicionar event listeners aos formulários
     document.getElementById('expeditionForm').addEventListener('submit', (e) => { e.preventDefault(); lancarCarga(); });
     document.getElementById('editExpeditionForm').addEventListener('submit', (e) => { e.preventDefault(); saveEditedExpedition(); });
     document.getElementById('passwordForm').addEventListener('submit', (e) => { e.preventDefault(); checkPassword(); });
     document.getElementById('addForm').addEventListener('submit', (e) => { e.preventDefault(); handleSave(); });
     // Event listener para o formulário de autenticação de edição
-    document.getElementById('authEditForm').addEventListener('submit', (e) => { 
-        e.preventDefault(); 
-        checkAuthForEdit(); 
+    document.getElementById('authEditForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        checkAuthForEdit();
     });
 
     // Carregar dados para os selects
@@ -1355,7 +1280,7 @@ async function loadAllTabData() {
 
 
 
-        async function loadSelectData() {
+async function loadSelectData() {
     try {
         const [lojasData, docasData, veiculosData, motoristasData, lideresData] = await Promise.all([
             // Ordena lojas por código primeiro, depois por nome
@@ -1376,7 +1301,7 @@ async function loadAllTabData() {
         console.error("Erro ao carregar dados dos selects:", error);
     }
 }
-       function populateSelects() {
+function populateSelects() {
     // Ordena lojas por código localmente (garantia extra)
     const lojasOrdenadas = [...lojas].sort((a, b) => {
         // Primeiro por código, depois por nome
@@ -1387,7 +1312,7 @@ async function loadAllTabData() {
     });
 
     // Ordena docas por nome localmente (garantia extra)
-    const docasOrdenadas = [...docas].sort((a, b) => 
+    const docasOrdenadas = [...docas].sort((a, b) =>
         a.nome.localeCompare(b.nome, 'pt-BR')
     );
 
@@ -1414,7 +1339,7 @@ async function loadAllTabData() {
     // Resto da função permanece igual...
     ['dashboardPlacaSelect', 'placaMotorista'].forEach(id => {
         const placaSelect = document.getElementById(id);
-        if(placaSelect) {
+        if (placaSelect) {
             placaSelect.innerHTML = '<option value="">Selecione o veículo</option>';
             veiculos.forEach(v => {
                 placaSelect.innerHTML += `<option value="${v.id}">${v.placa} - ${v.modelo}</option>`;
@@ -1432,8 +1357,8 @@ async function loadAllTabData() {
         }
     });
 }
-        
-        function getStatusLabel(status) {
+
+function getStatusLabel(status) {
     const labels = {
         // ... (seus status existentes)
         'faturamento_iniciado': 'Faturando', 'faturado': 'Faturado',
@@ -1444,12 +1369,12 @@ async function loadAllTabData() {
     return labels[status] || status.replace(/_/g, ' ');
 }
 
-        function minutesToHHMM(minutes) {
-            if (minutes === null || isNaN(minutes) || minutes < 0) return '-';
-            const hours = Math.floor(minutes / 60);
-            const mins = Math.round(minutes % 60);
-            return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-        }
+function minutesToHHMM(minutes) {
+    if (minutes === null || isNaN(minutes) || minutes < 0) return '-';
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
 
 
 function showAuthEditModal(expeditionId) {
@@ -1458,7 +1383,7 @@ function showAuthEditModal(expeditionId) {
     document.getElementById('authEditUser').value = '';
     document.getElementById('authEditPassword').value = '';
     document.getElementById('authEditAlert').innerHTML = '';
-    
+
     // ADICIONA UM CAMPO HIDDEN COM O ID DA EXPEDIÇÃO
     let hiddenIdField = document.getElementById('authEditExpeditionId');
     if (!hiddenIdField) {
@@ -1468,7 +1393,7 @@ function showAuthEditModal(expeditionId) {
         document.getElementById('authEditForm').appendChild(hiddenIdField);
     }
     hiddenIdField.value = expeditionId;
-    
+
     document.getElementById('authEditUser').focus();
 }
 
@@ -1504,7 +1429,7 @@ async function checkAuthForEdit() {
         }
 
         const user = result[0];
-        
+
         // Verifica se o usuário tem permissão (ALL ou filial específica)
         if (user.tipo_acesso !== 'ALL' && user.tipo_acesso !== selectedFilial.nome) {
             showAlert('authEditAlert', 'Você não tem permissão para editar nesta filial.', 'error');
@@ -1514,7 +1439,7 @@ async function checkAuthForEdit() {
         // Autenticação bem-sucedida
         closeAuthEditModal();
         showNotification(`Acesso autorizado para ${user.nome}!`, 'success');
-        
+
         // Abre o modal de edição diretamente
         openEditModalDirectly(expeditionId);
 
@@ -1527,7 +1452,7 @@ async function checkAuthForEdit() {
 // SUBSTITUIR A FUNÇÃO openEditModal COMPLETA
 async function openEditModal(expeditionId) {
     const isMaster = masterUserPermission;
-    
+
     // 1. Verificar Permissão Principal: Checagem robusta de múltiplas nomenclaturas
     const requiredPermissions = [
         'edit_expeditions',     // Plural inglês (Mais comum no seu BD para ações)
@@ -1536,7 +1461,7 @@ async function openEditModal(expeditionId) {
         'view_editar_expedicao',// Prefixado (Fallback)
         'acesso_editar_expedicao' // Prefixado (Fallback)
     ];
-    
+
     let canEdit = isMaster;
 
     // Se o usuário não for MASTER, checa todas as variações da permissão de edição
@@ -1580,7 +1505,7 @@ async function openEditModal(expeditionId) {
         showNotification('Esta expedição não pode mais ser editada, pois já saiu para entrega.', 'error');
         return;
     }
-    
+
     // 3. Se não é Master, e o status é avançado, pedimos autenticação para garantir
     if (!isMaster && (expedition.status === 'faturado' || expedition.status === 'faturamento_iniciado')) {
         showNotification('Acesso a esta expedição requer autenticação adicional.', 'info');
@@ -1617,15 +1542,15 @@ async function openEditModalDirectly(expeditionId) {
         showNotification('Carregando dados...', 'info');
         await loadAcompanhamento();
     }
-    
+
     let expedition = allExpeditions ? allExpeditions.find(e => e.id === expeditionId) : null;
-    
+
     if (!expedition) {
         // Tenta buscar diretamente do banco
         try {
             const expeditions = await supabaseRequest(`expeditions?id=eq.${expeditionId}`);
             const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`);
-            
+
             if (expeditions && expeditions.length > 0) {
                 expedition = expeditions[0];
                 expedition.items = items || [];
@@ -1634,7 +1559,7 @@ async function openEditModalDirectly(expeditionId) {
             console.error('Erro ao buscar expedição:', error);
         }
     }
-    
+
     if (!expedition) {
         showNotification('Expedição não encontrada', 'error');
         return;
@@ -1645,12 +1570,12 @@ async function openEditModalDirectly(expeditionId) {
         showNotification('Esta expedição não pode mais ser editada pois já saiu para entrega.', 'error');
         return;
     }
-    
+
     document.getElementById('editExpeditionId').value = expeditionId;
-    
+
     // Preencher selects com opções
     populateEditSelects();
-    
+
     // Preencher campos editáveis (removendo status)
     document.getElementById('editMotorista').value = expedition.motorista_id || '';
     document.getElementById('editVeiculo').value = expedition.veiculo_id || '';
@@ -1661,11 +1586,11 @@ async function openEditModalDirectly(expeditionId) {
     const lojasContainer = document.getElementById('editLojasContainer');
     lojasContainer.innerHTML = '<h4 class="font-semibold text-gray-700">Lojas e Quantidades</h4>';
     editLojaLineCounter = 0;
-    
+
     if (expedition.items && expedition.items.length > 0) {
         expedition.items.forEach(item => addEditLojaLine(item));
     }
-    
+
     document.getElementById('editExpeditionModal').style.display = 'flex';
 }
 // Nova função para popular os selects do modal de edição
@@ -1699,11 +1624,11 @@ function populateEditSelects() {
     });
 }
 
-        function closeEditModal() {
-            document.getElementById('editExpeditionModal').style.display = 'none';
-        }
+function closeEditModal() {
+    document.getElementById('editExpeditionModal').style.display = 'none';
+}
 
-       // Função para adicionar uma nova linha de loja no modal de edição
+// Função para adicionar uma nova linha de loja no modal de edição
 function addEditLojaLine(item = null) {
     editLojaLineCounter++;
     const container = document.getElementById('editLojasContainer');
@@ -1711,7 +1636,7 @@ function addEditLojaLine(item = null) {
     // Ajustado para 5 colunas (Loja, Pallets, RollTrainers, Remover)
     newLine.className = 'grid grid-cols-1 md:grid-cols-5 gap-4 items-end';
     newLine.dataset.editIndex = editLojaLineCounter;
-    
+
     // Inclui campo RollTrainers (com a classe 'edit-rolls-input')
     newLine.innerHTML = `
         <div class="form-group md:col-span-2"><label>Loja:</label><select class="edit-loja-select w-full">${lojas.map(l => `<option value="${l.id}">${l.codigo} - ${l.nome}</option>`).join('')}</select></div>
@@ -1720,173 +1645,173 @@ function addEditLojaLine(item = null) {
         <div><button type="button" class="btn btn-danger btn-small w-full" onclick="removeEditLojaLine(${editLojaLineCounter})">Remover</button></div>
     `;
     container.appendChild(newLine);
-    
-    if(item) {
+
+    if (item) {
         newLine.querySelector('.edit-loja-select').value = item.loja_id;
         newLine.querySelector('.edit-pallets-input').value = item.pallets;
         // Preenche o campo RollTrainers com o valor existente
-        newLine.querySelector('.edit-rolls-input').value = item.rolltrainers || 0; 
+        newLine.querySelector('.edit-rolls-input').value = item.rolltrainers || 0;
     }
 }
-        
-        function removeEditLojaLine(index) {
-            document.querySelector(`[data-edit-index="${index}"]`)?.remove();
-        }
+
+function removeEditLojaLine(index) {
+    document.querySelector(`[data-edit-index="${index}"]`)?.remove();
+}
 
 // NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
 async function saveEditedExpedition() {
-  const expeditionId = document.getElementById('editExpeditionId').value;
-  const newVeiculo = document.getElementById('editVeiculo').value;
-  const newMotorista = document.getElementById('editMotorista').value;
-  const newDoca = document.getElementById('editDoca').value;
-  const newLider = document.getElementById('editLider').value;
-  const newObservacoes = document.getElementById('editObservacoes').value;
+    const expeditionId = document.getElementById('editExpeditionId').value;
+    const newVeiculo = document.getElementById('editVeiculo').value;
+    const newMotorista = document.getElementById('editMotorista').value;
+    const newDoca = document.getElementById('editDoca').value;
+    const newLider = document.getElementById('editLider').value;
+    const newObservacoes = document.getElementById('editObservacoes').value;
 
-  // 1. Coletar os novos dados dos itens da expedição (lojas)
-  const newItemsData = Array.from(document.querySelectorAll('#editLojasContainer .grid')).map(row => ({
-    loja_id: row.querySelector('.edit-loja-select').value,
-    pallets: parseInt(row.querySelector('.edit-pallets-input').value) || 0,
-    rolltrainers: parseInt(row.querySelector('.edit-rolls-input').value) || 0 // NOVO: Coleta RollTrainers
-  }));
+    // 1. Coletar os novos dados dos itens da expedição (lojas)
+    const newItemsData = Array.from(document.querySelectorAll('#editLojasContainer .grid')).map(row => ({
+        loja_id: row.querySelector('.edit-loja-select').value,
+        pallets: parseInt(row.querySelector('.edit-pallets-input').value) || 0,
+        rolltrainers: parseInt(row.querySelector('.edit-rolls-input').value) || 0 // NOVO: Coleta RollTrainers
+    }));
 
-  try {
-    // Encontra a expedição original
-    const originalExpedition = allExpeditions.find(e => e.id === expeditionId);
-    if (!originalExpedition) {
-      throw new Error('Expedição original não encontrada.');
-    }
-
-    // Verificar se pode editar
-    if (originalExpedition.status === 'saiu_para_entrega' || originalExpedition.status === 'entregue') {
-      throw new Error('Esta expedição não pode mais ser editada pois já saiu para entrega.');
-    }
-
-    const updatePromises = [];
-
-    // 2. Liberar recursos antigos se houve mudança
-    if (originalExpedition.motorista_id && originalExpedition.motorista_id !== newMotorista) {
-      updatePromises.push(
-        supabaseRequest(`motoristas?id=eq.${originalExpedition.motorista_id}`, 'PATCH', { status: 'disponivel' }, false)
-      );
-    }
-
-    if (originalExpedition.veiculo_id && originalExpedition.veiculo_id !== newVeiculo) {
-      updatePromises.push(
-        supabaseRequest(`veiculos?id=eq.${originalExpedition.veiculo_id}`, 'PATCH', { status: 'disponivel' }, false)
-      );
-    }
-
-    if (originalExpedition.doca_id && originalExpedition.doca_id !== newDoca) {
-      updatePromises.push(
-        supabaseRequest(`docas?id=eq.${originalExpedition.doca_id}`, 'PATCH', { status: 'disponivel' }, false)
-      );
-    }
-
-    // 3. Alocar novos recursos se foram selecionados
-    if (newMotorista && newMotorista !== originalExpedition.motorista_id) {
-      updatePromises.push(
-        supabaseRequest(`motoristas?id=eq.${newMotorista}`, 'PATCH', { status: 'em_viagem' }, false)
-      );
-    }
-
-    if (newVeiculo && newVeiculo !== originalExpedition.veiculo_id) {
-      updatePromises.push(
-        supabaseRequest(`veiculos?id=eq.${newVeiculo}`, 'PATCH', { status: 'em_uso' }, false)
-      );
-    }
-
-    if (newDoca && newDoca !== originalExpedition.doca_id) {
-      updatePromises.push(
-        supabaseRequest(`docas?id=eq.${newDoca}`, 'PATCH', { status: 'em_uso' }, false)
-      );
-    }
-
-    // 4. Atualizar os dados da expedição principal
-    const expeditionUpdatePayload = {
-      veiculo_id: newVeiculo || null,
-      motorista_id: newMotorista || null,
-      doca_id: newDoca || null,
-      lider_id: newLider || null,
-      observacoes: newObservacoes || null
-    };
-    
-    updatePromises.push(
-      supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', expeditionUpdatePayload, false)
-    );
-
-    // 5. Gerenciar os itens (lojas) da expedição
-    const originalItems = originalExpedition.items;
-
-    // Itens a serem removidos (se existiam antes e não estão mais na nova lista)
-    const itemsToRemove = originalItems.filter(originalItem =>
-      !newItemsData.some(newItem => newItem.loja_id === originalItem.loja_id)
-    );
-    for (const item of itemsToRemove) {
-      // 🚨 FIX CRÍTICO: Garante que a exclusão não envie filtro de filial (4º parâmetro = false)
-      updatePromises.push(
-        supabaseRequest(`expedition_items?id=eq.${item.id}`, 'DELETE', null, false)
-      );
-    }
-
-    // Itens a serem adicionados ou atualizados
-    for (const newItem of newItemsData) {
-      const existingItem = originalItems.find(originalItem => originalItem.loja_id === newItem.loja_id);
-      
-      if (existingItem) {
-        // Se já existe, verifica e atualiza
-        const payload = {};
-        let needsUpdate = false;
-
-        if (existingItem.pallets !== newItem.pallets) {
-          payload.pallets = newItem.pallets;
-          needsUpdate = true;
+    try {
+        // Encontra a expedição original
+        const originalExpedition = allExpeditions.find(e => e.id === expeditionId);
+        if (!originalExpedition) {
+            throw new Error('Expedição original não encontrada.');
         }
 
-        // NOVO: Verifica RollTrainers
-        if (existingItem.rolltrainers !== newItem.rolltrainers) {
-          payload.rolltrainers = newItem.rolltrainers;
-          needsUpdate = true;
+        // Verificar se pode editar
+        if (originalExpedition.status === 'saiu_para_entrega' || originalExpedition.status === 'entregue') {
+            throw new Error('Esta expedição não pode mais ser editada pois já saiu para entrega.');
         }
-        
-        if (needsUpdate) {
-            // 🚨 FIX CRÍTICO: Garante que o PATCH não envie filtro de filial (4º parâmetro = false)
+
+        const updatePromises = [];
+
+        // 2. Liberar recursos antigos se houve mudança
+        if (originalExpedition.motorista_id && originalExpedition.motorista_id !== newMotorista) {
             updatePromises.push(
-                supabaseRequest(`expedition_items?id=eq.${existingItem.id}`, 'PATCH', payload, false)
+                supabaseRequest(`motoristas?id=eq.${originalExpedition.motorista_id}`, 'PATCH', { status: 'disponivel' }, false)
             );
         }
-      } else {
-        // Se não existe, adiciona
-        const payload = {
-          expedition_id: expeditionId,
-          loja_id: newItem.loja_id,
-          pallets: newItem.pallets,
-          rolltrainers: newItem.rolltrainers,
-          status_descarga: 'pendente'
+
+        if (originalExpedition.veiculo_id && originalExpedition.veiculo_id !== newVeiculo) {
+            updatePromises.push(
+                supabaseRequest(`veiculos?id=eq.${originalExpedition.veiculo_id}`, 'PATCH', { status: 'disponivel' }, false)
+            );
+        }
+
+        if (originalExpedition.doca_id && originalExpedition.doca_id !== newDoca) {
+            updatePromises.push(
+                supabaseRequest(`docas?id=eq.${originalExpedition.doca_id}`, 'PATCH', { status: 'disponivel' }, false)
+            );
+        }
+
+        // 3. Alocar novos recursos se foram selecionados
+        if (newMotorista && newMotorista !== originalExpedition.motorista_id) {
+            updatePromises.push(
+                supabaseRequest(`motoristas?id=eq.${newMotorista}`, 'PATCH', { status: 'em_viagem' }, false)
+            );
+        }
+
+        if (newVeiculo && newVeiculo !== originalExpedition.veiculo_id) {
+            updatePromises.push(
+                supabaseRequest(`veiculos?id=eq.${newVeiculo}`, 'PATCH', { status: 'em_uso' }, false)
+            );
+        }
+
+        if (newDoca && newDoca !== originalExpedition.doca_id) {
+            updatePromises.push(
+                supabaseRequest(`docas?id=eq.${newDoca}`, 'PATCH', { status: 'em_uso' }, false)
+            );
+        }
+
+        // 4. Atualizar os dados da expedição principal
+        const expeditionUpdatePayload = {
+            veiculo_id: newVeiculo || null,
+            motorista_id: newMotorista || null,
+            doca_id: newDoca || null,
+            lider_id: newLider || null,
+            observacoes: newObservacoes || null
         };
-        // 🚨 FIX CRÍTICO: Garante que o POST não envie filtro de filial (4º parâmetro = false)
+
         updatePromises.push(
-          supabaseRequest('expedition_items', 'POST', payload, false)
+            supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', expeditionUpdatePayload, false)
         );
-      }
+
+        // 5. Gerenciar os itens (lojas) da expedição
+        const originalItems = originalExpedition.items;
+
+        // Itens a serem removidos (se existiam antes e não estão mais na nova lista)
+        const itemsToRemove = originalItems.filter(originalItem =>
+            !newItemsData.some(newItem => newItem.loja_id === originalItem.loja_id)
+        );
+        for (const item of itemsToRemove) {
+            // 🚨 FIX CRÍTICO: Garante que a exclusão não envie filtro de filial (4º parâmetro = false)
+            updatePromises.push(
+                supabaseRequest(`expedition_items?id=eq.${item.id}`, 'DELETE', null, false)
+            );
+        }
+
+        // Itens a serem adicionados ou atualizados
+        for (const newItem of newItemsData) {
+            const existingItem = originalItems.find(originalItem => originalItem.loja_id === newItem.loja_id);
+
+            if (existingItem) {
+                // Se já existe, verifica e atualiza
+                const payload = {};
+                let needsUpdate = false;
+
+                if (existingItem.pallets !== newItem.pallets) {
+                    payload.pallets = newItem.pallets;
+                    needsUpdate = true;
+                }
+
+                // NOVO: Verifica RollTrainers
+                if (existingItem.rolltrainers !== newItem.rolltrainers) {
+                    payload.rolltrainers = newItem.rolltrainers;
+                    needsUpdate = true;
+                }
+
+                if (needsUpdate) {
+                    // 🚨 FIX CRÍTICO: Garante que o PATCH não envie filtro de filial (4º parâmetro = false)
+                    updatePromises.push(
+                        supabaseRequest(`expedition_items?id=eq.${existingItem.id}`, 'PATCH', payload, false)
+                    );
+                }
+            } else {
+                // Se não existe, adiciona
+                const payload = {
+                    expedition_id: expeditionId,
+                    loja_id: newItem.loja_id,
+                    pallets: newItem.pallets,
+                    rolltrainers: newItem.rolltrainers,
+                    status_descarga: 'pendente'
+                };
+                // 🚨 FIX CRÍTICO: Garante que o POST não envie filtro de filial (4º parâmetro = false)
+                updatePromises.push(
+                    supabaseRequest('expedition_items', 'POST', payload, false)
+                );
+            }
+        }
+
+        // Executar todas as atualizações
+        await Promise.all(updatePromises);
+
+        showNotification('Expedição atualizada com sucesso!', 'success');
+        closeEditModal();
+
+        // Recarrega os dados para refletir as mudanças
+        await loadSelectData();
+        loadAcompanhamento();
+    } catch (error) {
+        console.error('Erro ao salvar edição:', error);
+        showAlert('editFormAlert', `Erro ao salvar edição: ${error.message}`, 'error');
     }
-
-    // Executar todas as atualizações
-    await Promise.all(updatePromises);
-
-    showNotification('Expedição atualizada com sucesso!', 'success');
-    closeEditModal();
-
-    // Recarrega os dados para refletir as mudanças
-    await loadSelectData();
-    loadAcompanhamento();
-  } catch (error) {
-    console.error('Erro ao salvar edição:', error);
-    showAlert('editFormAlert', `Erro ao salvar edição: ${error.message}`, 'error');
-  }
 }
-        
-       // CÓDIGO CORRIGIDO
+
+// CÓDIGO CORRIGIDO
 
 // SUBSTITUIR A FUNÇÃO deleteExpedition COMPLETA
 async function deleteExpedition(expeditionId) {
@@ -1895,7 +1820,7 @@ async function deleteExpedition(expeditionId) {
     // 1. Verificar Permissão Principal
     const requiredPermission = 'excluir_expedicao'; // Termo em português, mas mantemos o fallback
     let canDelete = isMaster || hasPermission(requiredPermission);
-    
+
     // 🚨 FIX CRÍTICO: Checa formas alternativas de permissão de ação.
     if (!canDelete) {
         // Ex: Se o BD tem o código de ação em inglês (delete_expeditions/delete_expedition)
@@ -1957,45 +1882,45 @@ async function deleteExpedition(expeditionId) {
         }
     }
 }
-        
-        // --- FUNCIONALIDADES DA ABA CONFIGURAÇÕES ---
+
+// --- FUNCIONALIDADES DA ABA CONFIGURAÇÕES ---
 
 
 // Função para mostrar detalhes da expedição
 async function showDetalhesExpedicao(expeditionId) {
     const modal = document.getElementById('detalhesExpedicaoModal');
     const content = document.getElementById('detalhesContent');
-    
+
     content.innerHTML = '<div class="loading"><div class="spinner"></div>Carregando detalhes...</div>';
     modal.style.display = 'flex';
-    
+
     try {
         // Buscar dados completos da expedição
         const expedition = await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'GET', null, false);
         const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`, 'GET', null, false);
-        
+
         if (!expedition || expedition.length === 0) {
             content.innerHTML = '<div class="alert alert-error">Expedição não encontrada.</div>';
             return;
         }
-        
+
         const exp = expedition[0];
         const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
         const motorista = motoristas.find(m => m.id === exp.motorista_id);
         const lider = lideres.find(l => l.id === exp.lider_id);
-        
+
         let planilhaHTML = '';
-        
+
         // Gerar uma página para cada loja
         if (items && items.length > 0) {
             items.forEach((item, index) => {
                 const loja = lojas.find(l => l.id === item.loja_id);
-                
+
                 // Adicionar quebra de página antes de cada loja (exceto a primeira)
                 if (index > 0) {
                     planilhaHTML += '<div style="page-break-before: always;"></div>';
                 }
-                
+
                 planilhaHTML += `
     <div class="planilha-controle">
         <!-- Cabeçalho da Loja -->
@@ -2034,11 +1959,11 @@ async function showDetalhesExpedicao(expeditionId) {
                 </div>
                 <div class="planilha-row" style="margin-bottom: 6px;">
                     <div class="planilha-cell" style="width: 120px;">INÍCIO CARREG.:</div>
-                    <div class="planilha-value">${exp.data_chegada_veiculo ? new Date(exp.data_chegada_veiculo).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : 'N/A'}</div>
+                    <div class="planilha-value">${exp.data_chegada_veiculo ? new Date(exp.data_chegada_veiculo).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
                 </div>
                 <div class="planilha-row" style="margin-bottom: 6px;">
                     <div class="planilha-cell" style="width: 120px;">FIM CARREG.:</div>
-                    <div class="planilha-value">${exp.data_saida_veiculo ? new Date(exp.data_saida_veiculo).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : 'N/A'}</div>
+                    <div class="planilha-value">${exp.data_saida_veiculo ? new Date(exp.data_saida_veiculo).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
                 </div>
             </div>
         </div>
@@ -2063,9 +1988,9 @@ async function showDetalhesExpedicao(expeditionId) {
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
                     <div class="planilha-cell" style="padding: 8px;">CHEGADA NA LOJA:</div>
-                    <div class="planilha-value" style="padding: 8px;">${item.data_inicio_descarga ? new Date(item.data_inicio_descarga).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : 'N/A'}</div>
+                    <div class="planilha-value" style="padding: 8px;">${item.data_inicio_descarga ? new Date(item.data_inicio_descarga).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
                     <div class="planilha-cell" style="padding: 8px;">SAÍDA DA LOJA:</div>
-                    <div class="planilha-value" style="padding: 8px;">${item.data_fim_descarga ? new Date(item.data_fim_descarga).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : 'N/A'}</div>
+                    <div class="planilha-value" style="padding: 8px;">${item.data_fim_descarga ? new Date(item.data_fim_descarga).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
                 </div>
             </div>
         ` : ''}
@@ -2081,9 +2006,9 @@ async function showDetalhesExpedicao(expeditionId) {
                 </div>
             `;
         }
-        
+
         content.innerHTML = planilhaHTML;
-        
+
     } catch (error) {
         console.error('Erro ao carregar detalhes:', error);
         content.innerHTML = '<div class="alert alert-error">Erro ao carregar detalhes da expedição.</div>';
@@ -2116,7 +2041,7 @@ async function handleInitialLogin(event) {
     event.preventDefault();
     // ✅ AJUSTE APLICADO: Use .trim() na senha para remover espaços em branco
     const nome = document.getElementById('initialUser').value.trim();
-    const senha = document.getElementById('initialPassword').value.trim(); 
+    const senha = document.getElementById('initialPassword').value.trim();
     const alertContainer = document.getElementById('initialLoginAlert');
 
     if (!nome || !senha) {
@@ -2133,19 +2058,19 @@ async function handleInitialLogin(event) {
         // A URL final que o proxy da Vercel receberá será: /api/proxy?endpoint=acessos&select=...
         const nomeEndpointBase = 'acessos';
         const filtros = `select=id,nome,grupo_id&nome=eq.${nome}&senha=eq.${senha}`;
-        
+
         const authUrl = `${SUPABASE_PROXY_URL}?endpoint=${nomeEndpointBase}&${filtros}`;
-        
+
         const authResponse = await fetch(authUrl, {
             method: 'GET',
-            headers: headers 
+            headers: headers
         });
 
         if (!authResponse.ok) {
             const errorText = await authResponse.text();
             throw new Error(`Erro ${authResponse.status} na autenticação: ${errorText}`);
         }
-        
+
         const result = await authResponse.json();
 
         // VALIDAÇÃO CRÍTICA: Se a resposta for vazia, significa falha na autenticação
@@ -2163,7 +2088,7 @@ async function handleInitialLogin(event) {
 
         // 1. Carregar as permissões do usuário (Grupo + Individual)
         await loadUserPermissions(currentUser.id, currentUser.grupoId);
-        
+
         // 2. Se o usuário é Master, ele ganha acesso a todas as filiais
         if (masterUserPermission) {
             const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
@@ -2171,14 +2096,14 @@ async function handleInitialLogin(event) {
         }
 
         // 3. Carrega as filiais ativas e determina o acesso/redirecionamento
-        await loadFiliais(); 
+        await loadFiliais();
 
         showNotification(`Bem-vindo, ${currentUser.nome}!`, 'success');
 
     } catch (err) {
         let msg = 'Erro ao verificar credenciais. Verifique a conexão.';
         if (err.message.includes('401')) {
-             msg = `Erro crítico (401). Verifique se a sua chave 'SUPABASE_ANON_KEY' está incorreta.`;
+            msg = `Erro crítico (401). Verifique se a sua chave 'SUPABASE_ANON_KEY' está incorreta.`;
         }
         alertContainer.innerHTML = `<div class="alert alert-error">${msg}</div>`;
         console.error(err);
@@ -2192,7 +2117,7 @@ async function showMainSystem() {
     document.getElementById('filialSelectionContainer').style.display = 'none';
     // Exibe a tela principal
     document.getElementById('mainSystem').style.display = 'flex';
-    
+
     // 🚨 NOVO: Garante que a visibilidade do link 'Trocar Filial' seja checada no momento da exibição
     toggleFilialLinkVisibility();
 }
@@ -2212,15 +2137,15 @@ function showAddGroupForm(grupo = null) {
     const title = document.getElementById('addFormTitle');
     const fieldsContainer = document.getElementById('addFormFields');
     fieldsContainer.innerHTML = '';
-    
+
     title.textContent = grupo ? `Editar Grupo: ${grupo.nome}` : `Adicionar Novo Grupo`;
-    
+
     // O campo 'grupo' é para salvar via handleSave.
     fieldsContainer.innerHTML = `
         ${grupo ? `<input type="hidden" id="edit_grupo_id" value="${grupo.id}">` : ''}
         <div class="form-group"><label>Nome do Grupo:</label><input type="text" id="add_nome" value="${grupo ? grupo.nome : ''}" required></div>
     `;
-    
+
     modal.style.display = 'flex';
 }
 
@@ -2231,7 +2156,7 @@ async function saveGroup() {
     const nome = document.getElementById('add_nome').value;
 
     const data = { nome };
-    
+
     if (isEdit) {
         await supabaseRequest(`grupos_acesso?id=eq.${grupoId}`, 'PATCH', data, false);
         showNotification('Grupo atualizado com sucesso!', 'success');
@@ -2290,17 +2215,17 @@ async function managePermissionsModal(targetId, targetName, targetType) {
         // 1. Buscar todas as permissões base do sistema e filiais
         const allPermissionsBase = await supabaseRequest('permissoes_sistema?ativa=eq.true&order=categoria,nome', 'GET', null, false);
         const allFiliais = await supabaseRequest('filiais?ativo=eq.true&order=nome', 'GET', null, false);
-        
+
         // 🚨 FIX CRÍTICO: ADICIONAR PERMISSÕES DE SUB-ABA MANUALMENTE 🚨
         let allPermissions = [...allPermissionsBase];
-        
+
         // Mapeia todas as permissões de sub-aba do hardcoded map
         for (const viewId in subTabPermissionMap) {
             for (const subTabId in subTabPermissionMap[viewId]) {
                 const code = subTabPermissionMap[viewId][subTabId];
                 const name = subTabId.replace(/([A-Z])/g, ' $1').toLowerCase(); // Transforma 'faturamentoAtivo' em 'faturamento ativo'
                 const viewNome = viewId.charAt(0).toUpperCase() + viewId.slice(1);
-                
+
                 // Cria um objeto no formato esperado pela renderização
                 allPermissions.push({
                     codigo: code,
@@ -2310,7 +2235,7 @@ async function managePermissionsModal(targetId, targetName, targetType) {
                 });
             }
         }
-        
+
         // Classifica novamente a lista completa por categoria e nome
         allPermissions.sort((a, b) => {
             if (a.categoria !== b.categoria) {
@@ -2320,12 +2245,12 @@ async function managePermissionsModal(targetId, targetName, targetType) {
             }
             return a.nome.localeCompare(b.nome);
         });
-        
+
         // Fim do bloco de construção da lista mestra
         // ====================================================================
 
         let currentPermissions = [];
-        let isReadOnly = targetType !== 'grupo'; 
+        let isReadOnly = targetType !== 'grupo';
 
         if (targetType === 'grupo') {
             const result = await supabaseRequest(`permissoes_grupo?grupo_id=eq.${targetId}&select=permissao`, 'GET', null, false);
@@ -2342,15 +2267,15 @@ async function managePermissionsModal(targetId, targetName, targetType) {
 
         let html = '';
         let currentCategory = '';
-        
+
         const saveButton = document.querySelector('#permissionsModal .btn-success');
         if (saveButton) saveButton.style.display = isReadOnly ? 'none' : 'block';
-        
+
         // ====================================================================
         // A) RENDERIZAR PERMISSÕES DE ACESSO À FILIAL
         // ====================================================================
         html += `<h4 class="font-bold text-lg text-gray-700 mt-4 mb-2 border-b pb-1">Acessos de Filial</h4>`;
-        
+
         allFiliais.forEach(filial => {
             const permissionCode = `acesso_filial_${filial.nome}`;
             const permissao = { codigo: permissionCode, nome: `Filial ${filial.nome} (${filial.descricao})`, descricao: `Permissão de login na Filial ${filial.nome}` };
@@ -2368,7 +2293,7 @@ async function managePermissionsModal(targetId, targetName, targetType) {
                 </div>
             `;
         });
-        
+
         // ====================================================================
         // B) RENDERIZAR OUTRAS PERMISSÕES DO SISTEMA (ABAS, SUB-ABAS, AÇÕES)
         // ====================================================================
@@ -2381,7 +2306,7 @@ async function managePermissionsModal(targetId, targetName, targetType) {
                     html += `<h4 class="font-bold text-lg text-gray-700 mt-4 mb-2 border-b pb-1">${p.categoria}</h4>`;
                 }
             }
-            
+
             const isChecked = currentPermissions.includes(p.codigo);
             const statusDisplay = isChecked ? '<span class="text-green-600 font-bold">PERMITIDO</span>' : '<span class="text-red-600 font-bold">NEGADO</span>';
 
@@ -2411,14 +2336,14 @@ async function savePermissions() {
     const checkboxes = document.querySelectorAll('#permissionsList input[type="checkbox"]');
     const alert = document.getElementById('permissionsAlert');
     alert.innerHTML = '';
-    
+
     // Apenas grupos podem ter permissões salvas. Usuários são apenas para visualização.
     if (targetType !== 'grupo') {
         showNotification('Permissões de usuário individual não são mais permitidas. Use apenas Grupos.', 'error');
         closePermissionsModal();
         return;
     }
-    
+
     try {
         await saveGroupPermissions(targetId, checkboxes, alert);
 
@@ -2435,7 +2360,7 @@ async function savePermissions() {
 async function saveGroupPermissions(grupoId, checkboxes, alert) {
     const permissionsToSave = [];
     const permissionsToRemove = [];
-    
+
     checkboxes.forEach(cb => {
         const code = cb.dataset.permissionCode;
         if (cb.checked) {
@@ -2460,7 +2385,7 @@ async function saveGroupPermissions(grupoId, checkboxes, alert) {
 function renderFiliaisSelection(allowedFiliais) {
     const grid = document.getElementById('filiaisGrid');
     grid.innerHTML = '';
-    
+
     allowedFiliais.forEach(filial => {
         const card = document.createElement('div');
         card.className = 'filial-card';
@@ -2478,22 +2403,22 @@ function filterNavigationMenu() {
 
     navItems.forEach(item => {
         const href = item.getAttribute('href');
-        
+
         // 🚨 FIX CRÍTICO: Garante que o item de navegação possui um href válido.
         if (!href || href.length <= 1) {
-             item.style.display = 'none'; // Esconde o item inválido para segurança
-             return;
+            item.style.display = 'none'; // Esconde o item inválido para segurança
+            return;
         }
-        
+
         const viewId = href.substring(1);
         const htmlPermission = item.dataset.permission; // Ex: 'acesso_faturamento'
-        
+
         let isPermitted = true;
 
         if (htmlPermission) {
             // 1. Checa a permissão principal (incluindo o mapeamento 'view_')
             let isPrincipalPermitted = hasPermission(htmlPermission);
-            
+
             if (!isPrincipalPermitted) {
                 // Tenta checar a permissão mapeada do BD ('acesso_' -> 'view_')
                 const mappedPermission = htmlPermission.replace('acesso_', 'view_');
@@ -2501,7 +2426,7 @@ function filterNavigationMenu() {
                     isPrincipalPermitted = true;
                 }
             }
-            
+
             isPermitted = isPrincipalPermitted;
 
             // 2. Se for uma aba com sub-abas, aplica o filtro de sub-abas (só se a principal já estiver OK)
@@ -2512,12 +2437,12 @@ function filterNavigationMenu() {
                     isPermitted = false;
                 }
             }
-        } 
-        
+        }
+
         if (!isPermitted) {
             item.style.display = 'none';
         } else {
-            item.style.display = 'flex'; 
+            item.style.display = 'flex';
             if (!firstPermittedViewId) {
                 firstPermittedViewId = viewId;
             }
@@ -2531,19 +2456,19 @@ function filterSubTabs() {
     const subTabItems = document.querySelectorAll('.sub-tab');
 
     subTabItems.forEach(item => {
-        const htmlPermission = item.dataset.permission; 
-        
+        const htmlPermission = item.dataset.permission;
+
         if (!htmlPermission) {
             // Se não houver data-permission, assume que deve aparecer (ex: botão de filtro, etc.)
-            item.style.display = 'flex'; 
+            item.style.display = 'flex';
             return;
         }
 
         let isPermitted = false;
-        
+
         // O valor do 'onclick' é o viewId (ex: 'faturamentoAtivo')
         const viewIdMatch = item.getAttribute('onclick').match(/'([^']*)','([^']*)'/);
-        const subTabContentId = viewIdMatch ? viewIdMatch[2] : null; 
+        const subTabContentId = viewIdMatch ? viewIdMatch[2] : null;
 
         // 1. Checa a permissão conforme está no HTML (Ex: 'acesso_faturamento_ativo')
         if (hasPermission(htmlPermission)) {
@@ -2558,7 +2483,7 @@ function filterSubTabs() {
 
         if (!isPermitted) {
             item.style.display = 'none';
-            
+
             // Garante que o conteúdo da sub-aba também seja escondido se for a aba ativa
             if (subTabContentId) {
                 const subTabContent = document.getElementById(subTabContentId);
@@ -2578,7 +2503,7 @@ async function loadFaturamentoData(subTabName = 'faturamentoAtivo') {
     if (!container) return;
 
     if (subTabName === 'faturamentoAtivo') {
-         container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expedições...</div>`;
+        container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expedições...</div>`;
 
         try {
             // AJUSTE CRÍTICO: Incluir 'em_carregamento' e 'carregado' (e o novo status)
@@ -2590,9 +2515,9 @@ async function loadFaturamentoData(subTabName = 'faturamentoAtivo') {
                 const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
                 const motorista = exp.motorista_id ? motoristas.find(m => m.id === exp.motorista_id) : null;
                 const expItems = items.filter(item => item.expedition_id === exp.id);
-                
+
                 return {
-                    ...exp, 
+                    ...exp,
                     veiculo_placa: veiculo?.placa || 'N/A',
                     motorista_nome: motorista?.nome || 'N/A',
                     lojas_count: expItems.length,
@@ -2601,10 +2526,10 @@ async function loadFaturamentoData(subTabName = 'faturamentoAtivo') {
                     total_rolltrainers: expItems.reduce((sum, item) => sum + (item.rolltrainers || 0), 0)
                 };
             });
-            
+
             updateFaturamentoStats(expeditionsWithItems);
             renderFaturamentoList(expeditionsWithItems);
-            
+
         } catch (error) {
             container.innerHTML = `<div class="alert alert-error">Erro ao carregar lista de faturamento: ${error.message}</div>`;
         }
@@ -2616,28 +2541,28 @@ async function loadFaturamentoData(subTabName = 'faturamentoAtivo') {
 function applyMotoristaStatusFilter() {
     const filterValue = document.getElementById('motoristaStatusFilter').value;
     const allMotoristas = window.motoristasDataCache || [];
-    
+
     let filteredList = allMotoristas;
 
     if (filterValue) {
         // Trata múltiplos status separados por vírgula (Ex: retornando_cd,retornando_com_imobilizado)
         const statuses = filterValue.split(',').map(s => s.trim());
-        
+
         if (statuses.length > 0 && statuses[0]) {
             // Filtra motoristas cujos status estão na lista de filtros
             filteredList = allMotoristas.filter(m => statuses.includes(m.displayStatus));
         }
     }
-    
+
     const listContainer = document.getElementById('motoristaListFiltered');
-    if(listContainer) {
+    if (listContainer) {
         listContainer.innerHTML = renderMotoristasListHtml(filteredList);
     }
-    
+
     // Garante que os timers sejam reiniciados apenas para os motoristas visíveis
     filteredList.forEach(m => {
         if (m.activeExp && m.displayStatus === 'saiu_para_entrega') {
-             startMotoristaTimer(m);
+            startMotoristaTimer(m);
         }
     });
 }
@@ -2645,32 +2570,32 @@ function applyMotoristaStatusFilter() {
 // NOVO CÓDIGO: Função auxiliar para iniciar o timer do motorista (extraída para limpeza)
 function startMotoristaTimer(m) {
     const timerId = `motorista_${m.id}`;
-    if(activeTimers[timerId]) clearInterval(activeTimers[timerId]);
-    
+    if (activeTimers[timerId]) clearInterval(activeTimers[timerId]);
+
     activeTimers[timerId] = setInterval(() => {
         let tempoEmLoja = 0, tempoDeslocamento = 0;
         let lastEventTime = new Date(m.activeExp.data_saida_entrega);
 
-        m.activeExp.items.sort((a,b) => new Date(a.data_inicio_descarga) - new Date(b.data_inicio_descarga)).forEach(item => {
-            if(item.data_inicio_descarga) {
-               const inicio = new Date(item.data_inicio_descarga);
-               tempoDeslocamento += (inicio - lastEventTime);
-               if(item.data_fim_descarga) {
-                   const fim = new Date(item.data_fim_descarga);
-                   tempoEmLoja += (fim - inicio);
-                   lastEventTime = fim;
-               } else {
-                   tempoEmLoja += (new Date() - inicio);
-                   lastEventTime = new Date();
-               }
+        m.activeExp.items.sort((a, b) => new Date(a.data_inicio_descarga) - new Date(b.data_inicio_descarga)).forEach(item => {
+            if (item.data_inicio_descarga) {
+                const inicio = new Date(item.data_inicio_descarga);
+                tempoDeslocamento += (inicio - lastEventTime);
+                if (item.data_fim_descarga) {
+                    const fim = new Date(item.data_fim_descarga);
+                    tempoEmLoja += (fim - inicio);
+                    lastEventTime = fim;
+                } else {
+                    tempoEmLoja += (new Date() - inicio);
+                    lastEventTime = new Date();
+                }
             }
         });
-        
+
         const elLoja = document.getElementById(`loja_timer_${m.id}`);
         const elDesloc = document.getElementById(`desloc_timer_${m.id}`);
 
-        if(elLoja) elLoja.textContent = `Loja: ${minutesToHHMM(tempoEmLoja / 60000)}`;
-        if(elDesloc) elDesloc.textContent = `Desloc.: ${minutesToHHMM(tempoDeslocamento / 60000)}`;
+        if (elLoja) elLoja.textContent = `Loja: ${minutesToHHMM(tempoEmLoja / 60000)}`;
+        if (elDesloc) elDesloc.textContent = `Desloc.: ${minutesToHHMM(tempoDeslocamento / 60000)}`;
 
     }, 1000);
 }
@@ -2733,13 +2658,13 @@ async function openImprimirIdentificacaoModal(expeditionId) {
         lojaList.innerHTML = lojasHtml;
 
     } catch (error) {
-         // Se der erro ao buscar, mostra no local da lista e fecha o modal se precisar
+        // Se der erro ao buscar, mostra no local da lista e fecha o modal se precisar
         lojaList.innerHTML = `<div class="alert alert-error">Erro ao carregar lojas: ${error.message}</div>`;
-         // Se o modal já estiver visível por algum motivo, esconde
-         if (modal.style.display === 'flex') {
-             // Pode adicionar um botão para fechar ou fechar automaticamente
-             setTimeout(closePrintIdentificationModal, 3000);
-         }
+        // Se o modal já estiver visível por algum motivo, esconde
+        if (modal.style.display === 'flex') {
+            // Pode adicionar um botão para fechar ou fechar automaticamente
+            setTimeout(closePrintIdentificationModal, 3000);
+        }
     }
 }
 
@@ -2749,14 +2674,14 @@ function closePrintIdentificationModal() {
 
 async function handlePrintChoice(lojaId) {
     const expeditionId = document.getElementById('currentPrintExpeditionId').value;
-    
+
     // 1. Busca informações adicionais necessárias para a impressão
     const expeditionData = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=lider_id,numeros_carga`);
     const lider = expeditionData[0].lider_id ? lideres.find(l => l.id === expeditionData[0].lider_id) : { nome: 'N/A' };
     const numeroCarga = expeditionData[0].numeros_carga && expeditionData[0].numeros_carga.length > 0 ? expeditionData[0].numeros_carga[0] : 'N/A';
 
     closePrintIdentificationModal();
-    
+
     // 2. Chama a função de impressão modificada (passando o ID da loja como filtro)
     imprimirIdentificacao(expeditionId, numeroCarga, lider.nome, lojaId);
 }
@@ -3035,18 +2960,18 @@ function toggleFilialLinkVisibility() {
  */
 async function forceRefresh() {
     showNotification('Atualizando dados e selects...', 'info');
-    
+
     // 1. Recarrega dados estáticos (Lojas, Veículos, etc.)
     await loadSelectData();
 
     // 2. Garante que a view atual seja recarregada
     const activeNavItem = document.querySelector('.nav-item.active');
     const activeViewId = activeNavItem ? activeNavItem.getAttribute('href').substring(1) : 'home';
-    
+
     // Chamamos showView novamente para recarregar os dados da aba ativa
     // Passamos o elemento ativo para que o showView não mude o foco
-    showView(activeViewId, activeNavItem); 
-    
+    showView(activeViewId, activeNavItem);
+
     showNotification('Dados atualizados com sucesso!', 'success');
 }
 
@@ -3060,13 +2985,13 @@ function logOut() {
     currentUser = null;
     userPermissions = [];
     masterUserPermission = false;
-    
+
     // 2. Limpa timers
     if (rastreioTimer) clearInterval(rastreioTimer);
     if (homeMapTimer) clearInterval(homeMapTimer);
     Object.values(activeTimers).forEach(clearInterval);
     activeTimers = {};
-    
+
     // 3. Oculta telas do sistema
     document.getElementById('mainSystem').style.display = 'none';
     document.getElementById('filialSelectionContainer').style.display = 'none';
@@ -3078,4 +3003,5 @@ function logOut() {
 
     showNotification('Sessão encerrada.', 'info');
 }
+
 
