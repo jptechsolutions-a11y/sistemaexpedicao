@@ -1,6 +1,5 @@
  Chart.register(ChartDataLabels);
       
-        // Variáveis globais (do sistema original)
         let lojas = [], docas = [], lideres = [], veiculos = [], motoristas = [], filiais = [];
         let selectedFilial = null;
         let currentUser = null; // Para controle de acesso
@@ -18,45 +17,34 @@ let rastreioData = [];
 let pontosInteresse = []; // Pontos fixos no mapa
 let homeMapInstance = null;
 let homeMapTimer = null;
-// Variáveis e lógicas de permissão (ADICIONADO)
 let userPermissions = [];
 let masterUserPermission = false;
 let gruposAcesso = [];
 let allIdentificacaoExpeditions = []; // Guarda a lista completa para o filtro
 
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
-// SUBSTITUIR A VERSÃO EXISTENTE DE loadUserPermissions
 async function loadUserPermissions(userId, grupoId) {
     masterUserPermission = false;
     let finalPermissionsSet = new Set();
     
-    // 1. CHECAGEM DE GRUPO E CARREGAMENTO DE PERMISSÕES
     if (grupoId) {
          try {
-             // Carrega o nome do grupo e todas as permissões do grupo em paralelo
-             // O último 'false' garante que o filtro de filial NÃO seja aplicado (Correto para permissões)
              const [grupo, permissoesGrupo] = await Promise.all([
                  supabaseRequest(`grupos_acesso?id=eq.${grupoId}&select=nome`, 'GET', null, false),
                  supabaseRequest(`permissoes_grupo?grupo_id=eq.${grupoId}&select=permissao`, 'GET', null, false)
              ]);
              
-             // LOG PARA DIAGNÓSTICO
              console.log("Permissões do Grupo lidas do BD (Bruto):", permissoesGrupo);
 
-             // MASTER BYPASS: Se for MASTER, define o bypass e retorna
              if (grupo && grupo.length > 0 && grupo[0].nome === 'MASTER') {
                  masterUserPermission = true;
-                 // Adiciona um conjunto básico de permissões para garantir o fluxo de UI
                  userPermissions = ['gerenciar_permissoes', 'acesso_configuracoes', 'acesso_configuracoes_acessos', 'acesso_home'];
                  const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
                  todasFiliais.forEach(f => userPermissions.push(`acesso_filial_${f.nome}`));
                  return; 
              }
 
-             // CARREGA PERMISSÕES DE GRUPOS NORMAIS E SANEIA
              if (permissoesGrupo && Array.isArray(permissoesGrupo)) {
-                 // Saneamento: remove espaços e transforma em minúsculas
                  permissoesGrupo.forEach(p => finalPermissionsSet.add(p.permissao.trim().toLowerCase()));
              }
          } catch (e) {
@@ -64,14 +52,10 @@ async function loadUserPermissions(userId, grupoId) {
          }
     }
     
-    // 🚨 FIX CRÍTICO: Adiciona acesso_home implicitamente para garantir a navegação.
-    // O problema da tela vazia é resolvido por esta injeção.
     if (!masterUserPermission) {
         finalPermissionsSet.add('acesso_home');
     }
     
-    // 2. IMPLICAR PERMISSÕES PAI A PARTIR DE SUB-PERMISSÕES
-    // Garante que se tem 'acesso_faturamento_ativo', também terá 'acesso_faturamento'.
     const explicitPermissions = Array.from(finalPermissionsSet);
     explicitPermissions.forEach(p => {
         const parts = p.split('_');
@@ -80,7 +64,6 @@ async function loadUserPermissions(userId, grupoId) {
         }
     });
 
-    // 3. Checagem do Master por Permissão
     if (finalPermissionsSet.has('gerenciar_permissoes')) {
          masterUserPermission = true;
          try {
@@ -93,7 +76,6 @@ async function loadUserPermissions(userId, grupoId) {
     
     userPermissions = Array.from(finalPermissionsSet);
     
-    // LOG FINAL
     console.log("Permissões FINAIS (Saneadas e Implícitas):", userPermissions);
 }
 
@@ -102,35 +84,26 @@ function hasPermission(permission) {
         return true;
     }
     
-    // 🚨 FIX CRÍTICO: Garante que a permissão procurada está sempre saneada.
     const requiredPermission = permission.trim().toLowerCase();
     
-    // O array userPermissions já é populado com .trim().toLowerCase() na loadUserPermissions
     return userPermissions.includes(requiredPermission);
 }
 
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
 async function supabaseRequest(endpoint, method = 'GET', data = null, includeFilialFilter = true, upsert = false) {
     
-    // Separa o endpoint base dos filtros existentes
     const [nomeEndpointBase, filtrosExistentes] = endpoint.split('?', 2);
     
-    // Constrói a URL começando com o proxy e o endpoint base
     let url = `${SUPABASE_PROXY_URL}?endpoint=${nomeEndpointBase}`; 
     
-    // 🚨 CORREÇÃO CRÍTICA APLICADA NOVAMENTE: 
-    // Adiciona flag de upsert. Esta é uma QUERY PARAMETER do PROXY, não um filtro do Supabase.
     if (method === 'POST' && upsert) {
         url += '&upsert=true';
     }
     
-    // Adiciona filtros existentes se houver
     if (filtrosExistentes) {
         url += `&${filtrosExistentes}`;
     }
     
-    // 🚨 CORREÇÃO CRÍTICA: expedition_items TEM campo filial mas é preenchido via trigger 🚨
     const tablesWithoutFilialField = [
         'acessos',
         'grupos_acesso', 
@@ -142,19 +115,16 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
         'filiais'
     ];
     
-    // Tabelas que têm campo filial mas não devem receber no payload (trigger cuida)
     const tablesWithTriggerFilial = [
         'expedition_items' // Tem trigger que preenche automaticamente
     ];
     
-    // 🚨 FILTRO DE FILIAL EM GET (LEITURA) 🚨
     if (includeFilialFilter && selectedFilial && method === 'GET' && 
         !tablesWithoutFilialField.includes(nomeEndpointBase) && 
         !tablesWithTriggerFilial.includes(nomeEndpointBase)) {
         url += `&filial=eq.${selectedFilial.nome}`;
     }
     
-    // Configura as opções da requisição
     const options = { 
         method, 
         headers: { 
@@ -163,11 +133,9 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
         } 
     }; 
     
-    // 🚨 PROCESSAMENTO DO PAYLOAD - NÃO ENVIAR FILIAL PARA expedition_items 🚨
     if (data && (method === 'POST' || method === 'PATCH' || method === 'PUT')) { 
         let payload = data;
         
-        // Para expedition_items, NUNCA envia o campo filial (o trigger cuida)
         if (nomeEndpointBase === 'expedition_items') {
             if (Array.isArray(payload)) {
                 payload = payload.map(item => {
@@ -182,7 +150,6 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
                 delete payload.nome_filial; // Remove se existir
             }
         } 
-        // Para outras tabelas que precisam de filial, injeta o valor
         else if (includeFilialFilter && selectedFilial && 
                  !tablesWithoutFilialField.includes(nomeEndpointBase) && 
                  !tablesWithTriggerFilial.includes(nomeEndpointBase)) {
@@ -199,36 +166,28 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
             }
         }
         
-        // Converte o payload para JSON string
         options.body = JSON.stringify(payload);
         
-        // Log do payload para debug
         console.log(`[supabaseRequest] Payload sendo enviado para ${nomeEndpointBase}:`, payload);
     } 
     
-    // Configura header Prefer para retornar dados após operação
     if (method === 'PATCH' || method === 'POST') {
         options.headers.Prefer = 'return=representation';
     }
     
-    // Se for upsert, adiciona a preferência específica
-    // O PROXY já lida com esta flag, mas é bom ter uma verificação final
     if (method === 'POST' && upsert) {
         options.headers.Prefer = 'return=representation,resolution=merge-duplicates';
     }
 
     try {
-        // Log para debug
         console.log(`[supabaseRequest] ${method} ${url}`, {
             endpoint: nomeEndpointBase,
             hasFilialFilter: includeFilialFilter,
             selectedFilial: selectedFilial?.nome
         });
         
-        // Faz a requisição
         const response = await fetch(url, options);
         
-        // Tratamento de erros HTTP
         if (!response.ok) {
             const errorText = await response.text();
             let errorMessage = `Erro ${response.status}: ${errorText}`;
@@ -264,7 +223,6 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
             throw new Error(errorMessage);
         }
         
-        // Processa a resposta bem-sucedida
         const contentType = response.headers.get('content-type');
         
         if (method === 'DELETE' || response.status === 204 || !contentType?.includes('application/json')) {
@@ -303,7 +261,6 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
         throw error;
     }
 }
-        // NOVO: Função de notificação aprimorada
         function showNotification(message, type = 'info', timeout = 4000) {
             const container = document.getElementById('notificationContainer');
             if (!container) return;
@@ -343,15 +300,12 @@ async function supabaseRequest(endpoint, method = 'GET', data = null, includeFil
 
    
 
-// SUBSTITUIR A VERSÃO EXISTENTE DE showView (Aprox. linha 200 no script.js)
 function showView(viewId, element) {
   
     const permission = element.dataset.permission; 
     
-    // 🚨 FIX CRÍTICO: Aplica o mapeamento de permissão para garantir que a checagem dupla funcione 🚨
     let checkPermission = permission;
     if (permission && permission.startsWith('acesso_')) {
-        // Tenta checar o termo original do HTML ('acesso_faturamento')
         checkPermission = permission;
     } else if (permission) {
      
@@ -366,47 +320,37 @@ function showView(viewId, element) {
     }
 
 
-    // 1. Verificar permissão usando o termo ajustado/mapeado
     if (checkPermission && !hasPermission(checkPermission)) {
-        // Para garantir, fazemos a checagem dupla manual novamente:
         const alternativePermission = checkPermission.startsWith('acesso_') ? 
             checkPermission.replace('acesso_', 'view_') : 
             checkPermission; // Se for 'view_', mantém
 
         if (checkPermission !== alternativePermission && hasPermission(alternativePermission)) {
-             // O usuário tem a permissão 'view_', então o acesso é permitido.
-             // Não fazemos nada e o fluxo continua.
         } else {
-             // A checagem falhou e não há alternativa válida no array de permissões.
              showNotification('Você não tem permissão para acessar esta aba.', 'error');
              return;
         }
     }
 
-    // A partir daqui, o acesso está liberado:
     document.querySelectorAll('.view-content').forEach(view => view.classList.remove('active'));
     document.getElementById(viewId).classList.add('active');
 
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
     if(element) element.classList.add('active');
 
-   // Limpa timers antigos ao trocar de view para não sobrecarregar
     Object.values(activeTimers).forEach(clearInterval);
     activeTimers = {};
 
-    // Limpa timer específico do rastreio
     if (rastreioTimer) {
         clearInterval(rastreioTimer);
         rastreioTimer = null;
     }
 
-    // Limpa timer específico do mapa da home
     if (homeMapTimer) {
         clearInterval(homeMapTimer);
         homeMapTimer = null;
     }
 
-    // Carrega os dados da view selecionada
     switch(viewId) {
         case 'home': loadHomeData(); break;
         case 'transporte': loadTransportList(); break;
@@ -420,36 +364,28 @@ function showView(viewId, element) {
     feather.replace(); // Redesenha os ícones
 }
 
-// NOVO: Função para determinar e aplicar o acesso à filial
 async function determineFilialAccess() {
-    // 1. Identificar todas as filiais permitidas para o usuário
     const allowedFiliais = filiais.filter(f => hasPermission(`acesso_filial_${f.nome}`));
 
     if (allowedFiliais.length === 1) {
-        // Redirecionamento Automático: Apenas uma filial permitida
         showNotification(`Acesso único à filial ${allowedFiliais[0].nome}. Redirecionando...`, 'info', 1500);
         await selectFilial(allowedFiliais[0]); // Pula a tela de seleção e vai direto
     } else if (allowedFiliais.length > 1) {
-        // Múltiplas filiais: Exibe a tela de seleção, mas apenas com as permitidas
         document.getElementById('initialAuthContainer').style.display = 'none';
         document.getElementById('filialSelectionContainer').style.display = 'block';
         renderFiliaisSelection(allowedFiliais);
     } else {
-        // Nenhuma filial permitida
         document.getElementById('initialLoginAlert').innerHTML = '<div class="alert alert-error">Você não possui permissão para acessar nenhuma filial. Contate o administrador.</div>';
         document.getElementById('initialAuthContainer').style.display = 'block';
     }
 }
 
 
-       // SUBSTITUIR A VERSÃO EXISTENTE DE loadFiliais
 async function loadFiliais() {
     try {
-        // 1. Carrega TODAS as filiais ativas para cache
         const filiaisData = await supabaseRequest('filiais?select=nome,descricao,ativo,latitude_cd,longitude_cd&ativo=eq.true&order=nome', 'GET', null, false);
         filiais = filiaisData || [];
         
-        // 2. Determina quais filiais o usuário pode acessar e decide se redireciona
         await determineFilialAccess();
         
     } catch (error) {
@@ -458,21 +394,15 @@ async function loadFiliais() {
 }
 
 
-// SUBSTITUIR A FUNÇÃO selectFilial COMPLETA
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
-// SUBSTITUIR A FUNÇÃO selectFilial COMPLETA (ADICIONANDO A CHAMADA NO FINAL)
 async function selectFilial(filial) {
-    // Verificar permissão para a filial
     if (!hasPermission(`acesso_filial_${filial.nome}`)) {
         showNotification('Você não tem permissão para acessar esta filial.', 'error');
         return;
     }
 
     try {
-        // Busca os dados completos da filial (sem filtro de filial na busca)
         const fullFilialData = await supabaseRequest(`filiais?nome=eq.${filial.nome}`, 'GET', null, false);
         selectedFilial = fullFilialData[0];
     } catch (error) {
@@ -482,30 +412,21 @@ async function selectFilial(filial) {
     
     document.getElementById('sidebarFilial').textContent = selectedFilial.nome;
     
-    // 1. Inicia a transição para a tela principal
     await showMainSystem();
     
-    // 2. Carrega todos os dados estáticos e dinâmicos (abas)
     await loadAllTabData();
     await loadPontosInteresse();
 
-    // 🚨 NOVO FIX: Filtra as sub-abas ANTES de filtrar as abas principais 🚨
     filterSubTabs();
     
-    // 3. Filtra as abas de navegação e determina qual a primeira a ser mostrada
     const firstPermittedViewId = filterNavigationMenu(); 
 
     if (firstPermittedViewId) {
-        // Mostra a primeira aba permitida
         const firstNavItem = document.querySelector(`.nav-item[href="#${firstPermittedViewId}"]`);
         
-        // NOVO AJUSTE: Se a aba principal for carregada, mas todas as sub-abas forem filtradas,
-        // garantimos que o conteúdo da aba principal (que agora é o container de sub-abas)
-        // ainda mostre alguma mensagem se necessário.
         
         showView(firstPermittedViewId, firstNavItem);
         
-        // Configura o refresh automático da Home (se for a primeira aba permitida)
         if (firstPermittedViewId === 'home') {
              setTimeout(() => {
                 const homeAutoRefreshCheckbox = document.getElementById('homeAutoRefresh');
@@ -517,18 +438,15 @@ async function selectFilial(filial) {
         }
         
     } else {
-        // Se não houver nenhuma permissão de aba (erro de acesso final)
         document.getElementById('home').classList.add('active'); // Garante que a div está visível
         document.getElementById('home').innerHTML = '<div class="alert alert-error">Seu grupo de acesso não possui permissão para visualizar nenhuma aba. Contate o administrador.</div>';
     }
     
     showNotification(`Bem-vindo à filial: ${selectedFilial.nome}!`, 'success');
     
-    // 🚨 CHAMADA FINAL PARA GARANTIR VISIBILIDADE 🚨
     toggleFilialLinkVisibility();
 }
 
-// SUBSTITUIR A FUNÇÃO loadAllTabData COMPLETA
 async function loadAllTabData() {
             
     document.getElementById('operacao').innerHTML = `
@@ -1338,18 +1256,15 @@ async function loadAllTabData() {
 </div>
 `;
             
-    // Adicionar event listeners aos formulários
     document.getElementById('expeditionForm').addEventListener('submit', (e) => { e.preventDefault(); lancarCarga(); });
     document.getElementById('editExpeditionForm').addEventListener('submit', (e) => { e.preventDefault(); saveEditedExpedition(); });
     document.getElementById('passwordForm').addEventListener('submit', (e) => { e.preventDefault(); checkPassword(); });
     document.getElementById('addForm').addEventListener('submit', (e) => { e.preventDefault(); handleSave(); });
-    // Event listener para o formulário de autenticação de edição
     document.getElementById('authEditForm').addEventListener('submit', (e) => { 
         e.preventDefault(); 
         checkAuthForEdit(); 
     });
 
-    // Carregar dados para os selects
     await loadSelectData();
 }
 
@@ -1358,9 +1273,7 @@ async function loadAllTabData() {
         async function loadSelectData() {
     try {
         const [lojasData, docasData, veiculosData, motoristasData, lideresData] = await Promise.all([
-            // Ordena lojas por código primeiro, depois por nome
             supabaseRequest('lojas?select=*,codlojaqr,endereco_completo,latitude,longitude&ativo=eq.true&order=codigo,nome'),
-            // Ordena docas por nome
             supabaseRequest('docas?ativo=eq.true&order=nome'),
             supabaseRequest('veiculos?order=placa'),
             supabaseRequest('motoristas?order=nome'),
@@ -1377,21 +1290,17 @@ async function loadAllTabData() {
     }
 }
        function populateSelects() {
-    // Ordena lojas por código localmente (garantia extra)
     const lojasOrdenadas = [...lojas].sort((a, b) => {
-        // Primeiro por código, depois por nome
         if (a.codigo !== b.codigo) {
             return a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true });
         }
         return a.nome.localeCompare(b.nome, 'pt-BR');
     });
 
-    // Ordena docas por nome localmente (garantia extra)
     const docasOrdenadas = [...docas].sort((a, b) => 
         a.nome.localeCompare(b.nome, 'pt-BR')
     );
 
-    // Popula todos os selects de loja
     const lojaSelects = document.querySelectorAll('.loja-select');
     lojaSelects.forEach(select => {
         select.innerHTML = '<option value="">Selecione a loja</option>';
@@ -1400,7 +1309,6 @@ async function loadAllTabData() {
         });
     });
 
-    // Popula selects de doca
     ['dashboardDocaSelect', 'lancar_docaSelect'].forEach(id => {
         const docaSelect = document.getElementById(id);
         if (docaSelect) {
@@ -1411,7 +1319,6 @@ async function loadAllTabData() {
         }
     });
 
-    // Resto da função permanece igual...
     ['dashboardPlacaSelect', 'placaMotorista'].forEach(id => {
         const placaSelect = document.getElementById(id);
         if(placaSelect) {
@@ -1435,11 +1342,8 @@ async function loadAllTabData() {
         
         function getStatusLabel(status) {
     const labels = {
-        // ... (seus status existentes)
         'faturamento_iniciado': 'Faturando', 'faturado': 'Faturado',
-        // NOVO STATUS COMBINADO
         'em_carregamento_faturando': 'Carregando/Faturando',
-        // ... (o resto dos status)
     };
     return labels[status] || status.replace(/_/g, ' ');
 }
@@ -1456,7 +1360,6 @@ async function loadHomeData() {
     const dataFimInput = document.getElementById('homeDataFim');
     const searchInput = document.getElementById('homeSearchInput');
 
-    // Verifica se os elementos existem antes de tentar usá-los
     if (!dataInicioInput || !dataFimInput || !searchInput) {
         console.error("Erro: Elementos da página inicial não encontrados. A função loadHomeData não pode ser executada.");
         return;
@@ -1632,7 +1535,6 @@ async function loadHomeData() {
         renderLojaDesempenhoChart(lojasData.slice(0, 5));
         renderFleetUtilizationChart(perlogCount, jjsCount);
         renderTemposMediosTable(lojasData);
-        // Inicializar/atualizar mapa da home
         await initHomeMap();
 
     } catch (error) {
@@ -1734,7 +1636,6 @@ async function loadHomeData() {
         return;
     }
     
-    // Pega apenas os top 5 e ordena por entregas
     const top5 = [...motoristasData]
         .sort((a, b) => b.entregas - a.entregas)
         .slice(0, 5);
@@ -1925,15 +1826,12 @@ async function loadHomeData() {
             `).join('');
         }
 
-        // --- FUNÇÕES DO MAPA DA HOME ---
 async function initHomeMap() {
-    // Destruir mapa existente se houver
     if (homeMapInstance) {
         homeMapInstance.remove();
         homeMapInstance = null;
     }
     
-    // Aguardar o elemento estar disponível
     const mapElement = document.getElementById('homeMap');
     if (!mapElement) {
         console.warn('Elemento do mapa da home não encontrado');
@@ -1941,21 +1839,16 @@ async function initHomeMap() {
     }
     
     try {
-        // Coordenadas do CD da filial selecionada
         const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
         
-        // Criar mapa da home
         homeMapInstance = L.map('homeMap').setView(cdCoords, 11);
         
-        // Adicionar camada do mapa
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(homeMapInstance);
         
-        // Carregar dados do rastreio para o mapa
         await loadHomeMapData();
         
-        // Configurar auto-refresh se estiver ativado
         if (document.getElementById('homeAutoRefresh')?.checked) {
             toggleHomeAutoRefresh();
         }
@@ -1975,17 +1868,14 @@ async function loadHomeMapData() {
     if (!homeMapInstance) return;
     
     try {
-        // Limpar marcadores existentes
         homeMapInstance.eachLayer(layer => {
             if (layer instanceof L.Marker || layer instanceof L.Circle) {
                 homeMapInstance.removeLayer(layer);
             }
         });
         
-        // Coordenadas do CD
         const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
         
-        // Adicionar marcador do CD
         const cdIcon = L.divIcon({
             className: 'custom-marker',
             html: '<div style="background: #0077B6; color: white; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🏭 CD</div>',
@@ -1997,11 +1887,9 @@ async function loadHomeMapData() {
             .addTo(homeMapInstance)
             .bindPopup(`<h3><strong>Centro de Distribuição</strong></h3><p>Filial ${selectedFilial.nome}</p>`);
         
-        // Carregar dados de rastreio atuais
         const expeditionsEmRota = await supabaseRequest('expeditions?status=eq.saiu_para_entrega&order=data_saida_entrega.desc');
         const motoristasRetornando = await supabaseRequest('motoristas?status=in.(retornando_cd,retornando_com_imobilizado)');
         
-        // Buscar localizações GPS
         let locations = [];
         if (expeditionsEmRota.length > 0) {
             const expeditionIds = expeditionsEmRota.map(exp => exp.id);
@@ -2019,7 +1907,6 @@ async function loadHomeMapData() {
         const bounds = L.latLngBounds();
         bounds.extend(cdCoords);
         
-        // Adicionar veículos em rota
         expeditionsEmRota.forEach(exp => {
             const location = locations.find(loc => loc.expedition_id === exp.id);
             if (location && location.latitude && location.longitude) {
@@ -2029,12 +1916,9 @@ async function loadHomeMapData() {
                 const motorista = motoristas.find(m => m.id === exp.motorista_id);
                 const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
                 
-                // Determinar status do veículo para cor
                 let color = '#F59E0B'; // laranja para em trânsito
                 let statusText = 'Em Trânsito';
                 
-                // Verificar se está descarregando (lógica simplificada)
-                // Na implementação real, você pode verificar o status atual das entregas
                 
                 const vehicleIcon = L.divIcon({
                     className: 'custom-marker',
@@ -2058,7 +1942,6 @@ async function loadHomeMapData() {
             }
         });
         
-        // Adicionar veículos retornando
         motoristasRetornando.forEach(motorista => {
             const location = returningLocations.find(loc => loc.motorista_id === motorista.id);
             if (location && location.latitude && location.longitude) {
@@ -2090,7 +1973,6 @@ async function loadHomeMapData() {
             }
         });
         
-        // Adicionar lojas
         lojas.forEach(loja => {
             if (loja.latitude && loja.longitude && loja.ativo) {
                 const lat = parseFloat(loja.latitude);
@@ -2115,7 +1997,6 @@ async function loadHomeMapData() {
             }
         });
 
-        // Adicionar pontos de interesse se existirem
         if (pontosInteresse && pontosInteresse.length > 0) {
             pontosInteresse.forEach(ponto => {
                 if (ponto.ativo) {
@@ -2133,12 +2014,10 @@ async function loadHomeMapData() {
             });
         }
         
-        // Ajustar zoom para mostrar todos os pontos
         if (bounds.isValid()) {
             homeMapInstance.fitBounds(bounds, { padding: [20, 20] });
         }
         
-        // Atualizar timestamp
         updateHomeLastRefreshTime();
         
     } catch (error) {
@@ -2150,14 +2029,12 @@ async function loadHomeMapData() {
 function toggleHomeAutoRefresh() {
     const autoRefresh = document.getElementById('homeAutoRefresh')?.checked;
     
-    // Limpar timer existente
     if (homeMapTimer) {
         clearInterval(homeMapTimer);
         homeMapTimer = null;
     }
     
     if (autoRefresh) {
-        // Atualizar a cada 30 segundos
         homeMapTimer = setInterval(() => {
             loadHomeMapData();
         }, 30000);
@@ -2191,17 +2068,14 @@ function showHomeMapFullscreen() {
             attribution: '© OpenStreetMap contributors'
         }).addTo(mapInstance);
         
-        // Reutilizar a mesma lógica do mapa da home
         await loadHomeMapDataForFullscreen();
     }, 100);
 }
 
 async function loadHomeMapDataForFullscreen() {
     try {
-        // Coordenadas do CD
         const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
         
-        // Adicionar marcador do CD
         const cdIcon = L.divIcon({
             className: 'custom-marker',
             html: '<div style="background: #0077B6; color: white; padding: 8px 16px; border-radius: 10px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">🏭 CD</div>',
@@ -2216,11 +2090,9 @@ async function loadHomeMapDataForFullscreen() {
         const bounds = L.latLngBounds();
         bounds.extend(cdCoords);
         
-        // Carregar dados de rastreio atuais (similar ao loadHomeMapData)
         const expeditionsEmRota = await supabaseRequest('expeditions?status=eq.saiu_para_entrega&order=data_saida_entrega.desc');
         const motoristasRetornando = await supabaseRequest('motoristas?status=in.(retornando_cd,retornando_com_imobilizado)');
         
-        // Buscar localizações GPS
         let locations = [];
         if (expeditionsEmRota.length > 0) {
             const expeditionIds = expeditionsEmRota.map(exp => exp.id);
@@ -2235,7 +2107,6 @@ async function loadHomeMapDataForFullscreen() {
             returningLocations = await supabaseRequest(query, 'GET', null, false);
         }
         
-        // Adicionar veículos em rota (ícones maiores para fullscreen)
         expeditionsEmRota.forEach(exp => {
             const location = locations.find(loc => loc.expedition_id === exp.id);
             if (location && location.latitude && location.longitude) {
@@ -2271,7 +2142,6 @@ async function loadHomeMapDataForFullscreen() {
             }
         });
         
-        // Adicionar veículos retornando
         motoristasRetornando.forEach(motorista => {
             const location = returningLocations.find(loc => loc.motorista_id === motorista.id);
             if (location && location.latitude && location.longitude) {
@@ -2304,7 +2174,6 @@ async function loadHomeMapDataForFullscreen() {
             }
         });
         
-        // Adicionar lojas (ícones maiores)
         lojas.forEach(loja => {
             if (loja.latitude && loja.longitude && loja.ativo) {
                 const lat = parseFloat(loja.latitude);
@@ -2336,7 +2205,6 @@ async function loadHomeMapDataForFullscreen() {
             }
         });
         
-        // Adicionar pontos de interesse se existirem
         if (pontosInteresse && pontosInteresse.length > 0) {
             pontosInteresse.forEach(ponto => {
                 if (ponto.ativo) {
@@ -2366,7 +2234,6 @@ async function loadHomeMapDataForFullscreen() {
 
     
 
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
 async function lancarCarga() {
     const lojaId = document.getElementById('lancar_lojaSelect').value;
@@ -2399,10 +2266,8 @@ async function lancarCarga() {
             observacoes: observacoes || null, 
             status: 'aguardando_agrupamento',
             numeros_carga: numerosCarga.length > 0 ? numerosCarga : null
-            // filial será injetada automaticamente pela função supabaseRequest
         };
         
-        // 1. Cria a Expedição principal COM filtro de filial (true)
         const expeditionResponse = await supabaseRequest('expeditions', 'POST', expeditionData, true);
         
         if (!expeditionResponse || expeditionResponse.length === 0) {
@@ -2411,17 +2276,14 @@ async function lancarCarga() {
         
         const newExpeditionId = expeditionResponse[0].id;
 
-        // 2. Cria o item da expedição SEM enviar campo filial (o trigger cuida)
         const itemData = { 
             expedition_id: newExpeditionId, 
             loja_id: lojaId, 
             pallets: pallets || 0, 
             rolltrainers: rolltrainers || 0, 
             status_descarga: 'pendente'
-            // NÃO incluir campo filial aqui - o trigger set_filial_expedition_items cuida disso
         };
         
-        // IMPORTANTE: Não precisa passar false, pois a função já sabe que não deve enviar filial para expedition_items
         await supabaseRequest('expedition_items', 'POST', itemData);
 
         const lojaNome = lojas.find(l => l.id === lojaId)?.nome || 'Loja';
@@ -2441,7 +2303,6 @@ async function lancarCarga() {
     }
 }
 
-        // --- FUNCIONALIDADES DA ABA TRANSPORTE ---
         async function loadTransportList() {
             try {
                 const expeditions = await supabaseRequest("expeditions?status=eq.aguardando_agrupamento&order=data_hora.asc");
@@ -2572,20 +2433,17 @@ async function lancarCarga() {
                     return;
                 }
 
-                // 🚨 CORREÇÃO: AGREGAR NÚMEROS DE CARGA 🚨
                 let todosNumerosCarga = [];
                 cargasSelecionadas.forEach(c => {
                     if (c.numeros_carga) {
                         if (Array.isArray(c.numeros_carga)) {
                             todosNumerosCarga.push(...c.numeros_carga);
                         } else if (typeof c.numeros_carga === 'string') {
-                             // Trata formato string do postgres ex: "{123,456}" ou "123"
                              const clean = c.numeros_carga.replace(/[{}"]/g, '');
                              if (clean) todosNumerosCarga.push(...clean.split(',').map(s => s.trim()));
                         }
                     }
                 });
-                // Remove duplicatas e vazios
                 todosNumerosCarga = [...new Set(todosNumerosCarga)].filter(n => n && n.trim() !== "");
 
                 const newExpeditionData = { 
@@ -2626,7 +2484,6 @@ async function lancarCarga() {
                 document.getElementById('alocar_motoristaSelect').value = '';
                 document.getElementById('alocar_observacoes').value = '';
 
-                // Chama o novo modal para definir a ordem
                 await openOrdemCarregamentoModal(newExpeditionId);
 
             } catch (error) {
@@ -2634,26 +2491,21 @@ async function lancarCarga() {
             }
         }
 
-      // SUBSTITUIR A FUNÇÃO loadFaturamento
 async function loadFaturamento() {
-    // Busca e aplica a lógica para auto-abrir a única sub-aba permitida
     const permittedFaturamentoTabs = getPermittedSubTabs('faturamento');
     
     if (permittedFaturamentoTabs.length > 0) {
         const initialSubTab = permittedFaturamentoTabs.length === 1 ? permittedFaturamentoTabs[0] : 'faturamentoAtivo';
         const initialElement = document.querySelector(`#faturamento .sub-tabs button[onclick*="'${initialSubTab}'"]`);
         
-        // NOVO: Garantir que o elemento exista e que a função showSubTab seja chamada
         if (initialElement) {
             showSubTab('faturamento', initialSubTab, initialElement);
         } else {
-             // Fallback: Se o botão não for encontrado (filtrado), chama a função de carregamento manual para garantir o estado
              await loadFaturamentoData(initialSubTab);
         }
     }
 }
 
-      // Substitua a função renderFaturamentoList existente por esta
 
 function renderFaturamentoList(expeditionsList) {
     const container = document.getElementById('faturamentoList');
@@ -2669,23 +2521,18 @@ function renderFaturamentoList(expeditionsList) {
         
         let actionButtons = '', statusInfo = '';
         
-        // Lógica de Status Aprimorada
-        // ESTADO FINAL: Ambos concluídos
         if (exp.status === 'faturado' && exp.data_saida_veiculo) {
             statusInfo = `<div class="text-green-600 font-semibold mb-2">✅ Carregado e Faturado</div>`;
             actionButtons = `<button class="btn btn-warning" onclick="marcarSaiuEntrega('${exp.id}')">Marcar Saída</button>`;
         }
-        // CASO 1: Faturado, mas aguardando fim do carregamento
         else if (exp.status === 'faturado' && !exp.data_saida_veiculo) {
             statusInfo = `<div class="text-blue-600 font-semibold mb-2">✅ Faturado (Aguardando Fim do Carregamento)</div>`;
             actionButtons = `<button class="btn btn-secondary" disabled title="Finalize o carregamento na tela de Motoristas para liberar a saída">Aguardando Carregamento</button>`;
         }
-        // CASO 2: Carregado, mas aguardando faturamento
         else if (exp.status === 'carregado' || exp.status === 'aguardando_faturamento') {
             statusInfo = `<div class="text-blue-600 font-semibold mb-2">🚚 Carregado (Aguardando Faturamento)</div>`;
             actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento</button>`;
         }
-        // CASO 3: Faturamento em andamento (com ou sem carregamento simultâneo)
         else if (exp.status === 'faturamento_iniciado' || exp.status === 'em_carregamento_faturando') {
             const iniciadoEm = exp.data_inicio_faturamento ? new Date(exp.data_inicio_faturamento) : null;
             const tempoFaturamento = iniciadoEm ? Math.round((new Date() - iniciadoEm) / 60000) : 0;
@@ -2693,7 +2540,6 @@ function renderFaturamentoList(expeditionsList) {
             statusInfo = `<div class="text-yellow-600 font-semibold mb-2">📄 ${faturandoTexto} há ${minutesToHHMM(tempoFaturamento)}</div>`;
             actionButtons = `<button class="btn btn-primary" onclick="finalizarFaturamento('${exp.id}')">Finalizar Faturamento</button>`;
         }
-        // CASO 4: Apenas carregando (faturamento ainda não iniciado)
         else if (exp.status === 'em_carregamento') {
             statusInfo = `<div class="text-gray-600 font-semibold mb-2">🚚 Carregando...</div>`;
             actionButtons = `<button class="btn btn-success" onclick="iniciarFaturamento('${exp.id}')">Iniciar Faturamento (Antecipado)</button>`;
@@ -2723,14 +2569,12 @@ function renderFaturamentoList(expeditionsList) {
 }
 
         function updateFaturamentoStats(expeditions) {
-    // NOVO: Conta a partir de 'em_carregamento' e 'carregado' que aguardam faturamento
     document.getElementById('totalCarregadas').textContent = expeditions.filter(e => 
         e.status === 'em_carregamento' || 
         e.status === 'carregado' || 
         e.status === 'aguardando_faturamento'
     ).length;
     
-    // NOVO: Inclui o status combinado 'em_carregamento_faturando'
     document.getElementById('emFaturamento').textContent = expeditions.filter(e => 
         e.status === 'faturamento_iniciado' || 
         e.status === 'em_carregamento_faturando'
@@ -2755,10 +2599,8 @@ function renderFaturamentoList(expeditionsList) {
         
         let newStatus;
         if (currentStatus === 'em_carregamento') {
-             // NOVO: Define o status combinado se o carregamento estiver em andamento
              newStatus = 'em_carregamento_faturando'; 
         } else if (currentStatus === 'carregado' || currentStatus === 'aguardando_faturamento') {
-             // Fluxo normal: inicia o faturamento após o carregamento
              newStatus = 'faturamento_iniciado';
         } else if (currentStatus === 'em_carregamento_faturando' || currentStatus === 'faturamento_iniciado') {
              showNotification('Faturamento já está em andamento!', 'info');
@@ -2798,7 +2640,6 @@ function renderFaturamentoList(expeditionsList) {
                 showNotification('Erro ao marcar saída: ' + error.message, 'error');
             }
         }
-// --- FUNCIONALIDADES DO HISTÓRICO DE FATURAMENTO ---
 async function loadHistoricoFaturamento() {
     const dataInicio = document.getElementById('historicoFaturamentoDataInicio').value;
     const dataFim = document.getElementById('historicoFaturamentoDataFim').value;
@@ -2808,7 +2649,6 @@ async function loadHistoricoFaturamento() {
     tbody.innerHTML = `<tr><td colspan="9" class="loading"><div class="spinner"></div>Carregando histórico...</td></tr>`;
     
     try {
-        // Buscar expedições que foram faturadas (que passaram pelo processo de faturamento)
         let query = 'expeditions?status=in.(saiu_para_entrega,entregue)&data_inicio_faturamento=not.is.null&data_fim_faturamento=not.is.null&order=data_fim_faturamento.desc';
         
         if (dataInicio) {
@@ -2832,7 +2672,6 @@ async function loadHistoricoFaturamento() {
             const veiculo = exp.veiculo_id ? veiculos.find(v => v.id === exp.veiculo_id) : null;
             const motorista = exp.motorista_id ? motoristas.find(m => m.id === exp.motorista_id) : null;
             
-            // Calcular tempo de faturamento
             let tempoFaturamento = 0;
             if (exp.data_inicio_faturamento && exp.data_fim_faturamento) {
                 tempoFaturamento = (new Date(exp.data_fim_faturamento) - new Date(exp.data_inicio_faturamento)) / 60000; // em minutos
@@ -2854,7 +2693,6 @@ async function loadHistoricoFaturamento() {
             };
         });
         
-        // Aplicar filtro de busca
         if (searchTerm) {
             expeditionsWithItems = expeditionsWithItems.filter(exp => {
                 const searchableText = [
@@ -2927,13 +2765,11 @@ function renderHistoricoFaturamentoTable(expeditions) {
             new Date(exp.data_fim_faturamento).toLocaleString('pt-BR') : 'N/A';
         const tempoFaturamento = exp.tempo_faturamento > 0 ? minutesToHHMM(exp.tempo_faturamento) : 'N/A';
         
-        // Formatar informações das lojas e cargas
         let lojasInfo = exp.lojas_info.join('<br>');
         if (exp.numeros_carga && exp.numeros_carga.length > 0) {
             lojasInfo += `<br><span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mt-1 inline-block">📦 Cargas: ${exp.numeros_carga.join(', ')}</span>`;
         }
         
-        // Definir cor do tempo baseada na duração
         let tempoColor = 'text-green-600';
         if (exp.tempo_faturamento > 60) tempoColor = 'text-orange-600'; // > 1 hora
         if (exp.tempo_faturamento > 120) tempoColor = 'text-red-600'; // > 2 horas
@@ -2962,7 +2798,6 @@ function clearHistoricoFaturamentoFilters() {
     document.getElementById('historicoFaturamentoDataFim').value = '';
     document.getElementById('historicoFaturamentoSearch').value = '';
     
-    // Definir datas padrão (últimos 30 dias)
     const hoje = new Date();
     const ha30Dias = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
     document.getElementById('historicoFaturamentoDataInicio').value = ha30Dias.toISOString().split('T')[0];
@@ -2973,17 +2808,13 @@ function clearHistoricoFaturamentoFilters() {
 
 
 
-// SUBSTITUIR A FUNÇÃO showSubTab (INCLUINDO A NOVA CHAMADA)
 function showSubTab(tabName, subTabName, element) {
-    // Permissão lida do atributo data-permission do botão clicado
     const permission = element ? element.dataset.permission : null; 
     
-    // Apenas faz a checagem se o botão realmente tiver uma permissão e o usuário não for MASTER
     if (permission && !masterUserPermission) {
         const requiredPermission = permission.trim().toLowerCase();
         const mappedPermission = requiredPermission.replace('acesso_', 'view_'); // Ex: 'view_faturamento_ativo'
         
-        // Se não tem a permissão do HTML NEM a permissão mapeada do BD (que deveria ter sido filtrada antes, mas checamos para segurança)
         if (!userPermissions.includes(requiredPermission) && !userPermissions.includes(mappedPermission)) {
              showNotification('Você não tem permissão para acessar esta seção.', 'error');
              return; 
@@ -2993,15 +2824,12 @@ function showSubTab(tabName, subTabName, element) {
     const tabContent = document.getElementById(tabName);
     if (!tabContent) return;
     
-    // Desativa todas as sub-abas e conteúdos para começar
     tabContent.querySelectorAll('.sub-tab').forEach(tab => tab.classList.remove('active'));
     tabContent.querySelectorAll('.sub-tab-content').forEach(content => content.classList.remove('active'));
 
-    // Ativa a sub-aba clicada
     if(element) element.classList.add('active');
     document.getElementById(subTabName).classList.add('active');
     
-    // Lógica para carregar os dados específicos da sub-aba (mantida)
     if (tabName === 'acompanhamento') {
         if (subTabName === 'frota') {
             loadFrotaData();
@@ -3014,7 +2842,6 @@ function showSubTab(tabName, subTabName, element) {
     } else if (tabName === 'historico' && subTabName === 'indicadores') {
         applyHistoricoFilters();
     } else if (tabName === 'faturamento') {
-        // 🚨 NOVO: Chama a função de dados de faturamento (Faturamento Ativo ou Histórico)
         if (subTabName === 'faturamentoAtivo') {
             loadFaturamentoData('faturamentoAtivo');
         } else if (subTabName === 'historicoFaturamento') {
@@ -3046,7 +2873,6 @@ function showSubTab(tabName, subTabName, element) {
             loadIdentificacaoExpedicoes();
         }
     } else if (tabName === 'motoristas') {
-        // 🚨 NOVO: Chama a função de dados de motoristas (Status da Frota ou Relatório)
         if (subTabName === 'statusFrota') {
             renderMotoristasStatusList(); // Função que carrega e renderiza o status da frota
         } else if (subTabName === 'relatorioMotoristas') {
@@ -3056,7 +2882,6 @@ function showSubTab(tabName, subTabName, element) {
     feather.replace();
 }
 
-// Novo: Mapa de Permissões de Sub-Abas e Views que contêm sub-abas
 const subTabViewIds = new Set(['operacao', 'faturamento', 'motoristas', 'acompanhamento', 'historico', 'configuracoes']);
 const subTabPermissionMap = {
     'operacao': {
@@ -3104,7 +2929,6 @@ function getPermittedSubTabs(viewId) {
         const requiredPermission = subTabs[subTabId]; // Ex: 'acesso_faturamento_ativo'
         const mappedPermission = requiredPermission.replace('acesso_', 'view_'); // Ex: 'view_faturamento_ativo'
         
-        // Checa a permissão do HTML e a permissão mapeada do banco
         if (hasPermission(requiredPermission) || hasPermission(mappedPermission)) {
             permittedSubTabs.push(subTabId);
         }
@@ -3114,9 +2938,7 @@ function getPermittedSubTabs(viewId) {
 
 
 
-   // SUBSTITUIR A FUNÇÃO loadMotoristaTab
 async function loadMotoristaTab() {
-    // Busca e aplica a lógica para auto-abrir a única sub-aba permitida
     const permittedMotoristasTabs = getPermittedSubTabs('motoristas');
     
     if (permittedMotoristasTabs.length > 0) {
@@ -3126,14 +2948,11 @@ async function loadMotoristaTab() {
         if (initialElement) {
             showSubTab('motoristas', initialSubTab, initialElement);
         } else {
-             // Fallback: Se o botão não for encontrado, chama a função de carregamento manual
              await renderMotoristasStatusList();
         }
     }
     
-    // Configurar datas padrão
     const hoje = new Date();
-    // Inicia com o dia de hoje, não os últimos 30 dias para evitar sobrecarga inicial
     const hojeFormatado = hoje.toISOString().split('T')[0];
     const dataInicio = document.getElementById('relatorioMotoristaDataInicio');
     const dataFim = document.getElementById('relatorioMotoristaDataFim');
@@ -3141,7 +2960,6 @@ async function loadMotoristaTab() {
     if (dataFim && !dataFim.value) dataFim.value = hojeFormatado;
 }
 
-// SUBSTITUIR A FUNÇÃO renderMotoristasStatusList COMPLETA (aproximadamente linha 2246)
 async function renderMotoristasStatusList() {
     const container = document.getElementById('motoristasStatusList');
     if (!container) return;
@@ -3150,19 +2968,15 @@ async function renderMotoristasStatusList() {
     activeTimers = {};
 
     const [activeExpeditions, recentlyCompletedExpeditions, allItems] = await Promise.all([
-         // Busca expedições ativas
          supabaseRequest(`expeditions?status=not.in.(entregue,cancelado)`),
-         // Busca expedições recentemente concluídas (para achar o último veículo de quem retornou)
          supabaseRequest(`expeditions?status=eq.entregue&order=data_hora.desc&limit=50`),
          supabaseRequest('expedition_items')
     ]);
     
-    // Contagem de status para o Dashboard
     const dispCount = motoristas.filter(m => m.status === 'disponivel').length;
     const ativoCount = motoristas.filter(m => ['em_viagem', 'descarregando_imobilizado', 'saiu_para_entrega'].includes(m.status)).length;
     const retornandoCount = motoristas.filter(m => ['retornando_cd', 'retornando_com_imobilizado'].includes(m.status)).length;
     
-    // Mapeia motoristas com status e info do veículo
     const motoristasComStatus = motoristas.map(m => {
         const activeExp = activeExpeditions.find(exp => exp.motorista_id === m.id);
         let veiculoPlaca = 'N/A';
@@ -3170,27 +2984,23 @@ async function renderMotoristasStatusList() {
         let displayStatus = m.status; // Status padrão do motorista
         
         if (activeExp) {
-            // 1. Se tem expedição ativa, o status é o da expedição (ex: saiu_para_entrega)
             veiculoId = activeExp.veiculo_id;
             veiculoPlaca = veiculos.find(v => v.id === veiculoId)?.placa || 'N/A';
             displayStatus = activeExp.status; // Exibe o status da expedição
             return { ...m, displayStatus, veiculoPlaca, veiculoId, activeExp: { ...activeExp, items: allItems.filter(i => i.expedition_id === activeExp.id) } };
         } 
         
-        // 2. Se o motorista está em um status de retorno, tenta achar o último veículo
         if (['retornando_cd', 'retornando_com_imobilizado', 'descarregando_imobilizado'].includes(m.status)) {
              const lastExp = recentlyCompletedExpeditions.find(exp => exp.motorista_id === m.id);
              veiculoId = lastExp?.veiculo_id;
              veiculoPlaca = veiculos.find(v => v.id === veiculoId)?.placa || 'N/A';
         }
         
-        // Retorna status normal (disponivel, folga, etc.)
         return { ...m, displayStatus, veiculoPlaca, veiculoId };
     });
 
     motoristasComStatus.sort((a, b) => a.nome.localeCompare(b.nome));
 
-    // HTML principal (sem o filtro, que foi movido)
     let html = `
         <div class="stats-grid">
             <div class="stat-card"><div class="stat-number">${dispCount}</div><div class="stat-label">Disponíveis</div></div>
@@ -3206,10 +3016,8 @@ async function renderMotoristasStatusList() {
         `;
     container.innerHTML = html;
     
-    // Armazena o array completo (não filtrado) na memória para o filtro
     window.motoristasDataCache = motoristasComStatus; 
     
-    // Iniciar timers
     motoristasComStatus.forEach(m => {
         if (m.activeExp && m.displayStatus === 'saiu_para_entrega') {
              startMotoristaTimer(m);
@@ -3220,7 +3028,6 @@ async function renderMotoristasStatusList() {
 
 
 
-// SUBSTITUA TODA E QUALQUER DEFINIÇÃO DESTA FUNÇÃO PELA ABAIXO:
 function renderMotoristasListHtml(motoristasData) {
     if (motoristasData.length === 0) {
         return '<div class="alert alert-info mt-4">Nenhum motorista encontrado com o filtro selecionado.</div>';
@@ -3229,7 +3036,6 @@ function renderMotoristasListHtml(motoristasData) {
     return motoristasData.map(m => {
         let actionButton = '';
         
-        // Determinar classe CSS baseada no status
         let placaClass = 'placa-destaque';
         if (m.displayStatus === 'saiu_para_entrega' || m.displayStatus === 'em_viagem') {
             placaClass += ' em-viagem';
@@ -3239,23 +3045,26 @@ function renderMotoristasListHtml(motoristasData) {
             placaClass += ' disponivel';
         }
         
-        // Placa animada com destaque
         const veiculoPlacaNoNome = m.veiculoPlaca && m.veiculoPlaca !== 'N/A' ? 
             `<span class="${placaClass}" title="Veículo: ${m.veiculoPlaca}">${m.veiculoPlaca}</span>` : '';
 
-        // AÇÕES PERMITIDAS NA ABA MOTORISTAS (APENAS CHEGADA E DESCARGA IMOBILIZADO)
         
-        // 1. Chegada no CD (para quem está retornando)
-        if ((m.displayStatus === 'retornando_cd' || m.displayStatus === 'retornando_com_imobilizado') && m.veiculoId) {
+        if (m.activeExp && m.displayStatus === 'em_carregamento') {
+            actionButton = `<button class="btn btn-primary btn-small" onclick="registrarSaidaCD('${m.id}', '${m.activeExp.id}')">Saída do CD</button>`;
+        }
+        else if (m.activeExp && m.displayStatus === 'saiu_para_entrega') {
+            actionButton = `<button class="btn btn-success btn-small" onclick="registrarChegadaLoja('${m.id}', '${m.activeExp.id}')">Chegada na Loja</button>`;
+        }
+        else if (m.activeExp && m.displayStatus === 'em_descarga') {
+            actionButton = `<button class="btn btn-warning btn-small" onclick="registrarSaidaLoja('${m.id}', '${m.activeExp.id}')">Saída da Loja</button>`;
+        }
+        else if ((m.displayStatus === 'retornando_cd' || m.displayStatus === 'retornando_com_imobilizado') && m.veiculoId) {
             actionButton = `<button class="btn btn-primary btn-small" onclick="marcarRetornoCD('${m.id}', '${m.veiculoId}')">Cheguei no CD</button>`;
         } 
-        // 2. Finalizar Descarga de Imobilizado
         else if (m.displayStatus === 'descarregando_imobilizado' && m.veiculoId) {
             actionButton = `<button class="btn btn-warning btn-small" onclick="finalizarDescargaImobilizado('${m.id}', '${m.veiculoId}')">Finalizar Descarga</button>`;
         }
         
-        // O BLOCO DE LÓGICA DO CARREGAMENTO FOI REMOVIDO DEFINITIVAMENTE.
-        // Nenhuma lógica para 'aguardando_veiculo' ou 'em_carregamento' deve existir aqui.
 
         let timeInfo = '';
         if (m.activeExp && m.displayStatus === 'saiu_para_entrega') {
@@ -3373,7 +3182,6 @@ function renderMotoristasListHtml(motoristasData) {
         }
         
         async function showYesNoModal(message) {
-            // Reutiliza o modal de QR, simplificado
             return new Promise((resolve) => {
                 const modal = document.getElementById('qrModal');
                 document.getElementById('qrModalTitle').textContent = "Confirmação";
@@ -3439,29 +3247,24 @@ function renderMotoristasListHtml(motoristasData) {
             }
         }
 
-        // --- FUNCIONALIDADES DO RELATÓRIO DE MOTORISTAS ---
         
         async function generateMotoristaReports() {
             const dataInicio = document.getElementById('relatorioMotoristaDataInicio').value;
             const dataFim = document.getElementById('relatorioMotoristaDataFim').value;
             
-            // Se não há filtros de data, usar últimos 30 dias
             const hoje = new Date();
             const inicioAnalise = dataInicio ? new Date(dataInicio + 'T00:00:00.000Z') : new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
             const fimAnalise = dataFim ? new Date(dataFim + 'T23:59:59.999Z') : hoje;
 
             try {
-                // Buscar expedições entregues no período
                 const expeditions = await supabaseRequest('expeditions?status=eq.entregue&order=data_hora.desc');
                 const items = await supabaseRequest('expedition_items');
                 
-                // Filtrar por período
                 const expedicoesFiltradas = expeditions.filter(exp => {
                     const dataExp = new Date(exp.data_hora);
                     return dataExp >= inicioAnalise && dataExp <= fimAnalise;
                 });
 
-                // Processar dados dos motoristas
                 const motoristasStats = {};
                 
                 expedicoesFiltradas.forEach(exp => {
@@ -3474,7 +3277,6 @@ function renderMotoristasListHtml(motoristasData) {
                     const totalEntregas = expItems.length;
                     const totalPallets = expItems.reduce((sum, item) => sum + (item.pallets || 0), 0);
                     
-                    // Calcular tempo total da viagem (da criação até última entrega)
                     let tempoTotalViagem = 0;
                     const ultimaEntrega = expItems.reduce((ultima, item) => {
                         const fimDescarga = item.data_fim_descarga ? new Date(item.data_fim_descarga) : null;
@@ -3506,7 +3308,6 @@ function renderMotoristasListHtml(motoristasData) {
                         stats.temposTotalViagem.push(tempoTotalViagem);
                     }
                     
-                    // Calcular ocupação do veículo
                     if (exp.veiculo_id) {
                         const veiculo = veiculos.find(v => v.id === exp.veiculo_id);
                         if (veiculo && veiculo.capacidade_pallets > 0) {
@@ -3518,7 +3319,6 @@ function renderMotoristasListHtml(motoristasData) {
                     }
                 });
 
-                // Calcular médias e preparar dados finais
                 const motoristasData = Object.values(motoristasStats).map(stats => ({
                     ...stats,
                     tempoMedioViagem: stats.temposTotalViagem.length > 0 ? 
@@ -3528,7 +3328,6 @@ function renderMotoristasListHtml(motoristasData) {
                     entregasPorViagem: stats.viagens > 0 ? (stats.entregas / stats.viagens).toFixed(1) : 0
                 }));
 
-                // Ordenar por número de entregas (ranking)
                 motoristasData.sort((a, b) => b.entregas - a.entregas);
 
                 renderMotoristaReportSummary(motoristasData, expedicoesFiltradas.length);
@@ -3582,14 +3381,12 @@ function renderMotoristasListHtml(motoristasData) {
         }
 
 
-// SUBSTITUIR A FUNÇÃO renderMotoristaRankingChart COMPLETA
 function renderMotoristaRankingChart(motoristasData) {
     if (!motoristasData || motoristasData.length === 0) {
         destroyChart('motoristasRankingChart');
         return;
     }
     
-    // Pega apenas os top 10 e ordena por entregas
     const top10 = [...motoristasData]
         .sort((a, b) => b.entregas - a.entregas)
         .slice(0, 10);
@@ -3755,7 +3552,6 @@ function renderMotoristaRankingChart(motoristasData) {
             container.innerHTML = tableHtml;
         }
         
-        // --- FUNÇÕES DO MODAL DE QR CODE ---
         async function openQrModal(action, mainId, code, secondaryId = null) {
             modalState = { action, mainId, secondaryId, expectedCode: code, scannedValue: null };
             const modal = document.getElementById('qrModal');
@@ -3812,11 +3608,9 @@ function renderMotoristaRankingChart(motoristasData) {
         }
 
        
-       // Adicione esta nova função ao seu arquivo script.js
 
 async function finishLoading(expeditionId) {
     try {
-        // 1. Pega o status atual da expedição antes de fazer qualquer alteração
         const [currentExp] = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=status`);
         if (!currentExp) {
             throw new Error('Expedição não encontrada.');
@@ -3826,20 +3620,14 @@ async function finishLoading(expeditionId) {
             data_saida_veiculo: new Date().toISOString()
         };
 
-        // 2. Lógica principal: Decide o novo status com base no estado atual
-        // Se o faturamento JÁ terminou (status 'faturado'), NÃO mude o status.
-        // Apenas registre a data de fim do carregamento. A interface irá combinar os dois estados para liberar a saída.
         if (currentExp.status === 'faturado') {
-            // O status permanece 'faturado'. A UI combinará isso com a nova 'data_saida_veiculo'.
         } else {
-            // Se o faturamento ainda não terminou, o novo status é 'carregado', indicando que agora aguarda o faturamento.
             updateData.status = 'carregado';
         }
 
         await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', updateData);
         showNotification('Carregamento finalizado com sucesso!', 'success');
 
-        // Recarrega a view ativa para refletir a mudança
         if (document.getElementById('motoristas').classList.contains('active')) {
              consultarExpedicoesPorPlaca();
         } else if (document.getElementById('acompanhamento').classList.contains('active')) {
@@ -3876,17 +3664,14 @@ async function finishLoading(expeditionId) {
             const comImobilizado = await showYesNoModal('Retornando com imobilizados?');
             const novoStatus = comImobilizado ? 'retornando_com_imobilizado' : 'retornando_cd';
             
-            // 🚨 AJUSTE CRÍTICO: Buscar o veiculo_id E o motorista_id
             const expDetails = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=motorista_id,veiculo_id`);
             const motoristaId = expDetails[0].motorista_id;
             const veiculoId = expDetails[0].veiculo_id;
             
-            // 1. Atualiza status do Motorista
             if (motoristaId) {
                 await supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'PATCH', { status: novoStatus }, false);
             }
             
-            // 2. NOVO CÓDIGO: Atualiza status do Veículo para o mesmo status de retorno
             if (veiculoId) {
                 await supabaseRequest(`veiculos?id=eq.${veiculoId}`, 'PATCH', { status: novoStatus }, false);
             }
@@ -3901,7 +3686,6 @@ async function finishLoading(expeditionId) {
     }
 }
         
-    // SUBSTITUA A FUNÇÃO loadAcompanhamento (aprox. linha 2891)
 async function loadAcompanhamento() {
     const permittedAcompanhamentoTabs = getPermittedSubTabs('acompanhamento');
     
@@ -3911,7 +3695,6 @@ async function loadAcompanhamento() {
         showSubTab('acompanhamento', initialSubTab, initialElement);
     }
     
-    // O restante da lógica de carregamento de dados (expeditions, items) permanece aqui
     setDefaultDateFilters();
     const tbody = document.getElementById('acompanhamentoBody');
     tbody.innerHTML = `<tr><td colspan="12" class="loading"><div class="spinner"></div>Carregando expedições...</td></tr>`;
@@ -3919,7 +3702,6 @@ async function loadAcompanhamento() {
     try {
         const expeditions = await supabaseRequest('expeditions?status=not.eq.entregue&order=data_hora.desc');
         const items = await supabaseRequest('expedition_items');
-        // ... (o resto da lógica de loadAcompanhamento, que popula allExpeditions, etc., deve permanecer)
         
         allExpeditions = expeditions.map(exp => {
             const expItems = items.filter(item => item.expedition_id === exp.id);
@@ -3932,7 +3714,6 @@ async function loadAcompanhamento() {
                 total_rolltrainers: expItems.reduce((s, i) => s + (i.rolltrainers || 0), 0),
                 lojas_count: expItems.length,
                 
-                // AJUSTE 1: Mostrar apenas o CÓDIGO da loja, separado por vírgula
                 lojas_info: expItems.map(item => {
                     const loja = lojas.find(l => l.id === item.loja_id);
                     return loja ? `${loja.codigo}` : 'N/A'; // Apenas o código
@@ -3942,7 +3723,6 @@ async function loadAcompanhamento() {
                 lider_nome: lideres.find(l => l.id === exp.lider_id)?.nome || 'N/A',
                 veiculo_placa: veiculo?.placa,
                 
-                // AJUSTE 2: Resumir o nome do motorista (Primeiro e Último nome)
                 motorista_nome: ((nomeCompleto) => {
                     if (!nomeCompleto) return '-';
                     const partes = nomeCompleto.trim().split(' ');
@@ -4008,7 +3788,6 @@ async function loadAcompanhamento() {
         }
 
         function setDefaultDateFilters() {
-    // Cria um formatador específico para obter ano, mês e dia no fuso de Brasília
     const formatter = new Intl.DateTimeFormat('pt-BR', {
         timeZone: 'America/Sao_Paulo',
         year: 'numeric',
@@ -4016,7 +3795,6 @@ async function loadAcompanhamento() {
         day: '2-digit'
     });
 
-    // Obtém as partes da data atual formatadas para Brasília
     const parts = formatter.formatToParts(new Date());
     let year, month, day;
     parts.forEach(part => {
@@ -4025,10 +3803,8 @@ async function loadAcompanhamento() {
         if (part.type === 'day') day = part.value;
     });
 
-    // Monta a string no formato YYYY-MM-DD
     const hojeBrasilia = `${year}-${month}-${day}`;
 
-    // --- Aplica aos filtros da aba Acompanhamento ---
     const filtroInicio = document.getElementById('filtroDataInicio');
     const filtroFim = document.getElementById('filtroDataFim');
     if (filtroInicio) filtroInicio.value = hojeBrasilia;
@@ -4056,7 +3832,6 @@ async function loadAcompanhamento() {
             document.getElementById('tempoMedioTotal').textContent = minutesToHHMM(calcularMedia(temposTotal));
         }
         
-       // SUBSTITUA A FUNÇÃO renderAcompanhamentoTable (aprox. linha 2970)
 function renderAcompanhamentoTable(expeditions) {
     const tbody = document.getElementById('acompanhamentoBody');
     if (expeditions.length === 0) {
@@ -4127,7 +3902,6 @@ function renderAcompanhamentoTable(expeditions) {
     tbody.innerHTML = `<tr><td colspan="5" class="loading"><div class="spinner"></div>Calculando ociosidade...</td></tr>`;
 
     try {
-        // 1. Definir Período de Análise
         const hoje = new Date();
         const dataInicio = document.getElementById('frotaFiltroDataInicio').value || new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString().split('T')[0];
         const dataFimInput = document.getElementById('frotaFiltroDataFim').value || hoje.toISOString().split('T')[0];
@@ -4135,16 +3909,13 @@ function renderAcompanhamentoTable(expeditions) {
         const startOfAnalysis = new Date(dataInicio + 'T00:00:00.000Z');
         const endOfAnalysis = new Date(dataFimInput + 'T23:59:59.999Z');
 
-        // 2. Buscar histórico de status relevante
         const startQuery = new Date(startOfAnalysis);
         startQuery.setDate(startQuery.getDate() - 1); // Pega um dia antes para garantir o status inicial
         
-        // NOVO: A requisição agora busca o histórico de status de veículos da filial
         const statusHistory = await supabaseRequest(`veiculos_status_historico?created_at=gte.${startQuery.toISOString()}&created_at=lte.${endOfAnalysis.toISOString()}&order=created_at.asc`, 'GET', null, false);
 
         const ociosidadeData = [];
 
-        // NOVO: Filtrar veículos que NÃO estão em 'manutencao' e pertencem à filial
         const veiculosFiltrados = veiculos.filter(v => v.filial === selectedFilial.nome && v.status !== 'manutencao');
 
         for (const veiculo of veiculosFiltrados) {
@@ -4165,7 +3936,6 @@ function renderAcompanhamentoTable(expeditions) {
                 const tempoEvento = new Date(evento.created_at);
                 
                 if (statusAtual === 'disponivel') {
-                    // Soma o tempo ocioso acumulado entre a última ação e este evento
                     tempoOciosoTotal += (tempoEvento - ultimoTimestamp);
                 }
 
@@ -4179,20 +3949,16 @@ function renderAcompanhamentoTable(expeditions) {
                 }
             });
 
-            // Considera o tempo ocioso até o momento atual (endOfAnalysis)
             if (statusAtual === 'disponivel') {
                 tempoOciosoTotal += (endOfAnalysis - ultimoTimestamp);
             }
 
-            // NOVO CÓDIGO: Calcula o tempo ocioso 'agora'
             let tempoOciosoAtual = 0;
             if (veiculo.status === 'disponivel') {
-                // Tenta achar a última mudança para 'disponivel' dentro do período
                 const lastIdleChange = veiculoHistory
                     .filter(h => h.status_novo === 'disponivel' && new Date(h.created_at) >= startOfAnalysis)
                     .pop();
                 
-                // Se achou, calcula o tempo entre o evento e o tempo atual (agora)
                 const inicioIdle = lastIdleChange ? new Date(lastIdleChange.created_at) : (inicioOciosidadeAtual || new Date());
                 tempoOciosoAtual = (new Date() - inicioIdle) / 60000; // Tempo em minutos até o 'agora'
             }
@@ -4204,7 +3970,6 @@ function renderAcompanhamentoTable(expeditions) {
                 idleTime: tempoOciosoTotal / 60000, // Tempo Ocioso Total no Período (em minutos)
                 idleSince: veiculo.status === 'disponivel' ? inicioOciosidadeAtual : null, // Início da Ociosidade no Período
                 lastAction: ultimoTimestamp, // Último evento de status no período (ou inicio da análise)
-                // NOVO: Adiciona o tempo ocioso atual (do status 'disponivel')
                 currentIdleTime: tempoOciosoAtual 
             });
         }
@@ -4214,7 +3979,6 @@ function renderAcompanhamentoTable(expeditions) {
         document.getElementById('frotaAtiva').textContent = veiculosFiltrados.filter(v => v.status !== 'disponivel' && v.status !== 'folga').length;
         document.getElementById('frotaOciosa').textContent = veiculosFiltrados.filter(v => v.status === 'disponivel').length;
         
-        // Ordena pela ociosidade ATUAL (currentIdleTime)
         renderOciosidadeTable(ociosidadeData.sort((a, b) => b.currentIdleTime - a.currentIdleTime));
 
     } catch (error) {
@@ -4233,16 +3997,12 @@ function renderAcompanhamentoTable(expeditions) {
     }
 
     tbody.innerHTML = data.map(v => {
-        // NOVO: Exibe o tempo ocioso APENAS se o status for 'disponivel'
         const tempoOciosoDisplay = v.status === 'disponivel' && v.currentIdleTime > 0 ? minutesToHHMM(v.currentIdleTime) : '-';
-        // A coluna 'Início Ociosidade' é o inicio da contagem atual (se disponível), senão é o tempo total da análise
         const ociosoDesdeDisplay = v.status === 'disponivel' && v.idleSince ? new Date(v.idleSince).toLocaleTimeString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
-        // NOVO: A coluna 'Última Ação' agora exibe o último timestamp de mudança de status (mesmo que não seja ocioso)
         const ultimaAcaoDisplay = v.lastAction && new Date(v.lastAction).getTime() > new Date(document.getElementById('frotaFiltroDataInicio').value + 'T00:00:00.000Z').getTime() ? 
             new Date(v.lastAction).toLocaleTimeString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : 
             'N/A'; // Não exibe se for o timestamp do início da análise
         
-        // Define a cor da linha com base no tempo ocioso atual
         let rowClass = '';
         if (v.status === 'disponivel') {
              if (v.currentIdleTime > 120) rowClass = 'bg-red-100'; // > 2h ocioso
@@ -4261,7 +4021,6 @@ function renderAcompanhamentoTable(expeditions) {
         `;
     }).join('');
 }
-// --- FUNCIONALIDADES DO RASTREIO EM TEMPO REAL ---
 
 function populateRastreioFilters() {
     const motoristaFilter = document.getElementById('rastreioFiltroMotorista');
@@ -4273,16 +4032,11 @@ function populateRastreioFilters() {
     }
 }
 
-// --- FUNCIONALIDADES DO RASTREIO EM TEMPO REAL ---
 
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
-// SUBSTITUIR A FUNÇÃO loadRastreioData COMPLETA
-// SUBSTITUIR A FUNÇÃO loadRastreioData COMPLETA (aprox. linha 3866)
 async function loadRastreioData() {
     try {
         console.log("Iniciando carregamento dos dados de rastreio...");
-        // Garante que o status de retorno seja tratado (para Veículos e Motoristas)
         const expeditionsEmRota = await supabaseRequest('expeditions?status=eq.saiu_para_entrega&order=data_saida_entrega.desc');
         const items = await supabaseRequest('expedition_items');
         
@@ -4303,7 +4057,6 @@ async function loadRastreioData() {
                 return null;
             }
 
-            // Ordenar itens por ordem_entrega primeiro, depois por data_inicio_descarga
             const itemsOrdenados = expItems.sort((a, b) => {
                 const aOrdem = a.ordem_entrega || 999;
                 const bOrdem = b.ordem_entrega || 999;
@@ -4345,13 +4098,11 @@ async function loadRastreioData() {
             const tempoSaida = new Date(exp.data_saida_entrega);
             const tempoDecorrido = (new Date() - tempoSaida) / 60000;
             
-            // 🚨 CÁLCULO DE DISTÂNCIA E TEMPO DA ROTA COMPLETA 🚨
             let distanciaTotalKm = 0;
             let tempoTotalRota = 0;
             let eta = new Date();
             
             try {
-                // Construir waypoints para a rota completa
                 const waypoints = [
                     { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd }
                 ];
@@ -4366,7 +4117,6 @@ async function loadRastreioData() {
                     }
                 });
                 
-                // Se há pelo menos 2 pontos, calcular a rota
                 if (waypoints.length >= 2) {
                     const rotaCompleta = await getRouteFromAPI(waypoints);
                     
@@ -4374,7 +4124,6 @@ async function loadRastreioData() {
                         distanciaTotalKm = rotaCompleta.distance / 1000; // Converter metros para km
                         tempoTotalRota = rotaCompleta.duration / 60; // Converter segundos para minutos
                     } else {
-                        // Fallback: calcular distância em linha reta
                         let distanciaEstimada = 0;
                         for (let i = 1; i < waypoints.length; i++) {
                             distanciaEstimada += calculateDistance(
@@ -4387,7 +4136,6 @@ async function loadRastreioData() {
                     }
                 }
                 
-                // Calcular ETA para a próxima loja (se houver)
                 if (proximaLoja && proximaLoja.latitude && proximaLoja.longitude) {
                     try {
                         const rotaProximaLoja = await getRouteFromAPI([
@@ -4399,7 +4147,6 @@ async function loadRastreioData() {
                             const tempoRestanteMinutos = rotaProximaLoja.duration / 60;
                             eta = new Date(Date.now() + (tempoRestanteMinutos * 60000));
                         } else {
-                            // Fallback: estimar baseado em distância reta
                             const distReta = calculateDistance(
                                 parseFloat(currentLocation.latitude), parseFloat(currentLocation.longitude),
                                 parseFloat(proximaLoja.latitude), parseFloat(proximaLoja.longitude)
@@ -4413,7 +4160,6 @@ async function loadRastreioData() {
                 }
             } catch (error) {
                 console.error('Erro ao calcular rota completa:', error);
-                // Fallback completo: usar estimativa simples
                 let distanciaEstimada = 0;
                 const waypoints = [
                     { lat: selectedFilial.latitude_cd, lng: selectedFilial.longitude_cd }
@@ -4488,7 +4234,6 @@ async function loadRastreioData() {
             const lastVehicle = lastVeiculoId ? veiculos.find(v => v.id === lastVeiculoId) : null;
             
             if (currentLocation && currentLocation.latitude && currentLocation.longitude) {
-                // Calcular distância e tempo de retorno ao CD
                 let distanciaTotalKm = 0;
                 let tempoEstimadoMinutos = 0;
                 let eta = new Date();
@@ -4504,7 +4249,6 @@ async function loadRastreioData() {
                         tempoEstimadoMinutos = rota.duration / 60;
                         eta = new Date(Date.now() + (tempoEstimadoMinutos * 60000));
                     } else {
-                        // Fallback
                         const distReta = calculateDistance(
                             parseFloat(currentLocation.latitude), parseFloat(currentLocation.longitude),
                             selectedFilial.latitude_cd, selectedFilial.longitude_cd
@@ -4609,11 +4353,9 @@ function applyRastreioFilters() {
     renderRastreioList(filteredData);
 }
 
-// SUBSTITUIR A FUNÇÃO renderRastreioList COMPLETA (Aprox. linha 3901)
 function renderRastreioList(data) {
     const container = document.getElementById('rastreioList');
     
-    // Filtra explicitamente qualquer nulo ou undefined que possa ter entrado
     const safeData = data.filter(Boolean); 
     
     if (safeData.length === 0) {
@@ -4626,7 +4368,6 @@ function renderRastreioList(data) {
         let locationInfo = '';
         let nextActionInfo = '';
         
-        // 🚨 NOVO CÓDIGO: Verifica se o status é de retorno para desabilitar o botão de trajeto 🚨
         const isReturning = rastreio.status_rastreio === 'retornando';
         const trajectoryButton = isReturning ?
             `<button class="btn btn-secondary btn-small" disabled title="Trajeto de retorno não disponível">Ver Trajeto</button>` :
@@ -4652,11 +4393,9 @@ function renderRastreioList(data) {
             nextActionInfo = `<div class="text-xs text-gray-500">ETA CD: ${rastreio.eta.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</div>`;
         }
         
-        // Calcular tempo desde a última atualização
         const tempoUltimaAtualizacao = rastreio.last_update ? 
             Math.round((new Date() - rastreio.last_update) / 60000) : null;
 
-        // Informações de proximidade
         let proximityInfo = '';
         if (rastreio.pontos_proximos && Array.isArray(rastreio.pontos_proximos) && rastreio.pontos_proximos.length > 0) {
             proximityInfo = `
@@ -4771,7 +4510,6 @@ return `<div class="flex items-center text-sm ...">
 }
 
 function showLocationMap(expeditionId, lat, lng) {
-    // Em uma implementação real, isso abriria um mapa (Google Maps, OpenStreetMap, etc.)
     const mapUrl = `https://www.google.com/maps?q=${lat},${lng}&z=15`;
     window.open(mapUrl, '_blank');
 }
@@ -4780,7 +4518,6 @@ function toggleAutoRefresh() {
     const autoRefresh = document.getElementById('autoRefreshRastreio').checked;
     
     if (autoRefresh) {
-        // Atualizar a cada 15 segundos para dados em tempo real
         rastreioTimer = setInterval(() => {
             loadRastreioData();
         }, 15000);
@@ -4799,7 +4536,6 @@ function updateLastRefreshTime() {
     document.getElementById('lastUpdateRastreio').textContent = 
         `Última atualização: ${now.toLocaleTimeString('pt-BR')}`;
 }
-     // SUBSTITUIR A FUNÇÃO loadHistorico
 async function loadHistorico() {
     const permittedHistoricoTabs = getPermittedSubTabs('historico');
     
@@ -4812,7 +4548,6 @@ async function loadHistorico() {
     const container = document.getElementById('historicoList');
     container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando histórico...</div>`;
     try {
-        // 🚨 FIX CRÍTICO: Adicionar limit=1000 para garantir que todos os registros sejam carregados
         const expeditions = await supabaseRequest('expeditions?status=eq.entregue&order=data_hora.desc&limit=1000');
         const items = await supabaseRequest('expedition_items');
         
@@ -4874,7 +4609,6 @@ async function loadHistorico() {
             applyHistoricoFilters();
         }
 
-      // SUBSTITUIR A FUNÇÃO renderHistorico COMPLETA (CORRIGIDA)
 function renderHistorico(data) {
     const container = document.getElementById('historicoList');
     if (data.length === 0) {
@@ -4883,7 +4617,6 @@ function renderHistorico(data) {
     }
 
     container.innerHTML = data.map(exp => {
-        // 1. CÁLCULO DE TEMPOS DA EXPEDIÇÃO (Tudo em minutos)
         const tempos = {
             patio: (exp.data_saida_veiculo && exp.data_hora) ? minutesToHHMM((new Date(exp.data_saida_veiculo) - new Date(exp.data_hora)) / 60000) : 'N/A',
             alocacao: (exp.data_alocacao_veiculo && exp.data_hora) ? minutesToHHMM((new Date(exp.data_alocacao_veiculo) - new Date(exp.data_hora)) / 60000) : 'N/A',
@@ -4897,9 +4630,7 @@ function renderHistorico(data) {
         let lastDeparture = exp.data_saida_entrega ? new Date(exp.data_saida_entrega) : new Date(exp.data_saida_veiculo);
 
 
-        // 2. ROTEIRO DE ENTREGAS E CÁLCULO DE TEMPOS DE TRÂNSITO/LOJA
         if (exp.items && exp.items.length > 0) {
-             // Ordena para garantir a ordem correta na renderização e cálculo
              exp.items.sort((a, b) => (a.ordem_entrega || 999) - (b.ordem_entrega || 999)).forEach((item, index) => {
                 const loja = lojas.find(l => l.id === item.loja_id);
                 const t_chegada = item.data_inicio_descarga ? new Date(item.data_inicio_descarga) : null;
@@ -4908,26 +4639,22 @@ function renderHistorico(data) {
                 let tempoEmLojaMin = 0;
                 let tempoTransitoMin = 0;
 
-                // Calcula o Tempo em Trânsito (do último ponto de saída até a chegada atual)
                 if (t_chegada && lastDeparture) {
                     tempoTransitoMin = (t_chegada - lastDeparture) / 60000;
                     totalTempoEmTransito += tempoTransitoMin;
                 }
                 
-                // Calcula o Tempo em Loja (descarga)
                 if (t_saida && t_chegada) {
                     tempoEmLojaMin = (t_saida - t_chegada) / 60000;
                     totalTempoEmLoja += tempoEmLojaMin;
                     lastDeparture = t_saida; // Atualiza o último ponto de saída
                 }
 
-                // Determina a cor da badge de tempo em loja (descarga)
                 let tempoLojaClass = '';
                 if (tempoEmLojaMin > 60) tempoLojaClass = 'bg-red-100 text-red-800'; // Vermelho se > 1h
                 else if (tempoEmLojaMin > 30) tempoLojaClass = 'bg-yellow-100 text-yellow-800'; // Amarelo se > 30min
                 else if (tempoEmLojaMin > 0) tempoLojaClass = 'bg-green-100 text-green-800'; // Verde
                 
-                // Garante que rolltrainers e pallets sejam exibidos como 0 se nulos
                 const palletsDisplay = item.pallets || 0;
                 const rollsDisplay = item.rolltrainers || 0;
 
@@ -4952,9 +4679,7 @@ function renderHistorico(data) {
              });
         }
 
-        // 3. RENDERIZAÇÃO DO CARD COMPLETO
         
-        // Define a cor da ocupação
         const ocupacaoPerc = Math.round(exp.ocupacao || 0);
         let ocupacaoColor = 'text-green-600';
         if (ocupacaoPerc > 90) ocupacaoColor = 'text-orange-600';
@@ -5026,7 +4751,6 @@ function renderHistorico(data) {
             }
         }
 
- // SUBSTITUIR A FUNÇÃO generateHistoricoIndicators COMPLETA
 function generateHistoricoIndicators(data) {
     const timeSummaryContainer = document.getElementById('indicadoresTimeSummary');
     const volumeStatsContainer = document.getElementById('indicadoresVolumeStats');
@@ -5045,7 +4769,6 @@ function generateHistoricoIndicators(data) {
     const calcularMedia = (arr) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
     const totalViagens = data.length;
     
-    // VARIÁVEIS DE AGRUPAMENTO
     let temposAlocar = [];
     let temposChegadaDoca = [];
     let temposCarregamento = [];
@@ -5053,7 +4776,6 @@ function generateHistoricoIndicators(data) {
     let temposEmTransito = []; 
     let temposEmLoja = [];
     
-    // Estrutura principal para Ranking e Participação. O array 'tempos' é crítico para o ranking.
     let lojasData = {}; 
     let entregasFort = 0, entregasComper = 0;
     let totalEntregas = 0;
@@ -5069,13 +4791,11 @@ function generateHistoricoIndicators(data) {
         const dataExp = new Date(exp.data_hora).toISOString().split('T')[0];
         datasExpedicao.add(dataExp);
         
-        // 1. CÁLCULOS DE TEMPO INTERNO (Pátio)
         if (exp.data_alocacao_veiculo) temposAlocar.push((new Date(exp.data_alocacao_veiculo) - new Date(exp.data_hora)) / 60000);
         if (exp.data_chegada_veiculo && exp.data_alocacao_veiculo) temposChegadaDoca.push((new Date(exp.data_chegada_veiculo) - new Date(exp.data_alocacao_veiculo)) / 60000);
         if (exp.data_chegada_veiculo && exp.data_saida_veiculo) temposCarregamento.push((new Date(exp.data_saida_veiculo) - new Date(exp.data_chegada_veiculo)) / 60000);
         if (exp.data_inicio_faturamento && exp.data_fim_faturamento) temposFaturamento.push((new Date(exp.data_fim_faturamento) - new Date(exp.data_inicio_faturamento)) / 60000);
         
-        // 2. CÁLCULOS DE VOLUME E TEMPO EXTERNO
         let ultimaData = exp.data_saida_entrega ? new Date(exp.data_saida_entrega) : new Date(exp.data_saida_veiculo);
         let totalTransitoViagem = 0;
         let totalLojaViagem = 0;
@@ -5085,13 +4805,11 @@ function generateHistoricoIndicators(data) {
         let cargaRollExp = 0;
 
         exp.items.sort((a, b) => (a.ordem_entrega || 999) - (b.ordem_entrega || 999)).forEach(item => {
-            // Conta totais GERAIS
             totalPallets += item.pallets || 0;
             totalRolls += item.rolltrainers || 0;
             cargaPalletExp += item.pallets || 0;
             cargaRollExp += item.rolltrainers || 0;
             
-            // Para o cálculo de tempos de loja e trânsito
             const t_chegada = item.data_inicio_descarga ? new Date(item.data_inicio_descarga) : null;
             const t_saida = item.data_fim_descarga ? new Date(item.data_fim_descarga) : null;
             const tempoEmLoja = t_saida && t_chegada ? (t_saida - t_chegada) / 60000 : 0;
@@ -5102,7 +4820,6 @@ function generateHistoricoIndicators(data) {
                 const loja = lojas.find(l => l.id === item.loja_id);
                 if(loja) {
                     lojasAtendidas.add(loja.id);
-                    // Inicializa a estrutura da loja
                     if (!lojasData[loja.id]) {
                         lojasData[loja.id] = { nome: `${loja.codigo} - ${loja.nome}`, totalEntregas: 0, totalTempo: 0, totalPallets: 0, tempos: [] }; // Adicionado 'tempos'
                     }
@@ -5118,17 +4835,14 @@ function generateHistoricoIndicators(data) {
             if (t_saida) ultimaData = t_saida;
         });
         
-        // CORREÇÃO CRÍTICA (Item 4): A contagem de Entregas/Saídas deve ser por EXPEDIÇÃO/ITEM finalizado
         if (exp.status === 'entregue') {
             exp.items.forEach(item => {
                 const loja = lojas.find(l => l.id === item.loja_id);
                 if (loja && item.status_descarga === 'descarregado') {
-                     // Conta 1 "saída" por item de expedição descarregado (reflete a lógica de 1 loja = 1 item)
                     lojasData[loja.id].totalEntregas++; 
                     totalEntregas++; 
                 }
             });
-            // Mantida para o gráfico de Evolução (se fosse usado)
             entregasDiarias[dataExp] = (entregasDiarias[dataExp] || 0) + exp.items.length;
         }
 
@@ -5141,7 +4855,6 @@ function generateHistoricoIndicators(data) {
         }
     });
     
-    // CÁLCULO DAS MÉDIAS FINAIS
     const mediaAlocar = calcularMedia(temposAlocar);
     const mediaChegadaDoca = calcularMedia(temposChegadaDoca);
     const mediaCarregamento = calcularMedia(temposCarregamento);
@@ -5150,24 +4863,16 @@ function generateHistoricoIndicators(data) {
     const mediaEmLoja = calcularMedia(temposEmLoja);
     const mediaOcupacao = calcularMedia(ocupacoes);
     
-    // T.M. TOTAL INTERNO (E2E): Ociosidade + Chegada Doca + Carregamento + Faturamento
     const mediaTempoInternoTotal = mediaAlocar + mediaChegadaDoca + mediaCarregamento + mediaFaturamento;
 
     
-    // PROCESSAMENTO PARA GRÁFICOS
     const lojasRankingData = Object.values(lojasData).map(loja => ({
         ...loja,
-        // Garante que o tempo médio por loja (para o Ranking) seja calculado a partir de todos os 'tempos'
         tempoMedio: calcularMedia(loja.tempos) 
     })).filter(l => l.totalEntregas > 0); 
     
-    // -----------------------------------------------------
-    // RENDERIZAÇÃO
-    // -----------------------------------------------------
     
-    // ... (Blocos de Volume e Tempos permanecem os mesmos)
     
-    // 1. Bloco de Volume e Eficiência (6 Indicadores)
     volumeStatsContainer.innerHTML = `
         <div class="stat-card" style="background: linear-gradient(135deg, #00D4AA, #00B4D8);">
             <div class="stat-number">${totalViagens}</div>
@@ -5195,7 +4900,6 @@ function generateHistoricoIndicators(data) {
         </div>
     `;
 
-    // 2. Bloco de Tempos por Grupo (5 Colunas)
     timeSummaryContainer.innerHTML = `
         <div class="bg-white p-4 rounded-xl shadow-lg border-t-4 border-blue-600 historico-time-card" data-aos="fade-up">
             <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">⏱️Tempo Interno </h3>
@@ -5245,23 +4949,16 @@ function generateHistoricoIndicators(data) {
         </div>
     `;
     
-    // 3. Renderização dos Gráficos
-    // CORREÇÃO DO RANKING (Item 2)
     renderLojasRankingChart(lojasRankingData.filter(l => l.tempoMedio > 0).sort((a, b) => b.tempoMedio - a.tempoMedio).slice(0, 10));
     renderEntregasChart(entregasFort, entregasComper);
     
-    // NOVOS GRÁFICOS
     renderTotalEntregasLojaChart(lojasRankingData);
     renderParticipacaoEntregasLojaChart(lojasRankingData); // Novo gráfico de Pizza (Ajustado no código abaixo)
     renderPalletsPorLojaChart(lojasRankingData); // Novo gráfico
     
-    // REMOVIDO renderEvolucaoEntregasDiaChart (Item 5)
 
 }
 
-// =======================================================
-// NOVAS FUNÇÕES DE RENDERIZAÇÃO DE GRÁFICOS (PARA ADICIONAR)
-// =======================================================
 
 function renderTotalEntregasLojaChart(lojasData) {
     const dataFiltrada = lojasData.filter(l => l.totalEntregas > 0).sort((a, b) => b.totalEntregas - a.totalEntregas).slice(0, 10);
@@ -5300,7 +4997,6 @@ function renderTotalEntregasLojaChart(lojasData) {
 }
 
 
-// SUBSTITUIR A FUNÇÃO renderParticipacaoEntregasLojaChart COMPLETA
 function renderParticipacaoEntregasLojaChart(lojasData) {
     const dataFiltrada = lojasData.filter(l => l.totalEntregas > 0).sort((a, b) => b.totalEntregas - a.totalEntregas);
     if (dataFiltrada.length === 0) {
@@ -5310,13 +5006,11 @@ function renderParticipacaoEntregasLojaChart(lojasData) {
 
     const totalGeral = dataFiltrada.reduce((sum, l) => sum + l.totalEntregas, 0);
     
-    // REQUISITO: TOP 5 e REMOVER FATIA 'OUTRAS LOJAS'
     const topN = 5;
     const topLojas = dataFiltrada.slice(0, topN);
     
     let labels = topLojas.map(l => l.nome);
     let data = topLojas.map(l => l.totalEntregas);
-    // Cores específicas para Fort/Comper
     let colors = topLojas.map(l => l.nome.toLowerCase().includes('fort') ? 'rgba(239, 68, 68, 0.8)' : 'rgba(0, 180, 216, 0.8)');
 
 
@@ -5457,15 +5151,12 @@ function renderPalletsPorLojaChart(lojasData) {
             }
         }
 
-// Função para mostrar modal de autenticação para edição - MODIFICADA
 function showAuthEditModal(expeditionId) {
-    // Armazena o ID no próprio formulário como um campo hidden
     document.getElementById('authEditModal').style.display = 'flex';
     document.getElementById('authEditUser').value = '';
     document.getElementById('authEditPassword').value = '';
     document.getElementById('authEditAlert').innerHTML = '';
     
-    // ADICIONA UM CAMPO HIDDEN COM O ID DA EXPEDIÇÃO
     let hiddenIdField = document.getElementById('authEditExpeditionId');
     if (!hiddenIdField) {
         hiddenIdField = document.createElement('input');
@@ -5478,12 +5169,10 @@ function showAuthEditModal(expeditionId) {
     document.getElementById('authEditUser').focus();
 }
 
-// Função para fechar modal de autenticação
 function closeAuthEditModal() {
     document.getElementById('authEditModal').style.display = 'none';
 }
 
-// Função para verificar autenticação para edição - SIMPLIFICADA
 async function checkAuthForEdit() {
     const nome = document.getElementById('authEditUser').value.trim();
     const senha = document.getElementById('authEditPassword').value;
@@ -5511,17 +5200,14 @@ async function checkAuthForEdit() {
 
         const user = result[0];
         
-        // Verifica se o usuário tem permissão (ALL ou filial específica)
         if (user.tipo_acesso !== 'ALL' && user.tipo_acesso !== selectedFilial.nome) {
             showAlert('authEditAlert', 'Você não tem permissão para editar nesta filial.', 'error');
             return;
         }
 
-        // Autenticação bem-sucedida
         closeAuthEditModal();
         showNotification(`Acesso autorizado para ${user.nome}!`, 'success');
         
-        // Abre o modal de edição diretamente
         openEditModalDirectly(expeditionId);
 
     } catch (error) {
@@ -5530,11 +5216,9 @@ async function checkAuthForEdit() {
     }
 }
 
-// SUBSTITUIR A FUNÇÃO openEditModal COMPLETA
 async function openEditModal(expeditionId) {
     const isMaster = masterUserPermission;
     
-    // 1. Verificar Permissão Principal: Checagem robusta de múltiplas nomenclaturas
     const requiredPermissions = [
         'edit_expeditions',     // Plural inglês (Mais comum no seu BD para ações)
         'edit_expedition',      // Singular inglês (Alternativa comum)
@@ -5545,7 +5229,6 @@ async function openEditModal(expeditionId) {
     
     let canEdit = isMaster;
 
-    // Se o usuário não for MASTER, checa todas as variações da permissão de edição
     if (!canEdit) {
         for (const perm of requiredPermissions) {
             if (hasPermission(perm)) {
@@ -5581,20 +5264,17 @@ async function openEditModal(expeditionId) {
         return;
     }
 
-    // 2. Aplicar Restrição de Status (SÓ PARA USUÁRIOS NORMAIS) - Master Bypass OK
     if (!isMaster && (expedition.status === 'saiu_para_entrega' || expedition.status === 'entregue')) {
         showNotification('Esta expedição não pode mais ser editada, pois já saiu para entrega.', 'error');
         return;
     }
     
-    // 3. Se não é Master, e o status é avançado, pedimos autenticação para garantir
     if (!isMaster && (expedition.status === 'faturado' || expedition.status === 'faturamento_iniciado')) {
         showNotification('Acesso a esta expedição requer autenticação adicional.', 'info');
         showAuthEditModal(expeditionId);
         return;
     }
 
-    // 4. Fluxo de Edição Normal
     document.getElementById('editExpeditionId').value = expeditionId;
 
     populateEditSelects();
@@ -5616,9 +5296,7 @@ async function openEditModal(expeditionId) {
     document.getElementById('editExpeditionModal').style.display = 'flex';
 }
 
-// Função que abre o modal de edição sem verificação
 async function openEditModalDirectly(expeditionId) {
-    // Primeiro, garante que temos os dados carregados
     if (!allExpeditions || allExpeditions.length === 0) {
         showNotification('Carregando dados...', 'info');
         await loadAcompanhamento();
@@ -5627,7 +5305,6 @@ async function openEditModalDirectly(expeditionId) {
     let expedition = allExpeditions ? allExpeditions.find(e => e.id === expeditionId) : null;
     
     if (!expedition) {
-        // Tenta buscar diretamente do banco
         try {
             const expeditions = await supabaseRequest(`expeditions?id=eq.${expeditionId}`);
             const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`);
@@ -5646,7 +5323,6 @@ async function openEditModalDirectly(expeditionId) {
         return;
     }
 
-    // Verificar se a expedição pode ser editada
     if (expedition.status === 'saiu_para_entrega' || expedition.status === 'entregue') {
         showNotification('Esta expedição não pode mais ser editada pois já saiu para entrega.', 'error');
         return;
@@ -5654,10 +5330,8 @@ async function openEditModalDirectly(expeditionId) {
     
     document.getElementById('editExpeditionId').value = expeditionId;
     
-    // Preencher selects com opções
     populateEditSelects();
     
-    // Preencher campos editáveis (removendo status)
     document.getElementById('editMotorista').value = expedition.motorista_id || '';
     document.getElementById('editVeiculo').value = expedition.veiculo_id || '';
     document.getElementById('editDoca').value = expedition.doca_id || '';
@@ -5674,30 +5348,25 @@ async function openEditModalDirectly(expeditionId) {
     
     document.getElementById('editExpeditionModal').style.display = 'flex';
 }
-// Nova função para popular os selects do modal de edição
 function populateEditSelects() {
-    // Veículos
     const veiculoSelect = document.getElementById('editVeiculo');
     veiculoSelect.innerHTML = '<option value="">Selecione o veículo</option>';
     veiculos.forEach(v => {
         veiculoSelect.innerHTML += `<option value="${v.id}">${v.placa} - ${v.modelo} (Cap: ${v.capacidade_pallets}P)</option>`;
     });
 
-    // Motoristas
     const motoristaSelect = document.getElementById('editMotorista');
     motoristaSelect.innerHTML = '<option value="">Selecione o motorista</option>';
     motoristas.forEach(m => {
         motoristaSelect.innerHTML += `<option value="${m.id}">${m.nome}</option>`;
     });
 
-    // Docas
     const docaSelect = document.getElementById('editDoca');
     docaSelect.innerHTML = '<option value="">Selecione a doca</option>';
     docas.forEach(d => {
         docaSelect.innerHTML += `<option value="${d.id}">${d.nome}</option>`;
     });
 
-    // Líderes
     const liderSelect = document.getElementById('editLider');
     liderSelect.innerHTML = '<option value="">Selecione o Conferente</option>';
     lideres.forEach(l => {
@@ -5709,16 +5378,13 @@ function populateEditSelects() {
             document.getElementById('editExpeditionModal').style.display = 'none';
         }
 
-       // Função para adicionar uma nova linha de loja no modal de edição
 function addEditLojaLine(item = null) {
     editLojaLineCounter++;
     const container = document.getElementById('editLojasContainer');
     const newLine = document.createElement('div');
-    // Ajustado para 5 colunas (Loja, Pallets, RollTrainers, Remover)
     newLine.className = 'grid grid-cols-1 md:grid-cols-5 gap-4 items-end';
     newLine.dataset.editIndex = editLojaLineCounter;
     
-    // Inclui campo RollTrainers (com a classe 'edit-rolls-input')
     newLine.innerHTML = `
         <div class="form-group md:col-span-2"><label>Loja:</label><select class="edit-loja-select w-full">${lojas.map(l => `<option value="${l.id}">${l.codigo} - ${l.nome}</option>`).join('')}</select></div>
         <div class="form-group"><label>Pallets:</label><input type="number" class="edit-pallets-input w-full" min="0"></div>
@@ -5730,7 +5396,6 @@ function addEditLojaLine(item = null) {
     if(item) {
         newLine.querySelector('.edit-loja-select').value = item.loja_id;
         newLine.querySelector('.edit-pallets-input').value = item.pallets;
-        // Preenche o campo RollTrainers com o valor existente
         newLine.querySelector('.edit-rolls-input').value = item.rolltrainers || 0; 
     }
 }
@@ -5739,7 +5404,6 @@ function addEditLojaLine(item = null) {
             document.querySelector(`[data-edit-index="${index}"]`)?.remove();
         }
 
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
 async function saveEditedExpedition() {
   const expeditionId = document.getElementById('editExpeditionId').value;
@@ -5749,7 +5413,6 @@ async function saveEditedExpedition() {
   const newLider = document.getElementById('editLider').value;
   const newObservacoes = document.getElementById('editObservacoes').value;
 
-  // 1. Coletar os novos dados dos itens da expedição (lojas)
   const newItemsData = Array.from(document.querySelectorAll('#editLojasContainer .grid')).map(row => ({
     loja_id: row.querySelector('.edit-loja-select').value,
     pallets: parseInt(row.querySelector('.edit-pallets-input').value) || 0,
@@ -5757,20 +5420,17 @@ async function saveEditedExpedition() {
   }));
 
   try {
-    // Encontra a expedição original
     const originalExpedition = allExpeditions.find(e => e.id === expeditionId);
     if (!originalExpedition) {
       throw new Error('Expedição original não encontrada.');
     }
 
-    // Verificar se pode editar
     if (originalExpedition.status === 'saiu_para_entrega' || originalExpedition.status === 'entregue') {
       throw new Error('Esta expedição não pode mais ser editada pois já saiu para entrega.');
     }
 
     const updatePromises = [];
 
-    // 2. Liberar recursos antigos se houve mudança
     if (originalExpedition.motorista_id && originalExpedition.motorista_id !== newMotorista) {
       updatePromises.push(
         supabaseRequest(`motoristas?id=eq.${originalExpedition.motorista_id}`, 'PATCH', { status: 'disponivel' }, false)
@@ -5789,7 +5449,6 @@ async function saveEditedExpedition() {
       );
     }
 
-    // 3. Alocar novos recursos se foram selecionados
     if (newMotorista && newMotorista !== originalExpedition.motorista_id) {
       updatePromises.push(
         supabaseRequest(`motoristas?id=eq.${newMotorista}`, 'PATCH', { status: 'em_viagem' }, false)
@@ -5808,7 +5467,6 @@ async function saveEditedExpedition() {
       );
     }
 
-    // 4. Atualizar os dados da expedição principal
     const expeditionUpdatePayload = {
       veiculo_id: newVeiculo || null,
       motorista_id: newMotorista || null,
@@ -5821,26 +5479,21 @@ async function saveEditedExpedition() {
       supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'PATCH', expeditionUpdatePayload, false)
     );
 
-    // 5. Gerenciar os itens (lojas) da expedição
     const originalItems = originalExpedition.items;
 
-    // Itens a serem removidos (se existiam antes e não estão mais na nova lista)
     const itemsToRemove = originalItems.filter(originalItem =>
       !newItemsData.some(newItem => newItem.loja_id === originalItem.loja_id)
     );
     for (const item of itemsToRemove) {
-      // 🚨 FIX CRÍTICO: Garante que a exclusão não envie filtro de filial (4º parâmetro = false)
       updatePromises.push(
         supabaseRequest(`expedition_items?id=eq.${item.id}`, 'DELETE', null, false)
       );
     }
 
-    // Itens a serem adicionados ou atualizados
     for (const newItem of newItemsData) {
       const existingItem = originalItems.find(originalItem => originalItem.loja_id === newItem.loja_id);
       
       if (existingItem) {
-        // Se já existe, verifica e atualiza
         const payload = {};
         let needsUpdate = false;
 
@@ -5849,20 +5502,17 @@ async function saveEditedExpedition() {
           needsUpdate = true;
         }
 
-        // NOVO: Verifica RollTrainers
         if (existingItem.rolltrainers !== newItem.rolltrainers) {
           payload.rolltrainers = newItem.rolltrainers;
           needsUpdate = true;
         }
         
         if (needsUpdate) {
-            // 🚨 FIX CRÍTICO: Garante que o PATCH não envie filtro de filial (4º parâmetro = false)
             updatePromises.push(
                 supabaseRequest(`expedition_items?id=eq.${existingItem.id}`, 'PATCH', payload, false)
             );
         }
       } else {
-        // Se não existe, adiciona
         const payload = {
           expedition_id: expeditionId,
           loja_id: newItem.loja_id,
@@ -5870,20 +5520,17 @@ async function saveEditedExpedition() {
           rolltrainers: newItem.rolltrainers,
           status_descarga: 'pendente'
         };
-        // 🚨 FIX CRÍTICO: Garante que o POST não envie filtro de filial (4º parâmetro = false)
         updatePromises.push(
           supabaseRequest('expedition_items', 'POST', payload, false)
         );
       }
     }
 
-    // Executar todas as atualizações
     await Promise.all(updatePromises);
 
     showNotification('Expedição atualizada com sucesso!', 'success');
     closeEditModal();
 
-    // Recarrega os dados para refletir as mudanças
     await loadSelectData();
     loadAcompanhamento();
   } catch (error) {
@@ -5892,19 +5539,14 @@ async function saveEditedExpedition() {
   }
 }
         
-       // CÓDIGO CORRIGIDO
 
-// SUBSTITUIR A FUNÇÃO deleteExpedition COMPLETA
 async function deleteExpedition(expeditionId) {
     const isMaster = masterUserPermission;
 
-    // 1. Verificar Permissão Principal
     const requiredPermission = 'excluir_expedicao'; // Termo em português, mas mantemos o fallback
     let canDelete = isMaster || hasPermission(requiredPermission);
     
-    // 🚨 FIX CRÍTICO: Checa formas alternativas de permissão de ação.
     if (!canDelete) {
-        // Ex: Se o BD tem o código de ação em inglês (delete_expeditions/delete_expedition)
         canDelete = hasPermission('delete_expeditions') || hasPermission('delete_expedition');
     }
 
@@ -5919,7 +5561,6 @@ async function deleteExpedition(expeditionId) {
         return;
     }
 
-    // 2. Aplicar Restrição de Status (SÓ PARA USUÁRIOS NORMAIS) - Master Bypass OK
     if (!isMaster && (expeditionToDel.status === 'saiu_para_entrega' || expeditionToDel.status === 'entregue')) {
         showNotification('Esta expedição não pode ser excluída, pois já saiu para entrega.', 'error');
         return;
@@ -5930,7 +5571,6 @@ async function deleteExpedition(expeditionId) {
         try {
             const updatePromises = [];
 
-            // 3. Liberar Recursos Alocados
             if (expeditionToDel.doca_id) {
                 updatePromises.push(
                     supabaseRequest(`docas?id=eq.${expeditionToDel.doca_id}`, 'PATCH', { status: 'disponivel' })
@@ -5964,7 +5604,6 @@ async function deleteExpedition(expeditionId) {
     }
 }
         
-        // --- FUNCIONALIDADES DA ABA CONFIGURAÇÕES ---
 
   async function loadConfiguracoes() {
     if (!currentUser) {
@@ -5997,7 +5636,6 @@ async function deleteExpedition(expeditionId) {
     }
 }
 
-        // SUBSTITUIR A VERSÃO EXISTENTE DE checkPassword
 async function checkPassword() {
     const nome = document.getElementById('userInput').value.trim();
     const senha = document.getElementById('passwordInput').value;
@@ -6024,7 +5662,6 @@ async function checkPassword() {
             grupoId: user.grupo_id
         };
 
-        // NOVO: Carregar as permissões do usuário
         await loadUserPermissions(currentUser.id, currentUser.grupoId);
 
         showNotification('Acesso concedido!', 'success');
@@ -6045,8 +5682,6 @@ async function checkPassword() {
             container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
         }
         
-      // Substitua a função showAddForm no seu script.js (cerca da linha 2689)
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
 function showAddForm(type, itemToEdit = null) {
     const modal = document.getElementById('addFormModal');
@@ -6056,11 +5691,9 @@ function showAddForm(type, itemToEdit = null) {
 
     let formHtml = '';
     
-    // Adiciona lógica de edição
     const isEditing = itemToEdit && typeof itemToEdit === 'object';
     const editData = isEditing ? itemToEdit : {};
     
-    // Atualiza o texto do botão salvar
     const saveButton = document.querySelector('#addFormModal button[type="submit"]');
     if (saveButton) {
         saveButton.textContent = isEditing ? 'Salvar Edição' : 'Salvar';
@@ -6165,10 +5798,8 @@ function showAddForm(type, itemToEdit = null) {
         `;
     } else if (type === 'acesso') { // LÓGICA DE USUÁRIO
         title.textContent = isEditing ? `Editar Usuário: ${editData.nome}` : `Adicionar Novo Usuário`;
-        // Usar gruposAcesso global para preencher o select
         const gruposHtml = gruposAcesso.map(g => `<option value="${g.id}" ${editData.grupo_id === g.id ? 'selected' : ''}>${g.nome}</option>`).join('');
         
-        // Se estiver editando, o itemToEdit.nome será o valor de 'acesso' a ser editado
         const nomeAcesso = editData.nome || '';
         
         formHtml = `
@@ -6182,7 +5813,6 @@ function showAddForm(type, itemToEdit = null) {
         `;
     } else if (type === 'pontoInteresse') {
         title.textContent = isEditing ? `Editar Ponto: ${editData.nome}` : 'Adicionar Ponto de Interesse';
-         // Lógica do select de lojas para preencher campos (apenas para a criação)
         const lojasOptions = lojas.map(loja => `<option value="${loja.id}">${loja.codigo} - ${loja.nome}</option>`).join('');
 
         formHtml = `
@@ -6226,7 +5856,6 @@ function showAddForm(type, itemToEdit = null) {
     fieldsContainer.innerHTML = formHtml;
     modal.style.display = 'flex';
     
-    // NOVO: Adicionar listener para o select de loja no Ponto de Interesse (apenas no modo de adição)
     if (type === 'pontoInteresse' && !isEditing) {
         const lojaSelect = document.getElementById('add_loja_id');
         if (lojaSelect) {
@@ -6369,8 +5998,6 @@ async function saveLider() {
         ativo: document.getElementById('add_ativo') ? document.getElementById('add_ativo').value === 'true' : true 
     };
     
-    // 🚨 AJUSTE CRÍTICO: Se estiver editando, não envie o código do funcionário 
-    // para evitar o erro de violação de chave única (409).
     if (isEdit) {
         delete data.codigo_funcionario; 
         
@@ -6428,7 +6055,6 @@ async function saveLider() {
     renderMotoristasConfig();
     return true;
 }
-      // SUBSTITUIR A VERSÃO EXISTENTE DE saveAcesso
 async function saveAcesso() {
     const isEdit = !!document.getElementById('edit_acesso_id');
     const userId = isEdit ? document.getElementById('edit_acesso_id').value : null;
@@ -6436,7 +6062,6 @@ async function saveAcesso() {
     const data = { 
         nome: document.getElementById('add_nome').value, 
         grupo_id: document.getElementById('add_grupo_id').value || null,
-        // Mantém tipo_acesso por compatibilidade, mas o campo de input foi removido
         tipo_acesso: 'CUSTOM' 
     };
     
@@ -6609,7 +6234,6 @@ async function deleteMotorista(motoristaId) {
                 `;
             }
         }
- // Variável global para o mapa
         let mapInstance = null;
         let markersLayer = null;
 
@@ -6619,7 +6243,6 @@ async function deleteMotorista(motoristaId) {
     document.getElementById('mapModalTitle').textContent = `Localização de ${vehiclePlaca}`;
     document.getElementById('mapModal').style.display = 'flex';
     
-    // Aguardar o modal aparecer antes de inicializar o mapa
     setTimeout(() => {
         initMap(lat, lng, vehiclePlaca);
     }, 100);
@@ -6705,20 +6328,16 @@ function initAllVehiclesAndLojasMap() {
 }
 
         function initMap(lat, lng, vehiclePlaca) {
-            // Destruir mapa existente se houver
             if (mapInstance) {
                 mapInstance.remove();
             }
             
-            // Criar novo mapa
             mapInstance = L.map('map').setView([lat, lng], 15);
             
-            // Adicionar camada do OpenStreetMap
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(mapInstance);
             
-            // Criar ícone personalizado para veículo
             const vehicleIcon = L.divIcon({
                 className: 'custom-marker',
                 html: `<div style="background: #0077B6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${vehiclePlaca}</div>`,
@@ -6726,33 +6345,27 @@ function initAllVehiclesAndLojasMap() {
                 iconAnchor: [40, 15]
             });
             
-            // Adicionar marcador do veículo
             L.marker([lat, lng], { icon: vehicleIcon })
                 .addTo(mapInstance)
                 .bindPopup(`<b>${vehiclePlaca}</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`);
         }
 
         function initAllVehiclesMap() {
-            // Destruir mapa existente se houver
             if (mapInstance) {
                 mapInstance.remove();
             }
             
-            // Criar novo mapa centrado em Cuiabá
             mapInstance = L.map('map').setView([-15.6014, -56.0979], 11);
             
-            // Adicionar camada do OpenStreetMap
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(mapInstance);
             
-            // Adicionar marcadores para todos os veículos
             const bounds = L.latLngBounds();
             
             rastreioData.forEach(rastreio => {
                 const { lat, lng } = rastreio.coordenadas;
                 
-                // Definir cor baseada no status
                 let color = '#0077B6'; // azul padrão
                 if (rastreio.status_rastreio === 'em_descarga') color = '#F59E0B'; // laranja
                 else if (rastreio.status_rastreio === 'retornando') color = '#10B981'; // verde
@@ -6779,7 +6392,6 @@ function initAllVehiclesAndLojasMap() {
                 bounds.extend([lat, lng]);
             });
             
-            // Ajustar zoom para mostrar todos os veículos
             if (rastreioData.length > 0) {
                 mapInstance.fitBounds(bounds, { padding: [20, 20] });
             }
@@ -6792,9 +6404,7 @@ function initAllVehiclesAndLojasMap() {
                 mapInstance = null;
             }
         }
-        // ===== ADICIONAR TODAS ESSAS FUNÇÕES NO SEU JAVASCRIPT =====
 
-// === FUNÇÕES PARA TRAJETO NO HISTÓRICO ===
 
 async function showTrajectoryMap(expeditionId, vehiclePlaca) {
     document.getElementById('mapModalTitle').textContent = `Trajeto da Viagem - ${vehiclePlaca}`;
@@ -6807,7 +6417,6 @@ async function showTrajectoryMap(expeditionId, vehiclePlaca) {
 
 
 
-// SUBSTITUIR A FUNÇÃO initTrajectoryMap COMPLETA
 async function initTrajectoryMap(expeditionId, vehiclePlaca) {
     try {
         if (mapInstance) {
@@ -6828,7 +6437,6 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             return;
         }
 
-        // 1. CONSTRUIR WAYPOINTS (CD + LOJAS)
         const waypoints = [
             L.latLng(selectedFilial.latitude_cd, selectedFilial.longitude_cd)
         ];
@@ -6840,7 +6448,6 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             }
         });
 
-        // Se não houver pontos suficientes para traçar rota
         if (waypoints.length < 2) {
              showNotification('Não há coordenadas de loja válidas para traçar a rota.', 'info');
              const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979];
@@ -6850,13 +6457,11 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
              return;
         }
 
-        // 2. CRIAR MAPA
         mapInstance = L.map('map');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(mapInstance);
         
-        // 3. CRIAR ROTEAMENTO COM TRATAMENTO DE ERRO ROBUSTO
         const routingControl = L.Routing.control({
             waypoints: waypoints,
             createMarker: function(i, waypoint, n) {
@@ -6892,13 +6497,11 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             show: false // Esconde o painel de instruções
         }).addTo(mapInstance);
         
-        // 4. TRATAMENTO DE SUCESSO
         routingControl.on('routesfound', function(e) {
             const route = e.routes[0];
             const distance = route.summary.totalDistance / 1000;
             const duration = route.summary.totalTime / 60;
             
-            // Ajustar o zoom do mapa para a rota completa
             try {
                 const bounds = route.bounds || L.latLngBounds(waypoints);
                 mapInstance.fitBounds(bounds, { padding: [30, 30] });
@@ -6908,7 +6511,6 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
                 mapInstance.fitBounds(fallbackBounds, { padding: [30, 30] });
             }
 
-            // Cria o painel de estatísticas
             const statsControl = L.control({ position: 'topright' });
             statsControl.onAdd = function() {
                 const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
@@ -6930,24 +6532,20 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
             showNotification('Rota calculada com sucesso!', 'success', 2000);
         });
         
-        // 5. TRATAMENTO DE ERRO CRÍTICO
         routingControl.on('routingerror', function(e) {
              console.error("Erro no Routing Machine:", e.error);
              
-             // Remove o controle com erro
              try {
                  mapInstance.removeControl(routingControl);
              } catch (err) {
                  console.warn('Erro ao remover controle:', err);
              }
              
-             // Ajusta zoom para os waypoints mesmo sem rota
              const boundsWaypoints = L.latLngBounds(waypoints);
              if (boundsWaypoints.isValid()) {
                  mapInstance.fitBounds(boundsWaypoints, { padding: [30, 30] });
              }
              
-             // Adiciona linha reta entre os pontos como fallback
              const fallbackPolyline = L.polyline(waypoints, {
                  color: '#F59E0B',
                  weight: 4,
@@ -6955,7 +6553,6 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
                  dashArray: '10, 10'
              }).addTo(mapInstance);
              
-             // Painel de aviso
              const warningControl = L.control({ position: 'topright' });
              warningControl.onAdd = function() {
                  const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
@@ -6978,11 +6575,9 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
              showNotification('Rota simplificada: Serviço OSRM instável. Linha reta exibida.', 'error', 5000);
         });
 
-        // 6. ESCONDER PAINEL DE INSTRUÇÕES
         const routingAlt = document.querySelector('.leaflet-routing-alt');
         if (routingAlt) routingAlt.style.display = 'none';
 
-        // 7. GARANTIA DE EXIBIÇÃO
         setTimeout(() => { 
             if (mapInstance) {
                 mapInstance.invalidateSize(); 
@@ -6995,7 +6590,6 @@ async function initTrajectoryMap(expeditionId, vehiclePlaca) {
         showNotification('Erro fatal ao carregar dados do trajeto.', 'error');
     }
 }
-// A função calculateTripStats também precisa ser ajustada para usar os dados do GPS
 function calculateTripStats(trajectoryData) {
     let distanciaTotal = 0;
     let velocidades = [];
@@ -7004,7 +6598,6 @@ function calculateTripStats(trajectoryData) {
         const p1 = trajectoryData[i - 1];
         const p2 = trajectoryData[i];
         
-        // Apenas calcula a distância se a velocidade for > 0, para ignorar paradas longas
         if (p2.velocidade > 0) {
             const lat1 = parseFloat(p1.latitude);
             const lon1 = parseFloat(p1.longitude);
@@ -7045,11 +6638,9 @@ function calculateTripStats(trajectoryData) {
     };
 }
 
-// === FUNÇÕES PARA PONTOS DE INTERESSE ===
 
 async function loadPontosInteresse() {
     try {
-        // Agora, a requisição busca os dados diretamente do banco de dados Supabase
         const pontosInteresseData = await supabaseRequest('pontos_interesse?order=nome', 'GET', null, false);
         
         if (!pontosInteresseData) {
@@ -7205,7 +6796,6 @@ async function addPontosInteresseToMap() {
     pontosInteresse.forEach(ponto => {
         if (!ponto.ativo) return;
         
-        // Ícone personalizado para o ponto
         const pontoIcon = L.divIcon({
             className: 'custom-marker',
             html: `<div style="background: ${ponto.cor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${ponto.tipo}</div>`,
@@ -7213,12 +6803,10 @@ async function addPontosInteresseToMap() {
             iconAnchor: [20, 10]
         });
         
-        // Adicionar marcador
         L.marker([ponto.latitude, ponto.longitude], { icon: pontoIcon })
             .addTo(mapInstance)
             .bindPopup(`<b>${ponto.nome}</b><br><small>${ponto.tipo}</small>`);
         
-        // Adicionar círculo de detecção
         L.circle([ponto.latitude, ponto.longitude], {
             color: ponto.cor,
             fillColor: ponto.cor,
@@ -7250,7 +6838,6 @@ async function initPontosInteresseMap() {
     
     await addPontosInteresseToMap();
     
-    // Ajustar zoom para mostrar todos os pontos
     if (pontosInteresse.length > 0) {
         const bounds = L.latLngBounds();
         pontosInteresse.forEach(ponto => {
@@ -7260,7 +6847,6 @@ async function initPontosInteresseMap() {
     }
 }
 
-// Função para detectar proximidade durante rastreamento
 function checkProximityToPontosInteresse(lat, lng) {
     const proximityAlerts = [];
     
@@ -7405,7 +6991,6 @@ async function renderLojasConfig() {
         tbody.innerHTML = `<tr><td colspan="6" class="alert alert-error">Erro ao carregar lojas: ${error.message}</td></tr>`;
     }
 }
-// --- FUNÇÕES DE EDIÇÃO E EXCLUSÃO ---
 
 async function editFilial(nomeFilial) {
     const filiais = await supabaseRequest(`filiais?nome=eq.${nomeFilial}`, 'GET', null, false);
@@ -7519,9 +7104,7 @@ async function deleteLider(liderId) {
     }
 }
 
-// SUBSTITUIR A VERSÃO EXISTENTE DE editAcesso
 async function editAcesso(nomeUsuario) {
-    // Busca o ID e o grupo_id para edição
     const acessosData = await supabaseRequest(`acessos?select=id,nome,grupo_id&nome=eq.${nomeUsuario}`, 'GET', null, false);
     if (!acessosData || acessosData.length === 0) {
         showNotification('Acesso não encontrado', 'error');
@@ -7690,13 +7273,11 @@ function showAllLojasMap() {
     }, 100);
 }
 
-// Cerca da linha 2167
 function initAllLojasMap() {
     if (mapInstance) {
         mapInstance.remove();
     }
     
-    // Ponto de partida dinâmico da filial
     const cdCoords = [selectedFilial.latitude_cd || -15.6014, selectedFilial.longitude_cd || -56.0979]; 
     
     mapInstance = L.map('map').setView(cdCoords, 11);
@@ -7816,7 +7397,6 @@ function calculateRouteToLoja(lojaId) {
 }
 
 
-// Novas funções para geolocalização da filial
 async function geocodeAddressFilial() {
     const endereco = document.getElementById('add_endereco_cd').value.trim();
     
@@ -7863,7 +7443,6 @@ function getCurrentLocationFilial() {
 }
 
 
-// SUBSTITUIR A VERSÃO EXISTENTE DE getRouteFromAPI
 async function getRouteFromAPI(waypoints) {
     if (!waypoints || waypoints.length < 2) {
         return null;
@@ -7876,12 +7455,10 @@ async function getRouteFromAPI(waypoints) {
         const response = await fetch(url);
         
         if (response.status === 429) {
-            // Limite de requisições. Lançar erro para que o allSettled capture.
             throw new Error('Limite de requisições OSRM (429)'); 
         }
         
         if (!response.ok) {
-            // Outros erros HTTP (404, 500, etc.)
             throw new Error(`Erro na API de roteamento: ${response.status}`);
         }
         
@@ -7895,24 +7472,18 @@ async function getRouteFromAPI(waypoints) {
                 coordinates: route.geometry.coordinates.map(c => [c[1], c[0]])
             };
         }
-        // Rota não encontrada
         return null;
     } catch (error) {
-        // 🚨 FIX CRÍTICO: Tratamento de erro de rede (Failed to fetch/Timeout) 🚨
         console.error('Falha crítica de rede/conexão OSRM:', error);
-        // Lança o erro para que o Promise.allSettled capture como 'rejected' e o fluxo continue.
         throw new Error('Falha de conexão OSRM: A rota não pôde ser calculada.'); 
     }
 }
 
 
-// NOVO CÓDIGO: Função para Snap-to-Road (Map Matching)
 async function getMapMatchedRoute(coordinates) {
     if (coordinates.length < 2) return null;
     
-    // Converte a lista de objetos LatLng em strings "lng,lat;lng,lat"
     const coordsString = coordinates.map(p => `${p.lng},${p.lat}`).join(';');
-    // Usa o endpoint Map Matching do OSRM para ajustar a rota às vias
     const url = `https://router.project-osrm.org/match/v1/driving/${coordsString}?geometries=geojson&steps=false&tidy=true`;
 
     try {
@@ -7921,7 +7492,6 @@ async function getMapMatchedRoute(coordinates) {
         
         const data = await response.json();
         if (data.matchings && data.matchings.length > 0) {
-            // Retorna as coordenadas ajustadas à rua
             return data.matchings[0].geometry.coordinates.map(c => [c[1], c[0]]);
         }
         return null;
@@ -7930,18 +7500,13 @@ async function getMapMatchedRoute(coordinates) {
         throw new Error('Falha no Map Matching: Servidor OSRM instável.');
     }
 }
-// NOVO: Função auxiliar para o Drag and Drop
 function getDragAfterElement(container, y) {
-    // Retorna todos os elementos arrastáveis que NÃO estão sendo arrastados
     const draggableElements = [...container.querySelectorAll('li[draggable="true"]:not(.dragging)')];
 
-    // Encontra o elemento mais próximo do ponto Y do cursor
     return draggableElements.reduce((closest, child) => {
         const box = child.getBoundingClientRect();
-        // Calcula a distância do meio do elemento até o cursor Y
         const offset = y - box.top - box.height / 2;
         
-        // Se a distância for negativa e mais próxima do zero (acima do meio do elemento)
         if (offset < 0 && offset > closest.offset) {
             return { offset: offset, element: child };
         } else {
@@ -7950,7 +7515,6 @@ function getDragAfterElement(container, y) {
     }, { offset: -Infinity }).element;
 }
 
-// ... O resto do seu script.js continua aqui
 
 async function openOrdemCarregamentoModal(expeditionId) {
     const modal = document.getElementById('ordemCarregamentoModal');
@@ -7960,7 +7524,6 @@ async function openOrdemCarregamentoModal(expeditionId) {
     modal.style.display = 'flex';
 
     try {
-        // Busca os itens da expedição e os dados das lojas associadas
         const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}&select=*,lojas(codigo,nome)`);
         
         if (!items || items.length === 0) {
@@ -7969,7 +7532,6 @@ async function openOrdemCarregamentoModal(expeditionId) {
             return;
         }
 
-        // Popula a lista com os itens arrastáveis
         list.innerHTML = items.map(item => `
             <li draggable="true" data-item-id="${item.id}" class="flex items-center">
                 <i data-feather="menu" class="drag-handle"></i>
@@ -7982,7 +7544,6 @@ async function openOrdemCarregamentoModal(expeditionId) {
 
         feather.replace(); // Renderiza os ícones (como o de arrastar)
 
-        // Adiciona os event listeners de drag-and-drop
         const draggables = list.querySelectorAll('li[draggable="true"]');
         draggables.forEach(draggable => {
             draggable.addEventListener('dragstart', () => {
@@ -8018,7 +7579,6 @@ function closeOrdemCarregamentoModal() {
     document.getElementById('ordemLojasList').innerHTML = '';
 }
 
-// SUBSTITUA A FUNÇÃO saveOrdemCarregamento COMPLETA
 async function saveOrdemCarregamento() {
     const expeditionId = document.getElementById('ordemExpeditionId').value;
     const orderedItems = document.querySelectorAll('#ordemLojasList li');
@@ -8028,7 +7588,6 @@ async function saveOrdemCarregamento() {
         return;
     }
 
-    // Cria um array de objetos para a atualização
     const updates = Array.from(orderedItems).map((item, index) => {
         return {
             id: item.dataset.itemId,
@@ -8037,32 +7596,25 @@ async function saveOrdemCarregamento() {
     });
 
     try {
-        // Cria uma lista de promessas de atualização, uma para cada item
         const updatePromises = updates.map(update => {
             const endpoint = `expedition_items?id=eq.${update.id}`; // Especifica o ID do item
             const payload = { ordem_entrega: update.ordem_entrega }; // Envia apenas o dado a ser atualizado
-            // 🚨 FIX CRÍTICO: Passa 'false' para não tentar injetar 'filial' no payload do item
             return supabaseRequest(endpoint, 'PATCH', payload, false); 
         });
 
-        // Executa todas as atualizações
         await Promise.all(updatePromises);
 
         showNotification('Ordem de carregamento salva com sucesso!', 'success');
         
         closeOrdemCarregamentoModal();
 
-        // Recarrega os dados
         loadTransportList();
         await loadSelectData(); 
     } catch (error) {
-        // A mensagem de erro agora virá do supabaseRequest, que já é detalhada
-        // Apenas para garantir, logamos o erro completo no console.
         console.error("Erro completo ao salvar ordem:", error);
         showNotification(`Erro ao salvar ordem de carregamento: ${error.message}`, 'error');
     }
 }
-// --- NOVAS FUNÇÕES DE RENDERIZAÇÃO PARA CONFIGURAÇÕES ---
 
 async function renderFiliaisConfig() {
     const tbody = document.getElementById('filiaisConfigBody');
@@ -8167,7 +7719,6 @@ function renderPontosInteresseConfig() {
     `).join('');
 }
 
-// SUBSTITUIR A VERSÃO EXISTENTE DE renderAcessosConfig (Cerca da linha 3290)
 async function renderAcessosConfig() {
     const tbody = document.getElementById('acessosConfigBody');
     if (!tbody) return;
@@ -8180,12 +7731,10 @@ async function renderAcessosConfig() {
     tbody.innerHTML = `<tr><td colspan="3" class="loading"><div class="spinner"></div>Carregando usuários e grupos...</td></tr>`;
 
     try {
-        // 1. Carregar Grupos de Acesso
         const gruposData = await supabaseRequest('grupos_acesso?order=nome', 'GET', null, false);
         let gruposHtml = '<tr><td colspan="3" class="font-bold text-center bg-gray-200">GRUPOS DE ACESSO</td></tr>';
         
         gruposData.forEach(grupo => {
-            // Usamos JSON.stringify e o replace para passar o objeto como string para o onclick
             const grupoJson = JSON.stringify(grupo).replace(/"/g, "'"); 
             gruposHtml += `
                 <tr class="hover:bg-gray-50">
@@ -8202,7 +7751,6 @@ async function renderAcessosConfig() {
             `;
         });
         
-        // 2. Carregar Usuários Individuais
         const acessosData = await supabaseRequest('acessos?select=id,nome,grupo_id(nome)&order=nome', 'GET', null, false);
         let acessosHtml = '<tr><td colspan="3" class="font-bold text-center bg-gray-200">USUÁRIOS INDIVIDUAIS</td></tr>';
 
@@ -8233,7 +7781,6 @@ async function renderAcessosConfig() {
     }
 }
 
-// Função para mostrar detalhes da expedição
 async function showDetalhesExpedicao(expeditionId) {
     const modal = document.getElementById('detalhesExpedicaoModal');
     const content = document.getElementById('detalhesContent');
@@ -8242,7 +7789,6 @@ async function showDetalhesExpedicao(expeditionId) {
     modal.style.display = 'flex';
     
     try {
-        // Buscar dados completos da expedição
         const expedition = await supabaseRequest(`expeditions?id=eq.${expeditionId}`, 'GET', null, false);
         const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}`, 'GET', null, false);
         
@@ -8258,12 +7804,10 @@ async function showDetalhesExpedicao(expeditionId) {
         
         let planilhaHTML = '';
         
-        // Gerar uma página para cada loja
         if (items && items.length > 0) {
             items.forEach((item, index) => {
                 const loja = lojas.find(l => l.id === item.loja_id);
                 
-                // Adicionar quebra de página antes de cada loja (exceto a primeira)
                 if (index > 0) {
                     planilhaHTML += '<div style="page-break-before: always;"></div>';
                 }
@@ -8345,7 +7889,6 @@ async function showDetalhesExpedicao(expeditionId) {
 `;
             });
         } else {
-            // Se não houver itens, mostrar mensagem
             planilhaHTML = `
                 <div class="planilha-controle">
                     <div class="planilha-header">DETALHES DA EXPEDIÇÃO</div>
@@ -8362,36 +7905,29 @@ async function showDetalhesExpedicao(expeditionId) {
     }
 }
 
-// Função para fechar modal de detalhes
 function closeDetalhesModal() {
     document.getElementById('detalhesExpedicaoModal').style.display = 'none';
 }
 
-// Função para imprimir detalhes
 function imprimirDetalhes() {
     window.print();
 }
-// --- FUNCIONALIDADES DA ABA OPERAÇÃO IDENTIFICAÇÃO ---
 async function loadOperacao() {
     const permittedOperacaoTabs = getPermittedSubTabs('operacao');
     if (permittedOperacaoTabs.length > 0) {
-        // Abre a única sub-aba permitida ou a padrão 'lancamento'
         const initialSubTab = permittedOperacaoTabs.length === 1 ? permittedOperacaoTabs[0] : 'lancamento';
         const initialElement = document.querySelector(`#operacao .sub-tabs button[onclick*="'${initialSubTab}'"]`);
         showSubTab('operacao', initialSubTab, initialElement);
     }
 }
 
-// SUBSTITUA a função loadIdentificacaoExpedicoes existente por esta:
 async function loadIdentificacaoExpedicoes() {
     const container = document.getElementById('expedicoesParaIdentificacao');
     const filterSelect = document.getElementById('identificacaoLojaFilter');
     container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expedições...</div>`;
-    // Limpa opções antigas, exceto a primeira ("Todas as Lojas")
     filterSelect.length = 1;
 
     try {
-        // Busca expedições que ainda não saíram para entrega
         const expeditions = await supabaseRequest("expeditions?status=in.(aguardando_agrupamento,aguardando_veiculo,em_carregamento,carregado,aguardando_faturamento,faturamento_iniciado,faturado)&order=data_hora.desc");
         const items = await supabaseRequest('expedition_items'); // Pega todos os itens relevantes
 
@@ -8401,7 +7937,6 @@ async function loadIdentificacaoExpedicoes() {
             return;
         }
 
-        // Mapeia os dados e armazena na variável global
         allIdentificacaoExpeditions = expeditions.map(exp => {
             const expItems = items.filter(item => item.expedition_id === exp.id);
             const lider = lideres.find(l => l.id === exp.lider_id);
@@ -8419,7 +7954,6 @@ async function loadIdentificacaoExpedicoes() {
             };
         }).filter(exp => exp.items.length > 0); // Garante que só expedições com itens sejam listadas
 
-        // --- POPULAR FILTRO DE LOJA ---
         const uniqueLojas = {};
         allIdentificacaoExpeditions.forEach(exp => {
             exp.items.forEach(item => {
@@ -8430,7 +7964,6 @@ async function loadIdentificacaoExpedicoes() {
             });
         });
 
-        // Ordena as lojas alfabeticamente pelo nome para o dropdown
         const sortedLojas = Object.entries(uniqueLojas).sort(([, nameA], [, nameB]) => nameA.localeCompare(nameB));
 
         sortedLojas.forEach(([id, name]) => {
@@ -8439,14 +7972,11 @@ async function loadIdentificacaoExpedicoes() {
             option.textContent = name;
             filterSelect.appendChild(option);
         });
-        // --- FIM POPULAR FILTRO ---
 
-        // Garante que as lojas estejam carregadas (caso ainda não estejam)
         if (lojas.length === 0) {
             await loadSelectData();
         }
 
-        // Aplica o filtro (que inicialmente mostrará todos)
         applyIdentificacaoFilter();
 
     } catch (error) {
@@ -8456,27 +7986,22 @@ async function loadIdentificacaoExpedicoes() {
 }
 
 
-// **** NOVA FUNÇÃO ****
 function applyIdentificacaoFilter() {
     const selectedLojaId = document.getElementById('identificacaoLojaFilter').value;
     let filteredData = allIdentificacaoExpeditions; // Começa com a lista completa
 
     if (selectedLojaId) {
-        // Filtra a lista: mantém apenas expedições que TENHAM a loja selecionada
         filteredData = allIdentificacaoExpeditions.filter(exp =>
             exp.items.some(item => item.loja_id === selectedLojaId)
         );
     }
 
-    // Chama a função de renderização com a lista filtrada
     renderIdentificacaoExpedicoes(filteredData);
 }
 
-// SUBSTITUA a função renderIdentificacaoExpedicoes existente por esta:
 function renderIdentificacaoExpedicoes(expeditionsToRender) { // Recebe a lista (filtrada ou não)
     const container = document.getElementById('expedicoesParaIdentificacao');
 
-    // Verifica se a lista A SER RENDERIZADA está vazia
     if (!expeditionsToRender || expeditionsToRender.length === 0) {
          container.innerHTML = '<div class="alert alert-info">Nenhuma expedição encontrada para o filtro selecionado.</div>';
          return;
@@ -8486,7 +8011,6 @@ function renderIdentificacaoExpedicoes(expeditionsToRender) { // Recebe a lista 
         const totalItens = exp.total_pallets + exp.total_rolltrainers;
         const lojasInfo = exp.items.map(item => {
             const loja = lojas.find(l => l.id === item.loja_id);
-            // Mostra quantidade junto com a loja para clareza
             return loja ? `${loja.codigo} (${item.pallets || 0}P/${item.rolltrainers || 0}R)` : 'N/A';
         }).join(', ');
 
@@ -8533,13 +8057,10 @@ function renderIdentificacaoExpedicoes(expeditionsToRender) { // Recebe a lista 
     }).join('');
 }
 
-// SUBSTITUIR A FUNÇÃO imprimirIdentificacao existente por esta versão corrigida:
 async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaId = null) {
     try {
-        // 1. Busca os itens da expedição e as informações das lojas
         let endpoint = `expedition_items?expedition_id=eq.${expeditionId}`;
 
-        // Aplica o filtro de loja, se fornecido
         if (lojaId) {
             endpoint += `&loja_id=eq.${lojaId}`;
         }
@@ -8554,13 +8075,11 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
         const hoje = new Date();
         const dataFormatada = hoje.toLocaleDateString('pt-BR');
 
-        // Remove qualquer div de impressão anterior
         const existingPrintDiv = document.getElementById('printIdentificationDiv');
         if (existingPrintDiv) {
             existingPrintDiv.remove();
         }
 
-        // Cria o container de impressão
         const printDiv = document.createElement('div');
         printDiv.id = 'printIdentificationDiv';
 
@@ -8723,16 +8242,13 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
 
         const filial = selectedFilial;
 
-        // Para cada item/loja da expedição, gerar suas etiquetas separadamente
         for (const item of items) {
             const loja = lojas.find(l => l.id === item.loja_id);
             if (!loja) continue;
 
             const lojaInfo = `${loja.codigo} - ${loja.nome}`;
-            // A quantidade total de etiquetas é a soma de Pallets e RollTrainers
             const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
 
-            // Criar etiquetas para esta loja específica
             for (let i = 1; i <= totalItensLoja; i++) {
                 etiquetasHtml += `
                     <div class="etiqueta-page">
@@ -8762,10 +8278,8 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
 
         showNotification(lojaId ? `Preparando impressão para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressão de todas as etiquetas.', 'info');
 
-        // Imprime
         setTimeout(() => {
             window.print();
-            // Remove o div após a impressão
             setTimeout(() => {
                 if (document.getElementById('printIdentificationDiv')) {
                     document.getElementById('printIdentificationDiv').remove();
@@ -8778,9 +8292,7 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
         showNotification('Erro ao carregar dados para impressão: ' + error.message, 'error');
     }
 }
-       // Inicialização
 document.addEventListener('DOMContentLoaded', async () => {
-    // Inicializar AOS (animações)
     if (typeof AOS !== 'undefined') {
         AOS.init({
             duration: 800,
@@ -8793,7 +8305,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function handleInitialLogin(event) {
     event.preventDefault();
-    // ✅ AJUSTE APLICADO: Use .trim() na senha para remover espaços em branco
     const nome = document.getElementById('initialUser').value.trim();
     const senha = document.getElementById('initialPassword').value.trim(); 
     const alertContainer = document.getElementById('initialLoginAlert');
@@ -8805,11 +8316,8 @@ async function handleInitialLogin(event) {
     alertContainer.innerHTML = '<div class="loading">Autenticando...</div>';
 
     try {
-        // GARANTIA: Reseta o estado global antes da autenticação
         selectedFilial = null;
 
-        // ✅ CORREÇÃO CRÍTICA: SEPARAÇÃO DO ENDPOINT E DOS FILTROS.
-        // A URL final que o proxy da Vercel receberá será: /api/proxy?endpoint=acessos&select=...
         const nomeEndpointBase = 'acessos';
         const filtros = `select=id,nome,grupo_id&nome=eq.${nome}&senha=eq.${senha}`;
         
@@ -8827,7 +8335,6 @@ async function handleInitialLogin(event) {
         
         const result = await authResponse.json();
 
-        // VALIDAÇÃO CRÍTICA: Se a resposta for vazia, significa falha na autenticação
         if (!result || result.length === 0 || !result[0]) {
             alertContainer.innerHTML = '<div class="alert alert-error">Usuário ou senha incorretos.</div>';
             return;
@@ -8840,16 +8347,13 @@ async function handleInitialLogin(event) {
             grupoId: user.grupo_id
         };
 
-        // 1. Carregar as permissões do usuário (Grupo + Individual)
         await loadUserPermissions(currentUser.id, currentUser.grupoId);
         
-        // 2. Se o usuário é Master, ele ganha acesso a todas as filiais
         if (masterUserPermission) {
             const todasFiliais = await supabaseRequest('filiais?select=nome&ativo=eq.true', 'GET', null, false);
             todasFiliais.forEach(f => userPermissions.push(`acesso_filial_${f.nome}`));
         }
 
-        // 3. Carrega as filiais ativas e determina o acesso/redirecionamento
         await loadFiliais(); 
 
         showNotification(`Bem-vindo, ${currentUser.nome}!`, 'success');
@@ -8864,19 +8368,14 @@ async function handleInitialLogin(event) {
     }
 }
 
-// SUBSTITUIR A VERSÃO EXISTENTE DE showMainSystem
 async function showMainSystem() {
-    // Oculta todas as telas de seleção
     document.getElementById('initialAuthContainer').style.display = 'none';
     document.getElementById('filialSelectionContainer').style.display = 'none';
-    // Exibe a tela principal
     document.getElementById('mainSystem').style.display = 'flex';
     
-    // 🚨 NOVO: Garante que a visibilidade do link 'Trocar Filial' seja checada no momento da exibição
     toggleFilialLinkVisibility();
 }
 
-// Função para permitir ao usuário trocar de filial
 function trocarFilial() {
     selectedFilial = null;
     document.getElementById('mainSystem').style.display = 'none';
@@ -8885,7 +8384,6 @@ function trocarFilial() {
 }
 
 
-// NOVO: Funções para CRUD de Grupos de Acesso
 function showAddGroupForm(grupo = null) {
     const modal = document.getElementById('addFormModal');
     const title = document.getElementById('addFormTitle');
@@ -8894,7 +8392,6 @@ function showAddGroupForm(grupo = null) {
     
     title.textContent = grupo ? `Editar Grupo: ${grupo.nome}` : `Adicionar Novo Grupo`;
     
-    // O campo 'grupo' é para salvar via handleSave.
     fieldsContainer.innerHTML = `
         ${grupo ? `<input type="hidden" id="edit_grupo_id" value="${grupo.id}">` : ''}
         <div class="form-group"><label>Nome do Grupo:</label><input type="text" id="add_nome" value="${grupo ? grupo.nome : ''}" required></div>
@@ -8903,7 +8400,6 @@ function showAddGroupForm(grupo = null) {
     modal.style.display = 'flex';
 }
 
-// NOVO: Função de salvar Grupo
 async function saveGroup() {
     const isEdit = !!document.getElementById('edit_grupo_id');
     const grupoId = isEdit ? document.getElementById('edit_grupo_id').value : null;
@@ -8918,13 +8414,11 @@ async function saveGroup() {
         await supabaseRequest('grupos_acesso', 'POST', data, false);
         showNotification('Grupo cadastrado com sucesso!', 'success');
     }
-    // Recarrega o array global de grupos e a tabela de configurações
     gruposAcesso = await supabaseRequest('grupos_acesso?order=nome', 'GET', null, false);
     renderAcessosConfig();
     return true;
 }
 
-// NOVAS FUNÇÕES: CRUD DE GRUPOS E GESTÃO DE PERMISSÕES
 async function editGroup(grupoId) {
     try {
         const grupo = await supabaseRequest(`grupos_acesso?id=eq.${grupoId}`, 'GET', null, false);
@@ -8951,7 +8445,6 @@ function closePermissionsModal() {
 
 
 
-// SUBSTITUIR A VERSÃO EXISTENTE DE managePermissionsModal
 async function managePermissionsModal(targetId, targetName, targetType) {
     const modal = document.getElementById('permissionsModal');
     const title = document.getElementById('permissionsModalTitle');
@@ -8966,21 +8459,17 @@ async function managePermissionsModal(targetId, targetName, targetType) {
     modal.style.display = 'flex';
 
     try {
-        // 1. Buscar todas as permissões base do sistema e filiais
         const allPermissionsBase = await supabaseRequest('permissoes_sistema?ativa=eq.true&order=categoria,nome', 'GET', null, false);
         const allFiliais = await supabaseRequest('filiais?ativo=eq.true&order=nome', 'GET', null, false);
         
-        // 🚨 FIX CRÍTICO: ADICIONAR PERMISSÕES DE SUB-ABA MANUALMENTE 🚨
         let allPermissions = [...allPermissionsBase];
         
-        // Mapeia todas as permissões de sub-aba do hardcoded map
         for (const viewId in subTabPermissionMap) {
             for (const subTabId in subTabPermissionMap[viewId]) {
                 const code = subTabPermissionMap[viewId][subTabId];
                 const name = subTabId.replace(/([A-Z])/g, ' $1').toLowerCase(); // Transforma 'faturamentoAtivo' em 'faturamento ativo'
                 const viewNome = viewId.charAt(0).toUpperCase() + viewId.slice(1);
                 
-                // Cria um objeto no formato esperado pela renderização
                 allPermissions.push({
                     codigo: code,
                     nome: `Visualizar ${name}`,
@@ -8990,18 +8479,14 @@ async function managePermissionsModal(targetId, targetName, targetType) {
             }
         }
         
-        // Classifica novamente a lista completa por categoria e nome
         allPermissions.sort((a, b) => {
             if (a.categoria !== b.categoria) {
-                // Prioriza as categorias Filial e Sub-Aba no topo
                 const order = { 'Acessos de Filial': 1, 'Sub-Aba': 2, 'Aba': 3, 'Ação': 4 };
                 return (order[a.categoria] || 99) - (order[b.categoria] || 99);
             }
             return a.nome.localeCompare(b.nome);
         });
         
-        // Fim do bloco de construção da lista mestra
-        // ====================================================================
 
         let currentPermissions = [];
         let isReadOnly = targetType !== 'grupo'; 
@@ -9025,9 +8510,6 @@ async function managePermissionsModal(targetId, targetName, targetType) {
         const saveButton = document.querySelector('#permissionsModal .btn-success');
         if (saveButton) saveButton.style.display = isReadOnly ? 'none' : 'block';
         
-        // ====================================================================
-        // A) RENDERIZAR PERMISSÕES DE ACESSO À FILIAL
-        // ====================================================================
         html += `<h4 class="font-bold text-lg text-gray-700 mt-4 mb-2 border-b pb-1">Acessos de Filial</h4>`;
         
         allFiliais.forEach(filial => {
@@ -9048,14 +8530,10 @@ async function managePermissionsModal(targetId, targetName, targetType) {
             `;
         });
         
-        // ====================================================================
-        // B) RENDERIZAR OUTRAS PERMISSÕES DO SISTEMA (ABAS, SUB-ABAS, AÇÕES)
-        // ====================================================================
 
         allPermissions.forEach(p => {
             if (p.categoria !== currentCategory) {
                 currentCategory = p.categoria;
-                // Evita repetir a categoria "Acessos de Filial"
                 if (currentCategory !== 'Acessos de Filial') {
                     html += `<h4 class="font-bold text-lg text-gray-700 mt-4 mb-2 border-b pb-1">${p.categoria}</h4>`;
                 }
@@ -9083,7 +8561,6 @@ async function managePermissionsModal(targetId, targetName, targetType) {
     }
 }
 
-// SUBSTITUIR A VERSÃO EXISTENTE DE savePermissions
 async function savePermissions() {
     const targetId = document.getElementById('permissionsTargetId').value;
     const targetType = document.getElementById('permissionsTargetType').value;
@@ -9091,7 +8568,6 @@ async function savePermissions() {
     const alert = document.getElementById('permissionsAlert');
     alert.innerHTML = '';
     
-    // Apenas grupos podem ter permissões salvas. Usuários são apenas para visualização.
     if (targetType !== 'grupo') {
         showNotification('Permissões de usuário individual não são mais permitidas. Use apenas Grupos.', 'error');
         closePermissionsModal();
@@ -9124,18 +8600,14 @@ async function saveGroupPermissions(grupoId, checkboxes, alert) {
         }
     });
 
-    // 1. Deletar permissões que foram desmarcadas
     if (permissionsToRemove.length > 0) {
         await supabaseRequest(`permissoes_grupo?grupo_id=eq.${grupoId}&permissao=in.(${permissionsToRemove.join(',')})`, 'DELETE', null, false);
     }
 
-    // 2. Inserir/Atualizar permissões selecionadas usando Upsert em lote
     if (permissionsToSave.length > 0) {
-        // 🚨 AJUSTE CRÍTICO: Força o UPSERT no 5º parâmetro (true) para evitar erro 409/duplicata de grupo 🚨
         await supabaseRequest('permissoes_grupo', 'POST', permissionsToSave, false, true);
     }
 }
-// NOVO: Função para renderizar as filiais permitidas na tela de seleção
 function renderFiliaisSelection(allowedFiliais) {
     const grid = document.getElementById('filiaisGrid');
     grid.innerHTML = '';
@@ -9150,7 +8622,6 @@ function renderFiliaisSelection(allowedFiliais) {
 }
 
 
-// SUBSTITUIR A VERSÃO EXISTENTE DE filterNavigationMenu
 function filterNavigationMenu() {
     const navItems = document.querySelectorAll('.nav-item');
     let firstPermittedViewId = null;
@@ -9158,7 +8629,6 @@ function filterNavigationMenu() {
     navItems.forEach(item => {
         const href = item.getAttribute('href');
         
-        // 🚨 FIX CRÍTICO: Garante que o item de navegação possui um href válido.
         if (!href || href.length <= 1) {
              item.style.display = 'none'; // Esconde o item inválido para segurança
              return;
@@ -9170,11 +8640,9 @@ function filterNavigationMenu() {
         let isPermitted = true;
 
         if (htmlPermission) {
-            // 1. Checa a permissão principal (incluindo o mapeamento 'view_')
             let isPrincipalPermitted = hasPermission(htmlPermission);
             
             if (!isPrincipalPermitted) {
-                // Tenta checar a permissão mapeada do BD ('acesso_' -> 'view_')
                 const mappedPermission = htmlPermission.replace('acesso_', 'view_');
                 if (hasPermission(mappedPermission)) {
                     isPrincipalPermitted = true;
@@ -9183,11 +8651,9 @@ function filterNavigationMenu() {
             
             isPermitted = isPrincipalPermitted;
 
-            // 2. Se for uma aba com sub-abas, aplica o filtro de sub-abas (só se a principal já estiver OK)
             if (isPermitted && subTabViewIds.has(viewId)) {
                 const permittedSubTabs = getPermittedSubTabs(viewId);
                 if (permittedSubTabs.length === 0) {
-                    // Requisito: Esconder aba principal se não houver sub-abas permitidas
                     isPermitted = false;
                 }
             }
@@ -9205,7 +8671,6 @@ function filterNavigationMenu() {
     return firstPermittedViewId;
 }
 
-// NOVA FUNÇÃO: Filtra sub-abas após a injeção do HTML
 function filterSubTabs() {
     const subTabItems = document.querySelectorAll('.sub-tab');
 
@@ -9213,22 +8678,18 @@ function filterSubTabs() {
         const htmlPermission = item.dataset.permission; 
         
         if (!htmlPermission) {
-            // Se não houver data-permission, assume que deve aparecer (ex: botão de filtro, etc.)
             item.style.display = 'flex'; 
             return;
         }
 
         let isPermitted = false;
         
-        // O valor do 'onclick' é o viewId (ex: 'faturamentoAtivo')
         const viewIdMatch = item.getAttribute('onclick').match(/'([^']*)','([^']*)'/);
         const subTabContentId = viewIdMatch ? viewIdMatch[2] : null; 
 
-        // 1. Checa a permissão conforme está no HTML (Ex: 'acesso_faturamento_ativo')
         if (hasPermission(htmlPermission)) {
             isPermitted = true;
         } else {
-            // 2. Mapeia o nome da permissão para o padrão 'view_' do BD e checa novamente
             const mappedPermission = htmlPermission.replace('acesso_', 'view_');
             if (hasPermission(mappedPermission)) {
                 isPermitted = true;
@@ -9238,7 +8699,6 @@ function filterSubTabs() {
         if (!isPermitted) {
             item.style.display = 'none';
             
-            // Garante que o conteúdo da sub-aba também seja escondido se for a aba ativa
             if (subTabContentId) {
                 const subTabContent = document.getElementById(subTabContentId);
                 if (subTabContent) {
@@ -9260,7 +8720,6 @@ async function loadFaturamentoData(subTabName = 'faturamentoAtivo') {
          container.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando expedições...</div>`;
 
         try {
-            // AJUSTE CRÍTICO: Incluir 'em_carregamento' e 'carregado' (e o novo status)
             const expeditions = await supabaseRequest("expeditions?status=in.(em_carregamento,carregado,aguardando_faturamento,faturamento_iniciado,faturado,em_carregamento_faturando)&order=data_hora.asc");
             const items = await supabaseRequest('expedition_items');
 
@@ -9291,7 +8750,6 @@ async function loadFaturamentoData(subTabName = 'faturamentoAtivo') {
 }
 
 
-// SUBSTITUIR A FUNÇÃO applyMotoristaStatusFilter COMPLETA
 function applyMotoristaStatusFilter() {
     const filterValue = document.getElementById('motoristaStatusFilter').value;
     const allMotoristas = window.motoristasDataCache || [];
@@ -9299,11 +8757,9 @@ function applyMotoristaStatusFilter() {
     let filteredList = allMotoristas;
 
     if (filterValue) {
-        // Trata múltiplos status separados por vírgula (Ex: retornando_cd,retornando_com_imobilizado)
         const statuses = filterValue.split(',').map(s => s.trim());
         
         if (statuses.length > 0 && statuses[0]) {
-            // Filtra motoristas cujos status estão na lista de filtros
             filteredList = allMotoristas.filter(m => statuses.includes(m.displayStatus));
         }
     }
@@ -9313,7 +8769,6 @@ function applyMotoristaStatusFilter() {
         listContainer.innerHTML = renderMotoristasListHtml(filteredList);
     }
     
-    // Garante que os timers sejam reiniciados apenas para os motoristas visíveis
     filteredList.forEach(m => {
         if (m.activeExp && m.displayStatus === 'saiu_para_entrega') {
              startMotoristaTimer(m);
@@ -9321,7 +8776,6 @@ function applyMotoristaStatusFilter() {
     });
 }
 
-// NOVO CÓDIGO: Função auxiliar para iniciar o timer do motorista (extraída para limpeza)
 function startMotoristaTimer(m) {
     const timerId = `motorista_${m.id}`;
     if(activeTimers[timerId]) clearInterval(activeTimers[timerId]);
@@ -9363,37 +8817,28 @@ async function openImprimirIdentificacaoModal(expeditionId) {
     document.getElementById('currentPrintExpeditionId').value = expeditionId;
     document.getElementById('printExpeditionIdDisplay').textContent = expeditionId;
 
-    // Resetar o estado do modal (ANTES de exibir)
     document.getElementById('lojaSelectionContainer').style.display = 'none';
     const secondaryBtn = document.querySelector('#printIdentificationModal .btn-secondary');
     if (secondaryBtn) secondaryBtn.style.display = 'block';
     lojaList.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando lojas...</div>`;
-    // modal.style.display = 'flex'; // <-- NÃO exibir o modal ainda
 
     try {
-        // Busca os itens da expedição e os dados das lojas associadas
         const items = await supabaseRequest(`expedition_items?expedition_id=eq.${expeditionId}&select=id,loja_id,pallets,rolltrainers,lojas(codigo,nome)`);
 
         if (!items || items.length === 0) {
-            // Se não houver itens, apenas mostra notificação e não abre modal
             showNotification('Nenhum item encontrado para esta expedição.', 'error');
             closePrintIdentificationModal(); // Garante que o modal feche se estiver aberto por algum motivo
             return;
         }
 
-        // ***** NOVO: LÓGICA PARA IMPRESSÃO DIRETA *****
         if (items.length === 1) {
-            // Apenas uma loja, imprime diretamente
             showNotification('Apenas uma loja. Imprimindo diretamente...', 'info', 2000);
             handlePrintChoice(items[0].loja_id); // Chama a função de impressão com o ID da única loja
             return; // Sai da função para não mostrar o modal
         }
-        // ***** FIM DA NOVA LÓGICA *****
 
-        // Se chegou aqui, há mais de uma loja, então mostra o modal
         modal.style.display = 'flex'; // <-- Exibe o modal AGORA
 
-        // Popula a lista de lojas (código existente)
         let lojasHtml = '';
         items.forEach(item => {
             const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
@@ -9412,11 +8857,8 @@ async function openImprimirIdentificacaoModal(expeditionId) {
         lojaList.innerHTML = lojasHtml;
 
     } catch (error) {
-         // Se der erro ao buscar, mostra no local da lista e fecha o modal se precisar
         lojaList.innerHTML = `<div class="alert alert-error">Erro ao carregar lojas: ${error.message}</div>`;
-         // Se o modal já estiver visível por algum motivo, esconde
          if (modal.style.display === 'flex') {
-             // Pode adicionar um botão para fechar ou fechar automaticamente
              setTimeout(closePrintIdentificationModal, 3000);
          }
     }
@@ -9429,23 +8871,18 @@ function closePrintIdentificationModal() {
 async function handlePrintChoice(lojaId) {
     const expeditionId = document.getElementById('currentPrintExpeditionId').value;
     
-    // 1. Busca informações adicionais necessárias para a impressão
     const expeditionData = await supabaseRequest(`expeditions?id=eq.${expeditionId}&select=lider_id,numeros_carga`);
     const lider = expeditionData[0].lider_id ? lideres.find(l => l.id === expeditionData[0].lider_id) : { nome: 'N/A' };
     const numeroCarga = expeditionData[0].numeros_carga && expeditionData[0].numeros_carga.length > 0 ? expeditionData[0].numeros_carga[0] : 'N/A';
 
     closePrintIdentificationModal();
     
-    // 2. Chama a função de impressão modificada (passando o ID da loja como filtro)
     imprimirIdentificacao(expeditionId, numeroCarga, lider.nome, lojaId);
 }
-// SUBSTITUIR A FUNÇÃO imprimirIdentificacao existente por esta versão corrigida:
 async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaId = null) {
     try {
-        // 1. Busca os itens da expedição e as informações das lojas
         let endpoint = `expedition_items?expedition_id=eq.${expeditionId}`;
 
-        // Aplica o filtro de loja, se fornecido
         if (lojaId) {
             endpoint += `&loja_id=eq.${lojaId}`;
         }
@@ -9460,13 +8897,11 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
         const hoje = new Date();
         const dataFormatada = hoje.toLocaleDateString('pt-BR');
 
-        // Remove qualquer div de impressão anterior
         const existingPrintDiv = document.getElementById('printIdentificationDiv');
         if (existingPrintDiv) {
             existingPrintDiv.remove();
         }
 
-        // Cria o container de impressão
         const printDiv = document.createElement('div');
         printDiv.id = 'printIdentificationDiv';
 
@@ -9629,16 +9064,13 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
 
         const filial = selectedFilial;
 
-        // Para cada item/loja da expedição, gerar suas etiquetas separadamente
         for (const item of items) {
             const loja = lojas.find(l => l.id === item.loja_id);
             if (!loja) continue;
 
             const lojaInfo = `${loja.codigo} - ${loja.nome}`;
-            // A quantidade total de etiquetas é a soma de Pallets e RollTrainers
             const totalItensLoja = (item.pallets || 0) + (item.rolltrainers || 0);
 
-            // Criar etiquetas para esta loja específica
             for (let i = 1; i <= totalItensLoja; i++) {
                 etiquetasHtml += `
                     <div class="etiqueta-page">
@@ -9668,10 +9100,8 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
 
         showNotification(lojaId ? `Preparando impressão para ${lojas.find(l => l.id === lojaId)?.nome || 'Loja'}.` : 'Preparando impressão de todas as etiquetas.', 'info');
 
-        // Imprime
         setTimeout(() => {
             window.print();
-            // Remove o div após a impressão
             setTimeout(() => {
                 if (document.getElementById('printIdentificationDiv')) {
                     document.getElementById('printIdentificationDiv').remove();
@@ -9685,15 +9115,12 @@ async function imprimirIdentificacao(expeditionId, numeroCarga, liderNome, lojaI
     }
 }
 
-// NOVA FUNÇÃO: Checa e controla a visibilidade do link "Trocar Filial"
 function toggleFilialLinkVisibility() {
     const link = document.getElementById('trocarFilialLink');
     if (!link) return;
 
-    // 1. Identifica todas as filiais permitidas para o usuário
     const allowedFiliais = filiais.filter(f => hasPermission(`acesso_filial_${f.nome}`));
 
-    // 2. Torna o link visível se o usuário puder acessar mais de uma filial (SUA REGRA)
     if (allowedFiliais.length > 1) {
         link.style.display = 'flex'; // Torna visível (usando 'flex' para manter o layout do nav-item)
     } else {
@@ -9701,13 +9128,8 @@ function toggleFilialLinkVisibility() {
     }
 }
 
-// NO ARQUIVO: genteegestapojp/teste/TESTE-SA/script.js
 
-// ... (Adicionar no final do arquivo)
 
-// ========================================
-// NOVAS FUNÇÕES DE CONTROLE (LOGOUT / REFRESH)
-// ========================================
 
 /**
  * Força a atualização de todos os dados da view ativa e recarrega selects.
@@ -9715,15 +9137,11 @@ function toggleFilialLinkVisibility() {
 async function forceRefresh() {
     showNotification('Atualizando dados e selects...', 'info');
     
-    // 1. Recarrega dados estáticos (Lojas, Veículos, etc.)
     await loadSelectData();
 
-    // 2. Garante que a view atual seja recarregada
     const activeNavItem = document.querySelector('.nav-item.active');
     const activeViewId = activeNavItem ? activeNavItem.getAttribute('href').substring(1) : 'home';
     
-    // Chamamos showView novamente para recarregar os dados da aba ativa
-    // Passamos o elemento ativo para que o showView não mude o foco
     showView(activeViewId, activeNavItem); 
     
     showNotification('Dados atualizados com sucesso!', 'success');
@@ -9734,26 +9152,149 @@ async function forceRefresh() {
  * Desloga o usuário e volta para a tela de autenticação inicial.
  */
 function logOut() {
-    // 1. Limpa o estado global
     selectedFilial = null;
     currentUser = null;
     userPermissions = [];
     masterUserPermission = false;
     
-    // 2. Limpa timers
     if (rastreioTimer) clearInterval(rastreioTimer);
     if (homeMapTimer) clearInterval(homeMapTimer);
     Object.values(activeTimers).forEach(clearInterval);
     activeTimers = {};
     
-    // 3. Oculta telas do sistema
     document.getElementById('mainSystem').style.display = 'none';
     document.getElementById('filialSelectionContainer').style.display = 'none';
 
-    // 4. Exibe a tela de login inicial
     document.getElementById('initialAuthContainer').style.display = 'flex';
     document.getElementById('initialLoginForm').reset();
     document.getElementById('initialLoginAlert').innerHTML = '';
 
     showNotification('Sessão encerrada.', 'info');
+}
+
+// --- FUNÇÕES DE CONTROLE MANUAL DA FROTA VIA ABA MOTORISTAS ---
+
+async function registrarSaidaCD(motoristaId, expId) {
+    if(!confirm('Confirmar Saída do CD?')) return;
+    try {
+        const now = new Date().toISOString();
+        
+        await supabaseRequest(`expeditions?id=eq.${expId}`, 'PATCH', {
+            status: 'saiu_para_entrega',
+            data_saida_veiculo: now
+        });
+        
+        await supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'PATCH', {
+            status: 'saiu_para_entrega'
+        });
+        
+        const expData = await supabaseRequest(`expeditions?id=eq.${expId}`, 'GET');
+        if (expData && expData[0] && expData[0].veiculo_id) {
+            await supabaseRequest('veiculos_status_historico', 'POST', {
+               veiculo_id: expData[0].veiculo_id,
+               status: 'saiu_para_entrega',
+               expedition_id: expId,
+               data_hora: now
+            }, false);
+            await supabaseRequest(`veiculos?id=eq.${expData[0].veiculo_id}`, 'PATCH', { status: 'em_viagem' });
+        }
+        showNotification('Saída do CD registrada!', 'success');
+        if(typeof loadMotoristaTab === 'function') loadMotoristaTab();
+    } catch(e) {
+        showNotification('Erro ao registrar Saída do CD: ' + e.message, 'error');
+    }
+}
+
+async function registrarChegadaLoja(motoristaId, expId) {
+    if(!confirm('Confirmar chegada em Loja?')) return;
+    try {
+        const now = new Date().toISOString();
+        
+        const itens = await supabaseRequest(`expedition_items?expedition_id=eq.${expId}&status=in.(pendente,em_viagem)`, 'GET');
+        
+        if (!itens || itens.length === 0) {
+            showNotification('Não há lojas pendentes para esta expedição.', 'error');
+            return;
+        }
+        
+        const lojaPendente = itens[0];
+        
+        await supabaseRequest(`expedition_items?id=eq.${lojaPendente.id}`, 'PATCH', {
+            status: 'em_descarga',
+            data_inicio_descarga: now
+        });
+        
+        await supabaseRequest(`expeditions?id=eq.${expId}`, 'PATCH', {
+            status: 'em_descarga'
+        });
+        
+        await supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'PATCH', {
+            status: 'em_viagem'
+        });
+        
+        showNotification('Chegada na loja registrada!', 'success');
+        if(typeof loadMotoristaTab === 'function') loadMotoristaTab();
+    } catch(e) {
+        showNotification('Erro ao registrar Chegada na Loja: ' + e.message, 'error');
+    }
+}
+
+function registrarSaidaLoja(motoristaId, expId) {
+    const modalHtml = `
+    <div id="saidaLojaModal" class="modal-overlay" style="display:flex;">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+             <h3 class="text-xl font-semibold mb-4">Saída da Loja</h3>
+             <p class="mb-4">Selecione o destino do motorista:</p>
+             <div class="flex flex-col gap-3">
+                 <button class="btn btn-primary" onclick="confirmarSaidaLoja('${motoristaId}', '${expId}', 'proxima_loja')">Próxima Loja (Continuar Viagem)</button>
+                 <button class="btn btn-success" onclick="confirmarSaidaLoja('${motoristaId}', '${expId}', 'retorno_cd')">Retorno Normal (Terminou Entregas)</button>
+                 <button class="btn btn-warning" onclick="confirmarSaidaLoja('${motoristaId}', '${expId}', 'retorno_imobilizado')">Retorno com Imobilizado</button>
+             </div>
+             <button class="btn btn-danger mt-4 w-full" onclick="document.getElementById('saidaLojaModal').remove()">Cancelar</button>
+        </div>
+    </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function confirmarSaidaLoja(motoristaId, expId, destino) {
+    document.getElementById('saidaLojaModal').remove();
+    try {
+        const now = new Date().toISOString();
+        
+        const itensEmDescarga = await supabaseRequest(`expedition_items?expedition_id=eq.${expId}&status=eq.em_descarga`, 'GET');
+        if (itensEmDescarga && itensEmDescarga.length > 0) {
+            const item = itensEmDescarga[0];
+            await supabaseRequest(`expedition_items?id=eq.${item.id}`, 'PATCH', {
+                status: 'entregue',
+                data_fim_descarga: now
+            });
+        }
+        
+        if (destino === 'proxima_loja') {
+             await supabaseRequest(`expeditions?id=eq.${expId}`, 'PATCH', { status: 'saiu_para_entrega' });
+             await supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'PATCH', { status: 'saiu_para_entrega' });
+             showNotification('Saída da loja registrada. Motorista segue viagem.', 'success');
+        } else if (destino === 'retorno_cd') {
+             await supabaseRequest(`expeditions?id=eq.${expId}`, 'PATCH', { status: 'entregue' });
+             await supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'PATCH', { status: 'retornando_cd' });
+             const expData = await supabaseRequest(`expeditions?id=eq.${expId}`, 'GET');
+             if(expData && expData[0]) {
+                 await supabaseRequest(`veiculos?id=eq.${expData[0].veiculo_id}`, 'PATCH', { status: 'retornando' });
+             }
+             showNotification('Expedição finalizada. Motorista em retorno ao CD.', 'success');
+        } else if (destino === 'retorno_imobilizado') {
+             await supabaseRequest(`expeditions?id=eq.${expId}`, 'PATCH', { status: 'entregue' });
+             await supabaseRequest(`motoristas?id=eq.${motoristaId}`, 'PATCH', { status: 'retornando_com_imobilizado' });
+             const expData = await supabaseRequest(`expeditions?id=eq.${expId}`, 'GET');
+             if(expData && expData[0]) {
+                 await supabaseRequest(`veiculos?id=eq.${expData[0].veiculo_id}`, 'PATCH', { status: 'retornando' });
+             }
+             showNotification('Expedição finalizada. Motorista em retorno COM IMOBILIZADO.', 'warning');
+        }
+        
+        if(typeof loadMotoristaTab === 'function') loadMotoristaTab();
+    } catch(e) {
+        showNotification('Erro ao registrar Saída da Loja: ' + e.message, 'error');
+    }
 }
